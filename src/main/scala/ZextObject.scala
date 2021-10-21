@@ -1,17 +1,21 @@
-import Direction.{Direction, east, north, opposing, south, west}
-import Globals._
-import Rule._
+import Globals.*
+import Query.Property
+import Rule.*
+import Direction.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.language.postfixOps
-import scala.reflect.{ClassTag, classTag}
+import scala.language.{implicitConversions, postfixOps}
 
-object world extends container{
+given container : Container = world
+
+object world extends Container{
 
     val start = bedRoom
     var playerName = "Zebra"
     var inventory = ArrayBuffer[ZextObject]()
+    var location : Room = null
+
 
     def main(args: Array[String]): Unit = {
         contents.foreach { i =>
@@ -20,7 +24,7 @@ object world extends container{
 
         contents.foreach(_ match {
             case r: Room =>
-                r.connections.foreach(c => println(c.direction + " of " + r.name + " is " + c.room.name))
+                r.connections.foreach(c => println(c.direction.toString + " of " + r.name + " is " + c.room.name))
         })
     }
 
@@ -38,11 +42,14 @@ trait Property {
 
 }
 
+
 object StringExpression{
-    implicit def fromString(str: => String)  = {
+    implicit def fromString(str : => String): StringExpression = {
         new StringExpression(str)
     }
 }
+
+
 
 class StringExpression(lazyStr : => String) {
     override def toString: String = {
@@ -54,16 +61,17 @@ class StringExpression(lazyStr : => String) {
 object holdable extends Property
 object fixed extends Property
 object scenery extends Property
+object wet extends Property
 case class initialDescription(desc : StringExpression) extends Property
 
-trait container {
+trait Container {
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
 }
 
-object Direction extends Enumeration {
-    type Direction = Value
-    val north, south, east, west = Value
+enum Direction:
+    case north, east, south, west
 
+object Direction{
 
     def opposing(direction: Direction) = {
         var ret : Direction = north
@@ -74,24 +82,26 @@ object Direction extends Enumeration {
 
         ret
     }
-
 }
+
 
 case class Connection(room: Room, direction : Direction)
 
-class Room extends ZextObject with container {
-    world.contents += this
+class Room(using container : Container) extends ZextObject with Container {
+    given currentContainer : Container = this
+    given room : Room = this
+
     val connections = ArrayBuffer[Connection]()
 
     def connect(direction: Direction)(implicit room : Room) = {
         room.connections += Connection(this, direction)
-        this.connections += Connection(room, opposing(direction))
+        this.connections += Connection(room, Direction.opposing(direction))
     }
 
 }
 
 
-class ZextObject {
+class ZextObject(using container : Container) {
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
     var name : StringExpression = ""
@@ -99,6 +109,9 @@ class ZextObject {
     var properties : ArrayBuffer[Property] = ArrayBuffer[Property]()
     var plural = false
     var proper = false
+
+    var parentContainer : Container = container
+    container.contents += this
 
     def definite : String = {
         if(proper)
@@ -124,12 +137,16 @@ class ZextObject {
         properties.contains(property)
     }
 
+    def get[P <: Property] = {
+
+    }
+
     override def toString: String = definite
 }
 
 
 
-class thing extends ZextObject{
+class thing(using container : Container) extends ZextObject{
 
     def desc(desc : StringExpression)  ={
         description = desc
@@ -178,13 +195,11 @@ class thing extends ZextObject{
         properties += prop
         this
     }
-
-
 }
 
-class person extends thing
+//class person extends thing
 
-class supporter extends thing with container
+class Supporter(using container: Container) extends thing with Container
 
 object Rule {
 
@@ -194,99 +209,86 @@ object Rule {
         val insteadRules = ArrayBuffer[ActionRule]()
     }
 
-
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
     val everyTurnRules = ArrayBuffer[Rule]()
 
-/*
-    def before[T : ClassTag](r : Action)(body : => Unit): Unit = {
-        ruleSets(r).beforeRules += new ActionRule[T](body)
+
+    class Consequence(r : Action, conditions: Condition*) {
+        def say(s : StringExpression): ActionRule = {
+            instead(r, conditions:_*)( Say(s) )
+        }
     }
 
-    def before[T : ClassTag](r : Action, noun : ZextObject)(body : => Unit) : Unit = {
-        val rule = new ActionRule[T](body)
-        rule.objectCondition = Option(noun)
+
+    def before(r : Action, conditions: Condition*)(body : => Boolean) : ActionRule  = {
+        val rule = new ActionRule(body)
+        rule.conditions = conditions
         ruleSets(r).beforeRules += rule
-    }
-*/
-
-    def instead(r : Action, conditions: Condition*)(body : => Unit) = {
-        val rule = new ActionRule(body)
-        ruleSets(r).insteadRules += rule
-        rule.conditions = conditions
         rule
     }
 
-    def instead(r : Action, noun : ZextObject, conditions: Condition*)(body : => Unit)  = {
+    def before(r : Action, conditions: Condition*)(body : => Unit) (implicit dummyImplicit: DummyImplicit) : ActionRule  = {
+        before(r, conditions:_*){ body; true }
+    }
+
+
+    def instead(r : Action, conditions: Condition*)(body : => Boolean) : ActionRule  = {
         val rule = new ActionRule(body)
-        rule.objectCondition = Option(noun)
         rule.conditions = conditions
         ruleSets(r).insteadRules += rule
         rule
     }
 
+    def instead(r : Action, conditions: Condition*)(body : => Unit) (implicit dummyImplicit: DummyImplicit) : ActionRule  = {
+        instead(r, conditions:_*){ body; false }
+    }
 
-    def instead(r : Action, typeCondition : Class[_], conditions: Condition* )(body : => Unit)  = {
-        val rule = new ActionRule(body)
-        rule.typeCondition = typeCondition
-        rule.conditions = conditions
-        rule.objectCondition = Option(noun)
-        ruleSets(r).insteadRules += rule
-        rule
+    def instead(r : Action, conditions: Condition*) : Consequence  = {
+        new Consequence(r, conditions:_*)
     }
 
 
 
+    def ResolveOverloads(rules : ArrayBuffer[ActionRule]): Option[ActionRule]  ={
+        val possible = rules.filter( _.possible )
+        if(possible.isEmpty)
+            return Option.empty
 
-    var ruleResult = true
-
-    def Fail() = {
-        ruleResult = false
-    }
-
-    // we will likely need some kind of overload resolution here.
-    // the inform book says they sort by specificity, in our case, we are applying ALL possible rules.
-
-    def ResolveOverloads() ={
-
+        val maxPrecedence = possible.map(_.precedence).max
+        val maxPrecedenceRules = possible.filter(_.precedence == maxPrecedence)
+        val rule = maxPrecedenceRules.maxBy(_.specificity)
+        Option(rule)
     }
 
     def execute(rule: Action, target: ZextObject): Unit = {
         val set = ruleSets(rule)
         noun = target
-        ruleResult = true
 
-
-
-        set.beforeRules.foreach { r =>
-            if(r.possible && ruleResult) {
-                r.execute
-            }
+        val beforeRule = ResolveOverloads(set.beforeRules)
+        if(beforeRule.isDefined){
+            if(!beforeRule.get.evaluate)
+                return
         }
 
-        set.insteadRules.foreach { r =>
-            if(r.possible && ruleResult) {
-                ruleResult = false
-                r.execute
-            }
+        val insteadRule = ResolveOverloads(set.insteadRules)
+        if(insteadRule.isDefined){
+            if(!insteadRule.get.evaluate)
+                return
         }
 
-        if(ruleResult){
-            if(target == null) {
-                ruleResult = rule.executeNone()
-            } else {
-                ruleResult = rule.executeOne(target)
-            }
+        if(target == null) {
+            if(!rule.executeNone())
+                return
+        } else {
+            if(!rule.executeOne(target.asInstanceOf[thing]))
+                return
         }
 
-        set.afterRules.foreach { r =>
-            if(r.possible && ruleResult) {
-                r.execute
-                ruleResult = false
-            }
+        val afterRule = ResolveOverloads(set.afterRules)
+        if(afterRule.isDefined){
+            if(!afterRule.get.evaluate)
+                return
         }
-
-
     }
 
 }
@@ -295,25 +297,14 @@ abstract class Rule {
     val disabled = false
 }
 
+enum Query:
+    case Generic, Class, Property, Object, Location
+
 object Condition{
-    implicit def fromBool(bool: => Boolean)  = {
-        new Condition(bool)
-    }
-}
+    // inform's precedence is something like
+    // location > object > property > class > generic
 
-
-class Condition( condition : => Boolean ) {
-    def evaluate = condition
-}
-
-class ActionRule(body : => Unit) extends Rule{
-
-    var typeCondition : Class[_] = classOf[ZextObject]
-    var objectCondition : Option[ZextObject] = None
-    var conditions = Seq[Condition]()
-    val depth = typeDepth
-
-    def typeDepth : Int = {
+    def CalculateTypeDepth(typeCondition : Class[_]) : Int = {
         var depth = 1
         val top = classOf[ZextObject]
         if(typeCondition == classOf[Nothing] || typeCondition == classOf[ZextObject])
@@ -329,80 +320,73 @@ class ActionRule(body : => Unit) extends Rule{
         depth
     }
 
+    implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, Query.Generic)
+    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, Query.Object)
+    implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
+    implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
+    implicit def fromClass(c : => Class[_]) : Condition = {
+        val condition = new Condition(c.isAssignableFrom(noun.getClass), Query.Class)
+        condition.specificity = CalculateTypeDepth(c)
+        condition
+    }
+}
+
+
+
+class Condition( condition : => Boolean, val queryType: Query ) {
+    def evaluate = condition
+    var specificity = 1
+
     def precedence = {
-        var ret = 0
+        queryType.ordinal
+    }
+}
 
-        if(typeCondition != classOf[Nothing])
-            ret = 1
+class ActionRule(body : => Boolean) extends Rule{
 
-        if (objectCondition.isDefined)
-            ret = 2;
+    var conditions = Seq[Condition]()
 
-        ret
+    def specificity = {
+        conditions.map( _.specificity ).sum
     }
 
+    def precedence ={
+        conditions.map(_.precedence).max
+    }
 
     def possible = {
-        var success = true
-
-        if (objectCondition.isDefined) {
-            success = success && (objectCondition.get == noun)
-        }
-        else if(typeCondition != classOf[Nothing]){
-            val nounClass = noun.getClass
-
-        }
-
-        conditions.foreach { c =>
-            success = success && c.evaluate
-        }
-
-        success
+        conditions.forall( _.evaluate )
     }
 
-    def execute = this.body
+    def evaluate = this.body
 }
 
 
 abstract class Action(verb : String*) extends Rule {
     def executeNone() : Boolean = false
     def executeOne(noun : ZextObject) : Boolean = false
-    def execute(nouns : ZextObject*) : Boolean = false
+    def executeTwo(first : ZextObject, second : ZextObject) : Boolean = false
+
+    ruleSets(this) = new ActionRuleSet
 }
 
 
 
 object Globals {
-    var location : Room = null
     var noun : ZextObject = null
-
-    /*
-    object the {
-        def noun = { SpecialStrings.noun.definite }
-    }
-
-    object a {
-        def noun = { SpecialStrings.noun.indefinite }
-    }
-    */
 
     object is {
         override def toString: String = Globals.noun.be
     }
 }
-import Globals._
 
 object taking extends Action("take", "get") {
 
-    ruleSets(this) = new ActionRuleSet
-
-    override def executeOne(noun : ZextObject) : Boolean = {
-        if(noun ? fixed){
-            Say(s"$noun $is stuck.")
-            return false
-        }
-
+    override def executeOne(zextObject: ZextObject) : Boolean = {
         Say(s"I took $noun.")
+        inventory += noun
+        val container = noun.parentContainer.contents
+        container.remove( container.indexOf(noun) )
         true
     }
 }
@@ -410,8 +394,6 @@ object taking extends Action("take", "get") {
 
 
 object examining extends Action("examine", "x", "look" ) {
-
-    ruleSets(this) = new ActionRuleSet
 
     override def executeNone() : Boolean = {
         Say(location.name)
@@ -426,64 +408,76 @@ object examining extends Action("examine", "x", "look" ) {
 }
 
 object bedRoom extends Room {
-    implicit val room = this
 
     name = "bedroom"
     description = "The loft of the apartment is large enough for a bed and a desk. You have neither."
-    val rock = new thing a "rock" is fixed desc "a fragment of the old mountain" has initialDescription(s"It's lodged in the floor. $playerName put it here")
-    val bob = new person named "Bob" desc "Bob is here for some reason."
-    new supporter the "table" is fixed desc "a plywood mishap held up on the suggestion of four legs."
-    val chairs = new thing some "chairs" are scenery and fixed desc "they're bolted to the floor."
-    val sheet = new thing a "sheet of paper" desc "incomprehensible scribbles litter the surface."
+    val rock = new thing a "rock" desc "a fragment of the old mountain" has initialDescription(s"It's lodged in the floor. $playerName put it here")
+    // val bob = new person named "Bob" desc "Bob is here for some reason."
+    val table = new Supporter the "table" is fixed desc "a plywood mishap held up on the suggestion of four legs."
+    val box = new Supporter the "box" desc "it's full of garbage."
+    val chairs = new thing some "chairs" are scenery and fixed desc "A committee of seats"
+    val sheet = new thing a "sheet of paper" is wet desc "incomprehensible scribbles litter the surface."
+    var time = 10
 
+    before(taking, rock) {
+        Say(s"I might make $playerName mad.")
+    }
 
-    val a = instead(taking, location == bathroom) {
+    before(examining, rock){
+        val init = noun.properties(0).asInstanceOf[initialDescription]
+        Say(init.desc)
+    }
+
+    instead(taking, bathroom) {
         Say("I shouldn't take anything in the bathroom.")
     }
 
-    val b = instead(taking, sheet){
+
+    instead(taking, bathroom, wet) say s"I might slip! The current time is $time."
+    instead(taking, time == 10) say "It's too early for taking."
+    instead(taking, classOf[Container]) say "It's too heavy."
+
+
+    instead(taking, sheet){
         Say("I've seen enough.")
     }
 
 
-    val c = instead(taking, bob) {
-        Say(s"I would think twice.")
+    instead(taking, fixed) {
+        Say(s"$noun $is stuck.")
     }
 
-    instead(taking, classOf[person]) {
-        Say(s"I should probably ask first.")
+    instead(taking, chairs){
+        Say("they're bolted to the floor.")
     }
-
-
-    val e = instead(taking, classOf[thing]) {
-        Say(s"taking of things is forbidden.")
-    }
-
 
     bathroom connect west
 
 
     def main(args: Array[String]): Unit = {
-        world.playerName = args(0)
-
-
-        connections.foreach( c => println(c.direction.toString + " is " + c.room.toString) )
         location = bedRoom
-        execute(examining, null)
-        execute(examining, rock)
-        execute(taking, sheet)
+        world.playerName = args(0)
         execute(taking, rock)
-        execute(taking, bob)
+        execute(taking, box)
+        time = 5
+        execute(taking, rock)
+        playerName = "Potato"
+        execute(examining, rock)
+        execute(taking, chairs)
+        execute(taking, table)
+        execute(taking, sheet)
         location = bathroom
-        execute(examining, null)
-        execute(taking, bob)
+        execute(taking, sheet)
+        execute(taking, chairs)
+        execute(taking, table)
+        time = 7
+        execute(taking, sheet)
 
     }
 }
 
 
 object bathroom extends Room {
-    implicit val room = this
     name = "bathroom"
 
 }
