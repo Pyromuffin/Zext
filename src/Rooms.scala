@@ -74,6 +74,8 @@ object bedRoom extends Room {
 
     def main(args: Array[String]): Unit = {
 
+        val potato = Macros.variableName
+        println(potato)
 
         location = bedRoom
         println(shoes.name)

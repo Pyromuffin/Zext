@@ -30,12 +30,21 @@ object Macros{
 
     import scala.quoted.*
 
+
+
+    inline def varvarName : String = {
+        ${ varvarNameImpl }
+    }
+
+
     inline def variableName : String = {
         ${ variableNameImpl }
     }
 
-    inline def varvarName : String = {
-        ${ varvarNameImpl }
+    def variableNameImpl(using Quotes): Expr[String] = {
+        import quotes.reflect.*
+        val callee = Symbol.spliceOwner.owner
+        Expr(callee.name)
     }
 
     def varvarNameImpl(using Quotes): Expr[String] = {
@@ -45,13 +54,7 @@ object Macros{
     }
 
 
-    def variableNameImpl(using Quotes): Expr[String] = {
-        import quotes.reflect.*
-        val callee = Symbol.spliceOwner.owner
-        Expr(callee.name)
-    }
 }
-
 
 def ZebraCode[T]()(using Type[T], Quotes): Expr[String] = {
     Expr(Type.show[T])

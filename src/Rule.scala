@@ -169,11 +169,13 @@ class ActionRule(body : => Boolean) extends Rule{
 }
 
 
-abstract class Action(verb : String*) extends Rule {
+abstract class Action(val verb : String*) extends Rule {
     def executeNone() : Boolean = false
     def executeOne(noun : ZextObject) : Boolean = false
     def executeTwo(first : ZextObject, second : ZextObject) : Boolean = false
 
-    ruleSets(this) = new ActionRuleSet
+    def Register() ={
+        ruleSets(this) = new ActionRuleSet
+    }
 }
 

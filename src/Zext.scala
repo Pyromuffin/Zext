@@ -5,6 +5,7 @@ import Globals.*
 import Query.Property
 import Rule.*
 import Direction.*
+import Interpreter.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -34,31 +35,12 @@ object World extends Container{
 }
 import World._
 
-object Interpreter{
-    def Say(str: StringExpression): Unit = {
-        println(str.toString.capitalize)
-    }
-}
-import Interpreter._
+
 
 trait Property {
 
 }
 
-
-object StringExpression{
-    implicit def fromString(str : => String): StringExpression = {
-        new StringExpression(str)
-    }
-}
-
-
-
-class StringExpression(lazyStr : => String) {
-    override def toString: String = {
-        lazyStr
-    }
-}
 
 
 object holdable extends Property
