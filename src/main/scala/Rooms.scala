@@ -11,18 +11,6 @@ import scala.language.postfixOps
 
 object bedRoom extends Room {
 
-    inline def Thing : thing = {
-        thing() a Macros.variableName
-    }
-
-    extension(d: StringExpression)  {
-        inline def Thing = {
-            thing() a Macros.variableName desc d
-        }
-        inline def unary_~ : thing = {
-            thing() a Macros.variableName desc d
-        }
-    }
 
 
     name = "bedroom"
@@ -103,5 +91,7 @@ object bedRoom extends Room {
 
 object bathroom extends Room {
     name = "bathroom"
-    description = "A damp closet, reeks of shotgun potpurri."
+    description = "A damp closet that reeks of shotgun potpourri."
+    val potpourri = ~ "By shotguns, for shotguns." is scenery
+
 }

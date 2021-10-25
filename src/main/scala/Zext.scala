@@ -118,14 +118,30 @@ class Room(using container : Container) extends ZextObject with Container {
 
     after(examining, classOf[Room]) {
         val r = noun.asInstanceOf[Room]
-        if(!r.contents.isEmpty){
+        val visible = r.contents.filterNot(_ ? scenery)
+        if(!visible.isEmpty){
             var s = "You can see "
-            for(i <- r.contents){
+            for(i <- visible){
+                if( !i.?(scenery) )
                 s += i.indefinite + ", "
             }
             s = s.stripSuffix(", ")
             s += "."
             Say(s)
+        }
+    }
+
+
+    inline def Thing : thing = {
+        thing() a Macros.variableName
+    }
+
+    extension(d: StringExpression)  {
+        inline def Thing = {
+            thing() a Macros.variableName desc d
+        }
+        inline def unary_~ : thing = {
+            thing() a Macros.variableName desc d
         }
     }
 
@@ -283,7 +299,6 @@ object examining extends Action("examine", "x", "look" ) {
     override def executeOne(noun : ZextObject) : Boolean = {
         val immediate = s"$noun: ${noun.description}"
         Say(immediate)
-        //Say(noun.description)
         true
     }
 }
