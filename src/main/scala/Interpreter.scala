@@ -1,7 +1,6 @@
 package Zext
 
 
-
 object StringExpression{
   implicit def fromString(str : => String): StringExpression = {
     new StringExpression(str)
@@ -23,8 +22,8 @@ object Interpreter{
 }
 
 import Interpreter.*
-import Zext.Rule.{ActionRuleSet, before, execute, ruleSets}
-import Zext.World.playerName
+import Zext.Rule.*
+import Zext.World.*
 
 import scala.util.parsing.combinator.*
 
@@ -43,8 +42,8 @@ object Parser extends RegexParsers{
     parser
   }
 
-  def TargetParser(noun: ZextObject) : Parser[ZextObject] = {
-    val words = Seq(noun.name) // .concat(noun.aliases.toSeq)
+  def NounParser(noun: ZextObject) : Parser[ZextObject] = {
+    val words = Seq(noun.name).concat(noun.aliases.toSeq)
     val parsers = words.map {
       _.toString.r ^^ { s => noun }
     }
@@ -52,22 +51,8 @@ object Parser extends RegexParsers{
     parser
   }
 
-  def RegisterVerbs() = {
-    // this is incredibly hideous but i do not care anymore.
-    import org.reflections.*
-    val zext = new Reflections("Zext")
-    val actionsClasses = zext.getSubTypesOf(classOf[Action])
-    actionsClasses.forEach { a =>
-      try{
-        val companion = a.getField("MODULE$").get(a).asInstanceOf[Action]
-      } catch {
-        case e : NoSuchFieldException => ;
-      }
-    }
-  }
 
   case class Command(action: Action, noun: Option[ZextObject])
-
 
   def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
     val command = actions ~ opt(nouns) ^^ { (a) => Command(a._1,a._2) }
@@ -75,7 +60,7 @@ object Parser extends RegexParsers{
   }
 
 
-  object exiting extends Action("exit") {
+  val exiting = new Action("exit") {
     override def executeNone(): Boolean = {
       Say(s"Goodbye $playerName")
       exit = true
@@ -86,13 +71,12 @@ object Parser extends RegexParsers{
 
   def main(args: Array[String]): Unit = {
     import scala.io.StdIn.readLine
-    RegisterVerbs()
     World.location = bedRoom
 
 
     val actions = ruleSets.keys
     val actionParser = actions.map(VerbParser(_)).reduce( _ | _ )
-    val nounParser = ZextObject.nouns.map(TargetParser(_)).reduce( _ | _)
+    val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ | _)
     val commandParser = CommandParser(actionParser, nounParser)
 
     execute(examining)

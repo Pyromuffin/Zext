@@ -1,6 +1,5 @@
 package Zext
 
-import Globals.*
 import Interpreter.*
 import World.*
 import Rule.*
@@ -194,12 +193,12 @@ class ActionRule(body : => Boolean) extends Rule{
 }
 
 
-abstract class Action(val verb : String*) extends Rule {
+class Action(val verb : String*) extends Rule {
     def executeNone() : Boolean = false
     def executeOne(noun : ZextObject) : Boolean = false
     def executeTwo(first : ZextObject, second : ZextObject) : Boolean = false
 
-    def Register() ={
+    def Register() = {
         ruleSets(this) = new ActionRuleSet
     }
 
