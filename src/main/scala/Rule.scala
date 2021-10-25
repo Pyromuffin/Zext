@@ -20,45 +20,64 @@ object Rule {
     val everyTurnRules = ArrayBuffer[Rule]()
 
 
-    class Consequence(r : Action, conditions: Condition*) {
-        def say(s : StringExpression): ActionRule = {
-            instead(r, conditions*)( Say(s) )
+    class Consequence(r: Action, conditions: Condition*) {
+        def say(s: StringExpression): ActionRule = {
+            instead(r, conditions *)(Say(s))
         }
     }
 
 
-    def before(r : Action, conditions: Condition*)(body : => Boolean) : ActionRule  = {
+    def before(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
         val rule = new ActionRule(body)
         rule.conditions = conditions
         ruleSets(r).beforeRules += rule
         rule
     }
 
-    def before(r : Action, conditions: Condition*)(body : => Unit) (implicit dummyImplicit: DummyImplicit) : ActionRule  = {
-        before(r, conditions*){ body; true }
+    def before(r: Action, conditions: Condition*)(body: => Unit)(implicit dummyImplicit: DummyImplicit): ActionRule = {
+        before(r, conditions *) {
+            body; true
+        }
     }
 
 
-    def instead(r : Action, conditions: Condition*)(body : => Boolean) : ActionRule  = {
+    def instead(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
         val rule = new ActionRule(body)
         rule.conditions = conditions
         ruleSets(r).insteadRules += rule
         rule
     }
 
-    def instead(r : Action, conditions: Condition*)(body : => Unit) (implicit dummyImplicit: DummyImplicit) : ActionRule  = {
-        instead(r, conditions*){ body; false }
+    def instead(r: Action, conditions: Condition*)(body: => Unit)(implicit dummyImplicit: DummyImplicit): ActionRule = {
+        instead(r, conditions *) {
+            body; false
+        }
     }
 
-    def instead(r : Action, conditions: Condition*) : Consequence  = {
-        new Consequence(r, conditions*)
+    def instead(r: Action, conditions: Condition*): Consequence = {
+        new Consequence(r, conditions *)
+    }
+
+
+    def after(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
+        val rule = new ActionRule(body)
+        rule.conditions = conditions
+        ruleSets(r).afterRules += rule
+        rule
+    }
+
+    def after(r: Action, conditions: Condition*)(body: => Unit)(implicit dummyImplicit: DummyImplicit): ActionRule = {
+        after(r, conditions *) {
+            body; true
+        }
     }
 
 
 
-    def ResolveOverloads(rules : ArrayBuffer[ActionRule]): Option[ActionRule]  ={
-        val possible = rules.filter( _.possible )
-        if(possible.isEmpty)
+
+    def ResolveOverloads(rules: ArrayBuffer[ActionRule]): Option[ActionRule] = {
+        val possible = rules.filter(_.possible)
+        if (possible.isEmpty)
             return Option.empty
 
         val maxPrecedence = possible.map(_.precedence).max
@@ -67,37 +86,43 @@ object Rule {
         Option(rule)
     }
 
-    def execute(rule: Action, target: ZextObject): Unit = {
+
+    def execute(rule: Action, target: Option[ZextObject] = None): Unit = {
         val set = ruleSets(rule)
-        noun = target
+
+        if (target.isDefined)
+            noun = target.get
 
         val beforeRule = ResolveOverloads(set.beforeRules)
-        if(beforeRule.isDefined){
-            if(!beforeRule.get.evaluate)
+        if (beforeRule.isDefined) {
+            if (!beforeRule.get.evaluate)
                 return
         }
 
         val insteadRule = ResolveOverloads(set.insteadRules)
-        if(insteadRule.isDefined){
-            if(!insteadRule.get.evaluate)
+        if (insteadRule.isDefined) {
+            if (!insteadRule.get.evaluate)
                 return
         }
 
-        if(target == null) {
-            if(!rule.executeNone())
+        if (target.isEmpty) {
+            if (!rule.executeNone())
                 return
         } else {
-            if(!rule.executeOne(target.asInstanceOf[thing]))
+            if (!rule.executeOne(target.get))
                 return
         }
 
         val afterRule = ResolveOverloads(set.afterRules)
-        if(afterRule.isDefined){
-            if(!afterRule.get.evaluate)
+        if (afterRule.isDefined) {
+            if (!afterRule.get.evaluate)
                 return
         }
     }
 
+    def execute(rule: Action, target: ZextObject): Unit = {
+        execute(rule, Some(target))
+    }
 }
 
 abstract class Rule {
@@ -158,7 +183,7 @@ class ActionRule(body : => Boolean) extends Rule{
     }
 
     def precedence ={
-        conditions.map(_.precedence).max
+        conditions.map(_.precedence).foldLeft(0)( _ max _ )
     }
 
     def possible = {
@@ -177,5 +202,7 @@ abstract class Action(val verb : String*) extends Rule {
     def Register() ={
         ruleSets(this) = new ActionRuleSet
     }
+
+    Register()
 }
 

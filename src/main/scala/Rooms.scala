@@ -19,7 +19,7 @@ object bedRoom extends Room {
         inline def Thing = {
             thing() a Macros.variableName desc d
         }
-        inline def unary_~ = {
+        inline def unary_~ : thing = {
             thing() a Macros.variableName desc d
         }
     }
@@ -35,7 +35,9 @@ object bedRoom extends Room {
     val sheet = new thing a "sheet of paper" is wet desc "incomprehensible scribbles litter the surface."
     var time = 10
 
-    val shoes = ~ "Standard checkerboard pattern." are scenery
+    val shoes = ~ "Standard checkerboard pattern."
+    shoes.indefiniteArticle = "some"
+
 
     before(taking, rock) {
         Say(s"I might make $playerName mad.")
@@ -52,8 +54,6 @@ object bedRoom extends Room {
 
 
     instead(taking, bathroom, wet) say s"I might slip! The current time is $time."
-    instead(taking, time == 10) say "It's too early for taking."
-    //instead(taking, classOf[Container]) say "It's too heavy."
 
 
     instead(taking, sheet){
@@ -103,5 +103,5 @@ object bedRoom extends Room {
 
 object bathroom extends Room {
     name = "bathroom"
-
+    description = "A damp closet, reeks of shotgun potpurri."
 }

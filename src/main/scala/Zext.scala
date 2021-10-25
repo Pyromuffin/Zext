@@ -21,16 +21,20 @@ object World extends Container{
     var location : Room = null
 
 
-    def main(args: Array[String]): Unit = {
-        contents.foreach { i =>
-            println(i.indefinite)
-        }
+    object takingInventory extends Action("inventory", "i"){
 
-        contents.foreach(_ match {
-            case r: Room =>
-                r.connections.foreach(c => println(c.direction.toString + " of " + r.name + " is " + c.room.name))
-        })
+        override def executeNone() = {
+            var s = "I am holding "
+            for(i <- inventory){
+                s += i.indefinite + ", "
+            }
+            s = s.stripSuffix(", ")
+            s += "."
+            Say(s)
+            true
+        }
     }
+
 
 }
 import World._
@@ -67,6 +71,20 @@ object Direction{
 
         ret
     }
+
+    for(i <- Direction.values) {
+        val action = new Action(i.toString) {
+            override def executeNone() = {
+                val other = location.connections.get(i)
+                other.foreach { r =>
+                  Say(s"I went $i to $r.\n")
+                    location = r
+                    execute(examining)
+                }
+                true
+            }
+        }
+    }
 }
 
 
@@ -76,13 +94,37 @@ class Room(using container : Container) extends ZextObject with Container {
     given currentContainer : Container = this
     given room : Room = this
 
-    val connections = ArrayBuffer[Connection]()
+    val connections = mutable.HashMap[Direction, Room]()
 
     def connect(direction: Direction)(implicit room : Room) = {
-        room.connections += Connection(this, direction)
-        this.connections += Connection(room, Direction.opposing(direction))
+        room.connections(direction) = this
+        this.connections(opposing(direction)) = room
     }
 
+    object going extends Action("go") {
+        override def executeOne(noun: ZextObject): Boolean = {
+
+            true
+        }
+    }
+
+    after(examining, classOf[Room]) {
+        val r = noun.asInstanceOf[Room]
+        if(!r.contents.isEmpty){
+            var s = "You can see "
+            for(i <- r.contents){
+                s += i.indefinite + ", "
+            }
+            s = s.stripSuffix(", ")
+            s += "."
+            Say(s)
+        }
+    }
+
+}
+
+object ZextObject {
+    val nouns = ArrayBuffer[ZextObject]()
 }
 
 
@@ -90,6 +132,7 @@ class ZextObject(using container : Container) {
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
     var name : StringExpression = ""
+    var aliases = ArrayBuffer[StringExpression]()
     var description : StringExpression = ""
     var properties : ArrayBuffer[Property] = ArrayBuffer[Property]()
     var plural = false
@@ -97,6 +140,8 @@ class ZextObject(using container : Container) {
 
     var parentContainer : Container = container
     container.contents += this
+
+    ZextObject.nouns += this
 
     def definite : String = {
         if(proper)
@@ -201,6 +246,12 @@ object Globals {
 
 object taking extends Action("take", "get") {
 
+
+    override def executeNone() : Boolean = {
+        Say(s"I can't take nothing.")
+        true
+    }
+
     override def executeOne(zextObject: ZextObject) : Boolean = {
         Say(s"I took $noun.")
         inventory += noun
@@ -215,6 +266,7 @@ object taking extends Action("take", "get") {
 object examining extends Action("examine", "x", "look" ) {
 
     override def executeNone() : Boolean = {
+        noun = location
         Say(location.name)
         Say(location.description)
         true
