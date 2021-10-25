@@ -1,5 +1,11 @@
 package Zext
 
+import Interpreter.*
+import Rule.*
+import World.*
+import Zext.*
+import Actions.*
+
 
 object StringExpression{
   implicit def fromString(str : => String): StringExpression = {
@@ -21,9 +27,7 @@ object Interpreter{
   }
 }
 
-import Interpreter.*
-import Zext.Rule.*
-import Zext.World.*
+
 
 import scala.util.parsing.combinator.*
 
@@ -60,20 +64,13 @@ object Parser extends RegexParsers{
   }
 
 
-  val exiting = new Action("exit") {
-    override def executeNone(): Boolean = {
-      Say(s"Goodbye $playerName")
-      exit = true
-      true
-    }
-  }
 
 
   def main(args: Array[String]): Unit = {
     import scala.io.StdIn.readLine
-    World.location = bedRoom
+    World.Init()
 
-
+    
     val actions = ruleSets.keys
     val actionParser = actions.map(VerbParser(_)).reduce( _ | _ )
     val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ | _)

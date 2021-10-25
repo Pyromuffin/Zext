@@ -13,6 +13,7 @@ object Rule {
         val beforeRules = ArrayBuffer[ActionRule]()
         val afterRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
+        val reportRules = ArrayBuffer[ActionRule]()
     }
 
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
@@ -51,6 +52,13 @@ object Rule {
         instead(r, conditions *) {
             body; false
         }
+    }
+
+    def report(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+        val rule = new ActionRule( {body; true} )
+        rule.conditions = conditions
+        ruleSets(r).reportRules += rule
+        rule
     }
 
     def instead(r: Action, conditions: Condition*): Consequence = {
@@ -116,6 +124,11 @@ object Rule {
         if (afterRule.isDefined) {
             if (!afterRule.get.evaluate)
                 return
+        }
+
+        val reportRule = ResolveOverloads(set.reportRules)
+        if(reportRule.isDefined){
+            reportRule.get.evaluate
         }
     }
 
@@ -198,10 +211,8 @@ class Action(val verb : String*) extends Rule {
     def executeOne(noun : ZextObject) : Boolean = false
     def executeTwo(first : ZextObject, second : ZextObject) : Boolean = false
 
-    def Register() = {
-        ruleSets(this) = new ActionRuleSet
-    }
+    ruleSets(this) = new ActionRuleSet
 
-    Register()
+    override def toString = verb(0)
 }
 

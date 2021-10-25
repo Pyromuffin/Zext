@@ -138,6 +138,14 @@ class thing(using container : Container) extends ZextObject{
         this
     }
 
+
+    def mass = {
+        plural = true
+        indefiniteArticle = "some"
+        this
+    }
+
+
     def named(name : String) = {
         SetName(name)
         proper = true
@@ -158,36 +166,3 @@ class thing(using container : Container) extends ZextObject{
 class Supporter(using container: Container) extends thing with Container
 
 
-val taking = new Action("take", "get") {
-
-    override def executeNone() : Boolean = {
-        Say(s"I can't take nothing.")
-        true
-    }
-
-    override def executeOne(zextObject: ZextObject) : Boolean = {
-        Say(s"I took $noun.")
-        inventory += noun
-        val container = noun.parentContainer.contents
-        container.remove( container.indexOf(noun) )
-        true
-    }
-}
-
-
-
-val examining = new Action("examine", "x", "look" ) {
-
-    override def executeNone() : Boolean = {
-        noun = location
-        Say(location.name)
-        Say(location.description)
-        true
-    }
-
-    override def executeOne(noun : ZextObject) : Boolean = {
-        val immediate = s"$noun: ${noun.description}"
-        Say(immediate)
-        true
-    }
-}

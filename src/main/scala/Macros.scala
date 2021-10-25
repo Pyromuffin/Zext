@@ -54,6 +54,22 @@ object Macros{
     }
 
 
+    inline def TouchEveryone[T](something : T) : List[Any] = {
+        ${ TouchEveryoneImpl( '{something} ) }
+    }
+
+
+    def TouchEveryoneImpl[T](something : Expr[T])(using Quotes)(using t : Type[T]): Expr[List[Any]] = {
+        import quotes.reflect.*
+
+        val exprTree: Term = something.asTerm
+        val tpr = TypeRepr.of[T]
+        val symbol = tpr.typeSymbol
+        val fields = symbol.declaredFields
+        val listExprs : List[Expr[Any]] = fields.map(exprTree.select(_).asExpr)
+        Expr.ofList(listExprs)
+    }
+
 }
 
 def ZebraCode[T]()(using Type[T], Quotes): Expr[String] = {

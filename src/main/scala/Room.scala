@@ -4,6 +4,7 @@ import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.Rule.{after, execute}
 import Zext.World.{location, noun}
+import Actions.*
 
 import scala.collection.mutable
 
@@ -43,6 +44,8 @@ object Direction{
   }
 }
 
+
+
 class Room(using container : Container) extends ZextObject with Container {
   given currentContainer : Container = this
   given room : Room = this
@@ -55,18 +58,5 @@ class Room(using container : Container) extends ZextObject with Container {
   }
 
 
-  after(examining, classOf[Room]) {
-    val r = noun.asInstanceOf[Room]
-    val visible = r.contents.filterNot(_ ? scenery)
-    if(!visible.isEmpty){
-      var s = "You can see "
-      for(i <- visible){
-        if( !i.?(scenery) )
-          s += i.indefinite + ", "
-      }
-      s = s.stripSuffix(", ")
-      s += "."
-      Say(s)
-    }
-  }
+
 }
