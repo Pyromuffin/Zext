@@ -73,14 +73,22 @@ object Direction{
     }
 
     for(i <- Direction.values) {
-        val action = new Action(i.toString) {
+        val str : String = i.toString
+        val action = new Action(str, str.charAt(0).toString) {
             override def executeNone() = {
                 val other = location.connections.get(i)
-                other.foreach { r =>
-                  Say(s"I went $i to $r.\n")
-                    location = r
-                    execute(examining)
+                other match{
+                    case Some(r) => {
+                        Say(s"I went $i to $r.\n")
+                        location = r
+                        execute(examining)
+                    }
+                    case _ => {
+                        Say(s"I can't go $str.")
+                    }
                 }
+
+
                 true
             }
         }
