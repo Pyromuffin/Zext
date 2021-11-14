@@ -35,6 +35,7 @@ import scala.util.parsing.combinator.*
 object Parser extends RegexParsers{
 
   var exit = false
+  override def skipWhitespace = false
 
 
   def VerbParser(action: Action) : Parser[Action] = {
@@ -59,7 +60,7 @@ object Parser extends RegexParsers{
   case class Command(action: Action, noun: Option[ZextObject])
 
   def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
-    val command = actions ~ opt(nouns) ^^ { (a) => Command(a._1,a._2) }
+    val command = actions ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1, a._2) }
     command
   }
 
@@ -72,8 +73,8 @@ object Parser extends RegexParsers{
 
     
     val actions = ruleSets.keys
-    val actionParser = actions.map(VerbParser(_)).reduce( _ | _ )
-    val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ | _)
+    val actionParser = actions.map(VerbParser(_)).reduce( _ ||| _ )
+    val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ ||| _)
     val commandParser = CommandParser(actionParser, nounParser)
 
     execute(examining)
@@ -81,10 +82,12 @@ object Parser extends RegexParsers{
     while(!exit){
       print("> ")
       val input = readLine()
-      val command = parse(commandParser, input)
+      val command = parseAll(commandParser, input)
       if(command.successful){
         val c = command.get
         execute(c.action, c.noun)
+      } else {
+        Say("I'm not sure what you mean.")
       }
     }
   }

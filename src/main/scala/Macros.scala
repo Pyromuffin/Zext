@@ -30,6 +30,47 @@ object Macros{
 
     import scala.quoted.*
 
+/*
+    inline def packageToucher[T](something : T) : List[Any] = {
+        ${ packageToucherImpl('something) }
+    }
+
+    def packageToucherImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[Any]] = {
+        import quotes.reflect.*
+
+        val _package = TypeRepr.of[T].termSymbol.owner
+        val expr = _package.tree.asExpr
+        val objects = _package.declaredFields
+        val objects  = actions(0).tree match{
+            case ValDef(x, y, z) => z
+        }
+        val companion = actionType.get.asExpr
+        //val expr = companion.tree.asExpr
+
+        //val exprs = actions.map(a => a.termSymbol.tree.asExpr)
+        //val fields : List[Expr[Any]] = zext.declaredFields.map( f => zextTree.select(f).asExpr )
+        val names = actions.map( a => Expr(a.name))
+        Expr.ofList(List(companion))
+    }
+*/
+
+
+    inline def packageToucher[T](something : T) : List[Any] = {
+        ${ packageToucherImpl('something) }
+    }
+
+    def packageToucherImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[Any]] = {
+        import quotes.reflect.*
+        // assume something is a top level object
+        val _package = TypeRepr.of[T].typeSymbol.owner
+        val fields = _package.declaredFields
+        val packageExpr = _package.tree.asExpr //  assertion failed: Cannot get tree of package symbol
+        val packageTree = packageExpr.asTerm
+        val fieldExprs : List[Expr[Any]] = fields.map( f => packageTree.select(f).asExpr)
+
+        Expr.ofList(fieldExprs)
+    }
+
 
 
     inline def varvarName : String = {
@@ -81,6 +122,5 @@ def ZebraCode[T]()(using Type[T], Quotes): Expr[String] = {
 def fullClassNameImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[String] =
     import quotes.reflect.*
     Expr(TypeTree.of[T].symbol.fullName)
-
 
 

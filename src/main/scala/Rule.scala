@@ -7,11 +7,14 @@ import Rule.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import scala.reflect.ClassTag
+
 object Rule {
 
     class ActionRuleSet {
         val beforeRules = ArrayBuffer[ActionRule]()
         val afterRules = ArrayBuffer[ActionRule]()
+        val executeRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
         val reportRules = ArrayBuffer[ActionRule]()
     }
@@ -28,8 +31,7 @@ object Rule {
 
 
     def before(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
-        val rule = new ActionRule(body)
-        rule.conditions = conditions
+        val rule = new ActionRule(body, conditions*)
         ruleSets(r).beforeRules += rule
         rule
     }
@@ -42,8 +44,7 @@ object Rule {
 
 
     def instead(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
-        val rule = new ActionRule(body)
-        rule.conditions = conditions
+        val rule = new ActionRule(body, conditions*)
         ruleSets(r).insteadRules += rule
         rule
     }
@@ -55,11 +56,19 @@ object Rule {
     }
 
     def report(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule( {body; true} )
-        rule.conditions = conditions
+        val rule = new ActionRule( {body; true}, conditions* )
         ruleSets(r).reportRules += rule
         rule
     }
+
+
+    def report[T](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ tag.runtimeClass)* )
+        ruleSets(r).reportRules += rule
+        rule
+    }
+
+
 
     def instead(r: Action, conditions: Condition*): Consequence = {
         new Consequence(r, conditions *)
@@ -67,8 +76,7 @@ object Rule {
 
 
     def after(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
-        val rule = new ActionRule(body)
-        rule.conditions = conditions
+        val rule = new ActionRule(body, conditions*)
         ruleSets(r).afterRules += rule
         rule
     }
@@ -80,10 +88,27 @@ object Rule {
     }
 
 
+    def carryOut(r: Action, conditions: Condition*)(body: => Boolean) : ActionRule = {
+        val rule = new ActionRule(body, conditions*)
+        ruleSets(r).executeRules += rule
+        rule
+    }
+
+    def carryOut[T](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ tag.runtimeClass)* )
+        ruleSets(r).executeRules += rule
+        rule
+    }
+
+    def carryOut[T1, T2](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean) : ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]) }, conditions* )
+        ruleSets(r).executeRules += rule
+        rule
+    }
 
 
-    def ResolveOverloads(rules: ArrayBuffer[ActionRule]): Option[ActionRule] = {
-        val possible = rules.filter(_.possible)
+    def ResolveOverloads(rules: ArrayBuffer[ActionRule], targets : Int): Option[ActionRule] = {
+        val possible = rules.filter(_.targets == targets).filter(_.possible)
         if (possible.isEmpty)
             return Option.empty
 
@@ -94,45 +119,50 @@ object Rule {
     }
 
 
-    def execute(rule: Action, target: Option[ZextObject] = None): Unit = {
+    def execute(rule: Action, target: Option[ZextObject] = None): Boolean = {
         val set = ruleSets(rule)
+        var targets = 0
 
-        if (target.isDefined)
+        if (target.isDefined) {
             noun = target.get
+            targets = 1
+        } else {
+            noun = null
+        }
 
-        val beforeRule = ResolveOverloads(set.beforeRules)
+        val beforeRule = ResolveOverloads(set.beforeRules, targets)
         if (beforeRule.isDefined) {
             if (!beforeRule.get.evaluate)
-                return
+                return false
         }
 
-        val insteadRule = ResolveOverloads(set.insteadRules)
+        val insteadRule = ResolveOverloads(set.insteadRules, targets)
         if (insteadRule.isDefined) {
             if (!insteadRule.get.evaluate)
-                return
+                return false
         }
 
-        if (target.isEmpty) {
-            if (!rule.executeNone())
-                return
-        } else {
-            if (!rule.executeOne(target.get))
-                return
+        val carryOutRule = ResolveOverloads(set.executeRules, targets)
+        if (carryOutRule.isDefined) {
+            if (!carryOutRule.get.evaluate)
+                return false
         }
 
-        val afterRule = ResolveOverloads(set.afterRules)
+        val afterRule = ResolveOverloads(set.afterRules, targets)
         if (afterRule.isDefined) {
             if (!afterRule.get.evaluate)
-                return
+                return false
         }
 
-        val reportRule = ResolveOverloads(set.reportRules)
+        val reportRule = ResolveOverloads(set.reportRules, targets)
         if(reportRule.isDefined){
             reportRule.get.evaluate
         }
+
+        true
     }
 
-    def execute(rule: Action, target: ZextObject): Unit = {
+    def execute(rule: Action, target: ZextObject): Boolean = {
         execute(rule, Some(target))
     }
 }
@@ -186,9 +216,15 @@ class Condition( condition : => Boolean, val queryType: Query ) {
     }
 }
 
-class ActionRule(body : => Boolean) extends Rule{
+class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
-    var conditions = Seq[Condition]()
+    var targets = 0
+
+    for(c <- conditions){
+        if(c.queryType == Query.Object || c.queryType == Query.Property || c.queryType == Query.Class) {
+            targets = 1
+        }
+    }
 
     def specificity = {
         conditions.map( _.specificity ).sum
@@ -202,17 +238,16 @@ class ActionRule(body : => Boolean) extends Rule{
         conditions.forall( _.evaluate )
     }
 
-    def evaluate = this.body
+    def evaluate = body
 }
 
 
+
+
+
 class Action(val verb : String*) extends Rule {
-    def executeNone() : Boolean = false
-    def executeOne(noun : ZextObject) : Boolean = false
-    def executeTwo(first : ZextObject, second : ZextObject) : Boolean = false
 
     ruleSets(this) = new ActionRuleSet
-
     override def toString = verb(0)
 }
 

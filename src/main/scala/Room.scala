@@ -26,13 +26,13 @@ object Direction{
   for(i <- Direction.values) {
     val str : String = i.toString
     val action = new Action(str, str.charAt(0).toString) {
-      override def executeNone() = {
+      Rule.carryOut(this) {
         val other = location.connections.get(i)
         other match{
           case Some(r) => {
             Say(s"I went $i to $r.\n")
             location = r
-            execute(examining)
+            execute(examining, location)
           }
           case _ => {
             Say(s"I can't go $str.")
@@ -46,9 +46,10 @@ object Direction{
 
 
 
-class Room(using container : Container) extends ZextObject with Container {
-  given currentContainer : Container = this
-  given room : Room = this
+class Room extends ZextObject with Container {
+
+  given Room = this
+  World.currentRoom = this
 
   val connections = mutable.HashMap[Direction, Room]()
 

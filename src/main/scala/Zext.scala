@@ -31,8 +31,7 @@ object ZextObject {
     val nouns = ArrayBuffer[ZextObject]()
 }
 
-
-class ZextObject(using container : Container) {
+class ZextObject {
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
     var name : String = ""
@@ -42,9 +41,7 @@ class ZextObject(using container : Container) {
     var plural = false
     var proper = false
 
-    var parentContainer : Container = container
-    container.contents += this
-
+    var parentContainer : Container = null
     ZextObject.nouns += this
 
     def definite : String = {
@@ -87,8 +84,11 @@ object thing {
     }
 }
 
-class thing(using container : Container) extends ZextObject{
 
+class thing extends ZextObject{
+
+    parentContainer = World.currentRoom
+    parentContainer.contents += this
 
     def FixName(s : String): String  ={
         s.replace('_', ' ')
@@ -163,6 +163,6 @@ class thing(using container : Container) extends ZextObject{
     }
 }
 
-class Supporter(using container: Container) extends thing with Container
+class Supporter extends thing with Container
 
 
