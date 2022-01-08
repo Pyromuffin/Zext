@@ -1,12 +1,11 @@
 package Zext
 
-import Interpreter.*
-import World.*
-import Rule.*
+import Zext.Interpreter.*
+import Zext.Rule.*
+import Zext.World.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-
 import scala.reflect.ClassTag
 
 object Rule {

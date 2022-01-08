@@ -1,10 +1,10 @@
 package Zext
 
-import Interpreter.*
-import Rule.*
-import World.*
 import Zext.*
-import Actions.*
+import Zext.Actions.*
+import Zext.Interpreter.*
+import Zext.Rule.*
+import Zext.World.*
 
 
 object StringExpression{

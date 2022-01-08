@@ -1,10 +1,10 @@
 package Zext
 
+import Zext.Actions.*
 import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.Rule.{after, execute}
 import Zext.World.{location, noun}
-import Actions.*
 
 import scala.collection.mutable
 

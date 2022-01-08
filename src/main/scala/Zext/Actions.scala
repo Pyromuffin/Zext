@@ -1,10 +1,9 @@
 package Zext
 
-import Zext.Interpreter.Say
-import Zext.Parser.exit
+import Zext.Interpreter.*
+import Zext.Parser.*
 import Zext.Rule.*
 import Zext.World.*
-
 
 object Actions {
 
@@ -25,28 +24,28 @@ object Actions {
       Say(s"I took $n.")
     }
 
-    carryOut[ZextObject](taking){ n =>
+    carryOut[ZextObject](taking) { n =>
       inventory += n
       val container = n.parentContainer.contents
-      container.remove( container.indexOf(n) )
+      container.remove(container.indexOf(n))
       true
     }
   }
 
-  object examining extends Action("examine", "x", "look" ) {
+  object examining extends Action("examine", "x", "look") {
 
-     carryOut(examining){
-       execute(examining, location)
+    carryOut(examining) {
+      execute(examining, location)
     }
 
 
-    carryOut[Room](examining){ r =>
+    carryOut[Room](examining) { r =>
       Say(location.name)
       Say(location.description)
       true
     }
 
-    carryOut[ZextObject](examining){ n =>
+    carryOut[ZextObject](examining) { n =>
       val immediate = s"$n: ${n.description}"
       Say(immediate)
       true
@@ -55,10 +54,10 @@ object Actions {
 
     report[Room](examining) { r =>
       val visible = r.contents.filterNot(_ ? scenery)
-      if(!visible.isEmpty){
+      if (!visible.isEmpty) {
         var s = "You can see "
-        for(i <- visible){
-          if( !i.?(scenery) )
+        for (i <- visible) {
+          if (!i.?(scenery))
             s += i.indefinite + ", "
         }
         s = s.stripSuffix(", ")
@@ -70,17 +69,17 @@ object Actions {
 
 
   object exiting extends Action("exit") {
-     carryOut(exiting){
+    carryOut(exiting) {
       Say(s"Goodbye $playerName")
       exit = true
       true
     }
   }
 
-  object takingInventory extends Action("inventory", "i"){
-     carryOut(takingInventory){
+  object takingInventory extends Action("inventory", "i") {
+    carryOut(takingInventory) {
       var s = "I am holding "
-      for(i <- inventory){
+      for (i <- inventory) {
         s += i.indefinite + ", "
       }
       s = s.stripSuffix(", ")
@@ -90,6 +89,3 @@ object Actions {
     }
   }
 }
-
-
-

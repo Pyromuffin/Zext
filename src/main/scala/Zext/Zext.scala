@@ -1,10 +1,10 @@
 package Zext
 
-import World.*
-import Query.Property
-import Rule.*
-import Direction.*
-import Interpreter.*
+import Zext.Direction.*
+import Zext.Interpreter.*
+import Zext.Query.Property
+import Zext.Rule.*
+import Zext.World.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
