@@ -21,9 +21,21 @@ class StringExpression(lazyStr : => String) {
 }
 
 
+
+
 object Interpreter{
+
+  def Capitalize(str : String): String = {
+    var sentences = str.split('.')
+    sentences = sentences.map(_.stripSuffix(" ").stripPrefix(" ").capitalize)
+    sentences.reduce( _ + ". " + _ ) + "."
+
+  }
+
   def Say(str: StringExpression): Unit = {
-    println(str.toString.capitalize)
+    if(str.toString == "") println("Empty string!!!")
+
+    println( Capitalize(str.toString) )
   }
 }
 
