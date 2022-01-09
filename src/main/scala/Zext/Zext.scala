@@ -97,7 +97,8 @@ class thing extends ZextObject{
     def SetName(s : String): Unit = {
         val fixed = FixName(s)
         name = fixed
-        aliases.addAll(fixed.split(' '))
+        val words = fixed.split(' ')
+        if(words.length > 1) aliases.addAll(words)
     }
 
 

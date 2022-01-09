@@ -38,7 +38,6 @@ object Actions {
       execute(examining, location)
     }
 
-
     carryOut[Room](examining) { r =>
       Say(location.name)
       Say(location.description)
