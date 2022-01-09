@@ -37,6 +37,19 @@ object Parser extends RegexParsers{
   var exit = false
   override def skipWhitespace = false
 
+  val boldControlCode = "\u001b[0;1m"
+  val unboldControlCode = "\u001b[0;0m"
+
+  var bolded = false
+
+  def b = if(bolded) {
+    bolded = false
+    unboldControlCode
+  } else  {
+    bolded = true
+    boldControlCode
+  }
+
 
   def VerbParser(action: Action) : Parser[Action] = {
     val words = action.verb.toList
@@ -78,6 +91,7 @@ object Parser extends RegexParsers{
     val commandParser = CommandParser(actionParser, nounParser)
 
     execute(examining)
+    location.OnEnter()
 
     while(!exit){
       print("> ")

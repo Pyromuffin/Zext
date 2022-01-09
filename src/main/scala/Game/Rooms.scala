@@ -8,6 +8,7 @@ import Zext.World.*
 import Zext.*
 import Zext.Parser.*
 import Zext.thing.*
+import Zext.Direction.*
 
 import scala.language.postfixOps
 
@@ -46,7 +47,7 @@ object Rooms {
       Say("they're bolted to the floor.")
     }
 
-    bathroom connect Zext.Direction.west
+    bathroom connect west
   }
 
 

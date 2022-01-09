@@ -33,6 +33,7 @@ object Direction{
             Say(s"I went $i to $r.\n")
             location = r
             execute(examining, location)
+            location.OnEnter()
           }
           case _ => {
             Say(s"I can't go $str.")
@@ -51,7 +52,13 @@ class Room extends ZextObject with Container {
   given Room = this
   World.currentRoom = this
 
+  var visited = false
   val connections = mutable.HashMap[Direction, Room]()
+
+
+  def OnEnter(): Unit = {
+    visited = true
+  }
 
   def connect(direction: Direction)(implicit room : Room) = {
     room.connections(direction) = this
