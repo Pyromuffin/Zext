@@ -6,6 +6,9 @@ import Zext.Interpreter.*
 import Zext.Rule.*
 import Zext.World.*
 
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 
 object StringExpression{
   implicit def fromString(str : => String): StringExpression = {
@@ -46,6 +49,11 @@ import scala.util.parsing.combinator.*
 
 object Parser extends RegexParsers{
 
+
+  val ambiguousNouns = new mutable.HashMap[String, ArrayBuffer[ZextObject]]()
+  val extraWords = Array("a", "the", "of")
+
+
   var exit = false
   override def skipWhitespace = false
 
@@ -72,8 +80,22 @@ object Parser extends RegexParsers{
     parser
   }
 
-  def NounParser(noun: ZextObject) : Parser[ZextObject] = {
-    val words = Seq(noun.name).concat(noun.aliases.toSeq)
+
+  def RegisterNoun(): Unit = {
+    var words = Seq(noun.name).concat(noun.aliases.toSeq)
+    words = words.filterNot( extraWords.contains(_) )
+
+    for(word <- words){
+      val array = ambiguousNouns.getOrElse(word, new ArrayBuffer[ZextObject]() )
+      array.addOne(noun)
+      ambiguousNouns.update(word, array)
+    }
+  }
+
+  def GenerateNounParsers() : Parser[ ArrayBuffer[ZextObject] ] = {
+
+    
+
     val parsers = words.map {
       _.toString.r ^^ { s => noun }
     }
@@ -82,7 +104,7 @@ object Parser extends RegexParsers{
   }
 
 
-  case class Command(action: Action, noun: Option[ZextObject])
+  case class Command(action: Action, noun: Array[ZextObject])
 
   def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
     val command = actions ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1, a._2) }
