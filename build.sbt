@@ -2,6 +2,6 @@ name := "Zext"
 
 version := "0.1"
 
-scalaVersion := "3.0.2"
+scalaVersion := "3.1.3"
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.0.0"
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.1"

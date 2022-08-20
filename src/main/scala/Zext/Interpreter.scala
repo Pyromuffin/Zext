@@ -3,11 +3,9 @@ package Zext
 import Zext.*
 import Zext.Actions.*
 import Zext.Interpreter.*
+import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
 import Zext.World.*
-
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 
 object StringExpression{
@@ -28,9 +26,21 @@ class StringExpression(lazyStr : => String) {
 
 object Interpreter{
 
+
+  def CapitalizeStringWithControls(str : String): String = {
+    if(str.startsWith(boldControlCode)){
+      var s = str.stripPrefix(boldControlCode)
+      s = s.capitalize
+      s = boldControlCode + s
+      s
+    } else {
+      str.capitalize
+    }
+  }
+
   def Capitalize(str : String): String = {
     var sentences = str.split('.')
-    sentences = sentences.map(_.stripSuffix(" ").stripPrefix(" ").capitalize)
+    sentences = sentences.map(s => s.stripSuffix(" ").stripPrefix(" ").capitalize)
     sentences.reduce( _ + ". " + _ ) + "."
 
   }
@@ -40,6 +50,16 @@ object Interpreter{
 
     println( Capitalize(str.toString) )
   }
+
+  def Title(str : StringExpression): Unit = {
+    val orange = "\u001b[38;5;214m"
+    println(orange + str.toString.split(" ").map(_.capitalize).reduce(_ + " " + _) + unboldControlCode)
+
+  }
+
+  def LineBreak(): Unit = {
+    println("-------------")
+  }
 }
 
 
@@ -48,11 +68,6 @@ import scala.util.parsing.combinator.*
 
 
 object Parser extends RegexParsers{
-
-
-  val ambiguousNouns = new mutable.HashMap[String, ArrayBuffer[ZextObject]]()
-  val extraWords = Array("a", "the", "of")
-
 
   var exit = false
   override def skipWhitespace = false
@@ -80,22 +95,8 @@ object Parser extends RegexParsers{
     parser
   }
 
-
-  def RegisterNoun(): Unit = {
-    var words = Seq(noun.name).concat(noun.aliases.toSeq)
-    words = words.filterNot( extraWords.contains(_) )
-
-    for(word <- words){
-      val array = ambiguousNouns.getOrElse(word, new ArrayBuffer[ZextObject]() )
-      array.addOne(noun)
-      ambiguousNouns.update(word, array)
-    }
-  }
-
-  def GenerateNounParsers() : Parser[ ArrayBuffer[ZextObject] ] = {
-
-    
-
+  def NounParser(noun: ZextObject) : Parser[ZextObject] = {
+    val words = Seq(noun.name).concat(noun.aliases.toSeq)
     val parsers = words.map {
       _.toString.r ^^ { s => noun }
     }
@@ -104,7 +105,7 @@ object Parser extends RegexParsers{
   }
 
 
-  case class Command(action: Action, noun: Array[ZextObject])
+  case class Command(action: Action, noun: Option[ZextObject])
 
   def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
     val command = actions ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1, a._2) }
@@ -119,7 +120,7 @@ object Parser extends RegexParsers{
     World.Init()
 
     
-    val actions = ruleSets.keys
+    val actions = ruleSets.keys.filter(_.verb.nonEmpty)
     val actionParser = actions.map(VerbParser(_)).reduce( _ ||| _ )
     val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ ||| _)
     val commandParser = CommandParser(actionParser, nounParser)

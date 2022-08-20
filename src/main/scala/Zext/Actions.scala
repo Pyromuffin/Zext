@@ -7,6 +7,38 @@ import Zext.World.*
 
 object Actions {
 
+
+  object goingEast extends Action("east", "e")
+  object goingWest extends Action("west", "w")
+  object goingNorth extends Action("north", "n")
+  object goingSouth extends Action("south", "s")
+
+  object going extends Action("go", "travel", "walk", "run", "cartwheel"){
+
+    carryOut(goingEast) { execute(going, Direction.east) }
+    carryOut(goingWest) { execute(going, Direction.west) }
+    carryOut(goingNorth) { execute(going, Direction.north) }
+    carryOut(goingSouth) { execute(going, Direction.south) }
+
+    carryOut[Direction](going){ d =>
+      val other = location.connections.get(d)
+      other match{
+        case Some(r) => {
+          Say(s"I went $d to $r.")
+          location = r
+          LineBreak()
+          execute(examining, location)
+          location.OnEnter()
+        }
+        case _ => {
+          Say(s"I can't go $d.")
+        }
+      }
+      true
+    }
+  }
+
+
   object taking extends Action("take", "get") {
 
     carryOut(taking) {
@@ -39,7 +71,7 @@ object Actions {
     }
 
     carryOut[Room](examining) { r =>
-      Say(location.name)
+      Title(location.name)
       Say(location.description)
       true
     }

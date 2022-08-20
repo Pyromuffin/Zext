@@ -195,6 +195,7 @@ object Condition{
 
     implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, Query.Generic)
     implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, Query.Object)
+    implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), Query.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
     implicit def fromClass(c : => Class[_]) : Condition = {
