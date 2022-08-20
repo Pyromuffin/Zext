@@ -48,6 +48,7 @@ object JunimoGame {
 
   before(StartingGame){
     Say(startDescription)
+    val parser = new StardewParser()
   }
 
   before(takingInventory) {
