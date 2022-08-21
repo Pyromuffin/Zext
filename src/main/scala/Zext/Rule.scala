@@ -1,6 +1,7 @@
 package Zext
 
 import Zext.Interpreter.*
+import Zext.Macros.depth
 import Zext.Rule.*
 import Zext.World.*
 
@@ -62,8 +63,10 @@ object Rule {
     }
 
 
-    def report[T](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ tag.runtimeClass)* )
+
+    inline def report[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
+
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T])* )
         ruleSets(r).reportRules += rule
         rule
     }
@@ -94,8 +97,8 @@ object Rule {
         rule
     }
 
-    def carryOut[T](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ tag.runtimeClass)* )
+    inline def carryOut[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ Condition.fromClass[T])* )
         ruleSets(r).executeRules += rule
         rule
     }
@@ -183,11 +186,13 @@ object Condition{
     // inform's precedence is something like
     // location > object > property > class > generic
 
+    /*
     def CalculateTypeDepth(typeCondition : Class[_]) : Int = {
         var depth = 1
-/*
+
         val top = classOf[ZextObject]
-        if(typeCondition == classOf[Nothing] || typeCondition == classOf[ZextObject])
+        //if(typeCondition == classOf[Nothing] || typeCondition == classOf[ZextObject])
+        if(typeCondition == classOf[ZextObject])
             return 0
 
         var superClass = typeCondition.getSuperclass
@@ -196,18 +201,19 @@ object Condition{
             depth += 1
             superClass = superClass.getSuperclass
         }
-*/
+
         depth
     }
+    */
 
     implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, Query.Generic)
     implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, Query.Object)
     implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), Query.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
-    implicit def fromClass(c : => Class[_]) : Condition = {
-        val condition = new Condition(c.isAssignableFrom(noun.getClass), Query.Class)
-        condition.specificity = CalculateTypeDepth(c)
+    inline def fromClass[T <: ZextObject](implicit classTag: ClassTag[T]) : Condition = {
+        val condition = new Condition(classTag.runtimeClass.isAssignableFrom(noun.getClass), Query.Class)
+        condition.specificity = depth[T]
         condition
     }
 }

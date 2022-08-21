@@ -60,6 +60,6 @@ class Room extends ZextObject with Container {
     this.connections(opposing(direction)) = room
   }
 
-
-
 }
+
+class Crevice extends Room

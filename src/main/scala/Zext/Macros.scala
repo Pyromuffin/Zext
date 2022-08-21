@@ -27,6 +27,8 @@ object Macros{
   inline def fullClassName[T]: String =
     ${ fullClassNameImpl[T] }
 
+  inline def depth[T]: Int =
+    ${depthImpl[T]}
 
   import scala.quoted.*
 
@@ -122,4 +124,30 @@ def ZebraCode[T]()(using Type[T], Quotes): Expr[String] = {
 def fullClassNameImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[String] =
   import quotes.reflect.*
   Expr(TypeTree.of[T].symbol.fullName)
+
+
+def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
+  import quotes.reflect.*
+
+  var tpe = TypeRepr.of[T]
+
+  val zextSym = TypeRepr.of[ZextObject].typeSymbol
+  val bases = tpe.baseClasses.filterNot( c => c.flags.is(Flags.Trait) )
+  var depth = 0
+
+  val str = bases.map(_.fullName).reduce(_ + " " + _)
+  println(str)
+
+
+  for(i <- 0 until bases.size){
+    val base = bases(i)
+    if(base == zextSym)
+      return Expr(depth)
+    depth += 1
+
+  }
+
+  Expr(depth)
+
+}
 

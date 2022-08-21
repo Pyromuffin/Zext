@@ -76,6 +76,14 @@ object Actions {
       true
     }
 
+
+    carryOut[Crevice](examining) { r =>
+      Title(location.name + " It's small! ")
+      Say(location.description)
+      true
+    }
+
+
     carryOut[ZextObject](examining) { n =>
       val immediate = s"$n: ${n.description}"
       Say(immediate)
