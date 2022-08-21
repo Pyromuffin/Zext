@@ -12,6 +12,7 @@ enum Direction extends ZextObject {
   case north, east, south, west
 
   proper = true
+  global = true
 }
 
 

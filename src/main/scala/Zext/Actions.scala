@@ -64,7 +64,7 @@ object Actions {
     }
   }
 
-  object examining extends Action("examine", "x", "look") {
+  object examining extends Action("examine", "x", "look", "l") {
 
     carryOut(examining) {
       execute(examining, location)

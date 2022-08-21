@@ -40,6 +40,7 @@ class ZextObject {
     var properties : ArrayBuffer[Property] = ArrayBuffer[Property]()
     var plural = false
     var proper = false
+    var global = false
 
     var parentContainer : Container = null
     ZextObject.nouns += this
@@ -68,7 +69,12 @@ class ZextObject {
         properties.contains(property)
     }
 
-    def get[P <: Property] = {
+
+    def isVisible(room: Room) = {
+        global || room == parentContainer || room == this
+    }
+
+    def isAccessible = {
 
     }
 

@@ -6,6 +6,7 @@ import Zext.World.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
 object Rule {
@@ -124,6 +125,11 @@ object Rule {
 
         if (target.isDefined) {
             noun = target.get
+            if(!noun.isVisible(location)){
+                Say(s"I can't see ${noun.definite}")
+                return false
+            }
+
             targets = 1
         } else {
             noun = null
@@ -179,6 +185,7 @@ object Condition{
 
     def CalculateTypeDepth(typeCondition : Class[_]) : Int = {
         var depth = 1
+/*
         val top = classOf[ZextObject]
         if(typeCondition == classOf[Nothing] || typeCondition == classOf[ZextObject])
             return 0
@@ -189,7 +196,7 @@ object Condition{
             depth += 1
             superClass = superClass.getSuperclass
         }
-
+*/
         depth
     }
 
