@@ -12,9 +12,9 @@ object JunimoGame {
     case triangle, hourglass, octagon
 
 
-  var farmer : String = "Zexa-Swan"
-  var farm : String = "Zero Zillion"
-  var favoriteThing : String = "Holograms"
+  var farmer : String = "Farmer"
+  var farm : String = "Grandpa's Farm"
+  var favoriteThing : String = "Parsnips"
   var gender : Gender = Gender.octagon
   var rigidity : Int = 0
   var maxEncumbrance = 10
@@ -44,16 +44,21 @@ object JunimoGame {
 
   }
 
-  val startDescription = s"After a hard day toiling on fields of $farm, $farmer decides to take a break with a relaxing nap in the Secret Woods"
+
 
   before(StartingGame){
+    val parsed = StardewParser.Do()
+    farmer = parsed._1
+    farm = parsed._2
+    favoriteThing = parsed._3
+
+    val startDescription = s"After a hard day toiling on fields of $farm, $farmer decides to take a break with a relaxing nap in the Secret Woods"
     Say(startDescription)
-    val parser = new StardewParser()
   }
 
   before(takingInventory) {
     if(dirty)
-      Say(s"The dust you earned from today's productive work at $farm on clings to your body. A reminder of an honest job well done.")
+      Say(s"The dust you earned from today's productive work at $farm clings to your body. A reminder of an honest job well done.")
   }
 
   // inventory is something like: backpack : Pickaxe, shovel, hoe, sword, watering can, stones, fiber, sap, logs, clothes
