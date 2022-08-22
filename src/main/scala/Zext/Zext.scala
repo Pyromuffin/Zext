@@ -101,6 +101,7 @@ object thing {
 
 class thing(using c : Container) extends ZextObject{
 
+    parentContainer = c
     c.contents += this
 
     def FixName(s : String): String  ={

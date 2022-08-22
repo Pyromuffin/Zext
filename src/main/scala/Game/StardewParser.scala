@@ -7,9 +7,14 @@ import scala.io.Source
 
 object StardewParser {
 
-  def Do() = {
+  def Do() : (String, String, String) = {
     val documentsDir = System.getenv("APPDATA")
     val stardewDir = new File(documentsDir + "\\StardewValley\\Saves")
+
+    if(!stardewDir.exists())
+      return ("farmer", "farm", "favoriteThing")
+
+
     val folders = stardewDir.listFiles().filter(_.isDirectory)
     val filter = new FilenameFilter {
       override def accept(dir: File, name: String): Boolean = name == "SaveGameInfo"

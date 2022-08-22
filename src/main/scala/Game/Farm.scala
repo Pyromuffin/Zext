@@ -176,7 +176,7 @@ object OutsideWorld extends Room {
   }
 
   Connect(west, ChickenCoop)
-  report(going, ChickenCoop, here) {
+  report(going, ChickenCoop.asDestination, here) {
     Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
   }
 
