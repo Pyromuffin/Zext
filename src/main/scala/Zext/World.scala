@@ -28,7 +28,7 @@ object World extends Container {
 
     println("-------------")
 
-    location = Game.Forest
+    location = Game.FarmHouse
   }
 
   var noun: ZextObject = null

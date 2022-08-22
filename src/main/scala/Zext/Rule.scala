@@ -21,7 +21,7 @@ object Rule {
     }
 
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
-    val everyTurnRules = ArrayBuffer[Rule]()
+    val everyTurnRules = ArrayBuffer[PersistingRule]()
 
 
     class Consequence(r: Action, conditions: Condition*) {
@@ -176,6 +176,16 @@ object Rule {
 
 abstract class Rule {
     val disabled = false
+
+}
+
+
+object PersistingRule {
+    implicit def fromUnit(body : => Unit) : PersistingRule = PersistingRule(body)
+}
+
+class PersistingRule( body : => Unit) extends Rule {
+    def Execute() = body
 }
 
 enum Query:

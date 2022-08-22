@@ -129,7 +129,7 @@ def fullClassNameImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[String] =
 def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
   import quotes.reflect.*
 
-  var tpe = TypeRepr.of[T]
+  val tpe = TypeRepr.of[T]
 
   val zextSym = TypeRepr.of[ZextObject].typeSymbol
   val bases = tpe.baseClasses.filterNot( c => c.flags.is(Flags.Trait) )

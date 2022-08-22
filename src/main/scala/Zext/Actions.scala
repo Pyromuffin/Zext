@@ -7,6 +7,8 @@ import Zext.World.*
 
 object Actions {
 
+  def Randomly(numberOfTurns : Int) : Boolean = util.Random.nextInt(numberOfTurns) == 0
+
 
   object goingEast extends Action("east", "e")
   object goingWest extends Action("west", "w")

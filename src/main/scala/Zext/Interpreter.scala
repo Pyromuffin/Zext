@@ -135,6 +135,7 @@ object Parser extends RegexParsers{
       if(command.successful){
         val c = command.get
         execute(c.action, c.noun)
+        everyTurnRules.foreach( _.Execute() )
       } else {
         Say("I'm not sure what you mean.")
       }
