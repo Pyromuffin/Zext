@@ -50,12 +50,12 @@ object Actions {
 
 
     instead(taking, fixed) {
-      Say(s"$noun $is stuck.")
+      Say(s"$noun $is shoracle")
       false
     }
 
     report[ZextObject](taking) { n =>
-      Say(s"I took $n.")
+      Say(s"You took $n. Wow.")
     }
 
     carryOut[ZextObject](taking) { n =>

@@ -61,7 +61,7 @@ class device extends thing {
 object FarmHouse extends Room {
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
-  OutsideWorld connect south
+
 
   val tv = new device {
     name = "tv"
@@ -81,6 +81,7 @@ object FarmHouse extends Room {
     everyTurnRules += {
       if (on && location == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
     }
+
   }
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
@@ -130,27 +131,62 @@ object FarmHouse extends Room {
     Say (s"$noun doesn't give a heck. It's tamp-er proof.")
     false
   }
+  instead(taking, coffee_machine, this){
+    Say( str = "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down.")
+  }
 
 
+  OutsideWorld connect south
 }
 
 object OutsideWorld extends Room {
-  ChickenCoop connect west
+
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
 
-  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones."
+  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants"
+  crops.plural = true
 
+  val parsnip= ~"A single perfect parsnip, ripe and ready"
+  // "Pop! You gently but firmly yank the parsnip, extricating it from its bed."
+  //can u like hack their frikkin save file for the season or something and make it seasonally appropriate produce
 
+  instead(taking, crops, this) {
+    Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")
+  }
 }
+/*
+  after(going, south) {
+    Say("South, south, southy southy south. Like Momma always said, can't go wrong with south")
+  }
+  ChickenCoop connect west
+}
+*/
 
 
+
+class Animal extends thing {
+  var petted = false
+}
 object ChickenCoop extends Room {
   name = "Coop"
   description = "You are in a little wooden coop. So many fluffy feathery chicken friends surround you."
   // transitiontext = "You duck into the hatch, because doors are for losers. The chickens like it when you do things their way."
 
-  val chickens = ~"There are some cute lil chickens waiting for your love." aka "chicks" aka "chicken" aka "fluffballs" aka "cuties"
+  val voidmayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
+
+  val mayomachine = ~"You look hopefully at the mayo machine. You left some void egg in there last night."
+  /* property empty vs full (full of mayo)
+  "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
+  "Emptiness. Like the wrong kind of void."
+
+
+   */
+  val chickens = new Animal {
+    name = "chickens"
+    description = "There are some cute lil chickens waiting for your love."
+    aliases.addAll(Seq("chicks", "chicken", "fluffballs", "cuties"))
+  }
 
   chickens.plural = true
 
@@ -158,10 +194,7 @@ object ChickenCoop extends Room {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")
   }
 
-
-
-
-  object pet extends Action("pet", "hug", "pat", "love")
+  object petting extends Action("pet", "hug", "pat", "love")
 
   chickens.petted = false
 
@@ -169,14 +202,33 @@ object ChickenCoop extends Room {
     if (chickens.petted == true)
       Say("You pet the chickens again, extra hard. They make little contented clucks but don't love you any harder.")
     else
-      Say("You pet each and every chicken. They let our little <3's and love you even more now.")
+      Say("You pet each and every chicken. They let out little <3's and love you even more now.")
 
     chickens.petted = true
     true
   }
 
-  carryOut[ZextObject](tamping) { _ =>
-    Say(s"$noun doesn't give a heck. It's tamp-er proof.")
-    false
+  val hay = ~"a mini bundle of soft yellow hay, great for eating and sleeping on"
+  /*container take text "you scoop up a nice armful of hay and stuff it in your sack for later."
+   if inventory already has a hay, "Not so fast, Scarecrow Steve! Leave some for the chickens"
+  * */
+
+  after(taking, hay) {
+    Say("You aren't really sure why you want that but you do.")
   }
+
+  val hay_box = ~"tray of hay" is fixed aka "trough" aka "food" aka "feed"
+
+  val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine in this pleasant place" are scenery
+
+
+  instead(going, east, this) {
+    // if(no may in inventory
+    Say("but, but, the mayo, the chickens!")
+  }
+
+  instead(going, north, this) {
+    Say("You lift up one leg. The chickens look at you reproachfully. You change your mind about getting into the nest.")
+  }
+
 }
