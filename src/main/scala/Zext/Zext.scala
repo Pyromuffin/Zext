@@ -5,6 +5,7 @@ import Zext.Interpreter.*
 import Zext.Query.Property
 import Zext.Rule.*
 import Zext.World.*
+import Zext.thing.NounAmount
 
 import java.lang.reflect.Constructor
 import scala.collection.mutable.ArrayBuffer
@@ -40,7 +41,7 @@ class ZextObject {
     var aliases = ArrayBuffer[String]()
     var description : StringExpression = ""
     var properties : ArrayBuffer[Property] = ArrayBuffer[Property]()
-    var plural = false
+    var pluralized = false
     var proper = false
     var global = false
 
@@ -62,7 +63,7 @@ class ZextObject {
     }
 
     def be : String = {
-        if(plural)
+        if(pluralized)
             return "are"
         "is"
     }
@@ -90,6 +91,10 @@ object thing {
         inline def unary_~(using c : Container) : thing = {
             thing() named Macros.variableName desc d
         }
+    }
+
+    enum NounAmount {
+        case singular, plural, some
     }
 }
 
@@ -126,21 +131,6 @@ class thing(using c : Container) extends ZextObject{
     }
 
 
-    def some(name : String) : this.type = {
-        SetName(name)
-        plural = true
-        indefiniteArticle = "some"
-        this
-    }
-
-
-    def mass : this.type = {
-        plural = true
-        indefiniteArticle = "some"
-        this
-    }
-
-
     def named(name : String) : this.type = {
         SetName(name)
         this
@@ -153,6 +143,15 @@ class thing(using c : Container) extends ZextObject{
 
     def aka(s : String) : this.type  = {
         aliases.addOne(s)
+        this
+    }
+
+    def amount(nounAmount: NounAmount):  this.type ={
+        if nounAmount == NounAmount.plural then pluralized = true
+        if (nounAmount == NounAmount.some) {
+            pluralized = true
+            indefiniteArticle = "some"
+        }
         this
     }
 }

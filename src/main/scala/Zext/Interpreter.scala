@@ -144,7 +144,7 @@ object Parser extends RegexParsers{
         execute(c.action, c.noun)
         everyTurnRules.foreach( _.Execute() )
       } else {
-        Say("I'm not sure what you mean.")
+        Say("I'm very sure what you mean. But no.")
       }
     }
   }

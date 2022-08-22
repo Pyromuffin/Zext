@@ -5,6 +5,8 @@ import Zext.Rule.*
 import Zext.Interpreter.*
 import Zext.StringExpression
 import Zext.World.StartingGame
+import Zext.TernaryExtension
+
 
 object JunimoGame {
 
