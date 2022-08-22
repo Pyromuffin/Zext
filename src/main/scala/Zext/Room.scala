@@ -44,20 +44,21 @@ object Direction{
 
 class Room extends ZextObject with Container {
 
-  given Room = this
-  World.currentRoom = this
+  val here = this
 
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
+  global = true
 
+  def asDestination = Condition.fromObject(this)
 
   def OnEnter(): Unit = {
     visited = true
   }
 
-  def connect(direction: Direction)(implicit room : Room) = {
-    room.connections(direction) = this
-    this.connections(opposing(direction)) = room
+  def Connect(direction: Direction, destination : Room) = {
+    this.connections(direction) = destination
+    destination.connections(opposing(direction)) = this
   }
 
 }

@@ -15,6 +15,13 @@ object StringExpression{
 }
 
 
+implicit class TernaryExtension(that : Boolean) {
+
+  def ?(str : StringExpression) : StringExpression = {
+    if(that) str else ""
+  }
+}
+
 class StringExpression(lazyStr : => String) {
   override def toString: String = {
     lazyStr

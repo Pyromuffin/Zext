@@ -14,15 +14,12 @@ object World extends Container {
   var inventory = ArrayBuffer[ZextObject]()
   var location: Room = null
   var time = 10
-  var currentRoom: Room = null
 
   object StartingGame extends Action // for hooking.
 
   def Init(): Unit = {
     Macros.TouchEveryone(Actions)
-    Macros.TouchEveryone(Game.Rooms)
     Macros.TouchEveryone(JunimoGame)
-    currentRoom = null
 
     execute(StartingGame)
 

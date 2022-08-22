@@ -7,7 +7,7 @@ import Zext.World.*
 
 object Actions {
 
-  def Randomly(numberOfTurns : Int) : Boolean = util.Random.nextInt(numberOfTurns) == 0
+  def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
 
 
   object goingEast extends Action("east", "e")
@@ -17,31 +17,58 @@ object Actions {
 
   object going extends Action("go", "travel", "walk", "run", "cartwheel"){
 
-    carryOut(goingEast) { execute(going, Direction.east) }
-    carryOut(goingWest) { execute(going, Direction.west) }
-    carryOut(goingNorth) { execute(going, Direction.north) }
-    carryOut(goingSouth) { execute(going, Direction.south) }
+    val nowhere = Room()
+    var goingDir : Direction = null
 
-    carryOut[Direction](going){ d =>
-      val other = location.connections.get(d)
-      other match{
-        case Some(r) => {
-          Say(s"I went $d to $r.")
-          location = r
-          LineBreak()
-          execute(examining, location)
-          location.OnEnter()
-        }
-        case _ => {
-          Say(s"I can't go $d.")
+
+    carryOut(goingEast) { goingDir = Direction.east; execute(going, location.connections.getOrElse(Direction.east, nowhere)) }
+    carryOut(goingWest) {  goingDir = Direction.west; execute(going, location.connections.getOrElse(Direction.west, nowhere)) }
+    carryOut(goingNorth) { goingDir = Direction.north; execute(going, location.connections.getOrElse(Direction.north, nowhere)) }
+    carryOut(goingSouth) { goingDir = Direction.south; execute(going, location.connections.getOrElse(Direction.south, nowhere)) }
+    carryOut[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
+
+    // weird hack
+    before(going, nowhere.asDestination){
+      Say(s"I can't go $goingDir from here.")
+      false
+    }
+
+    // desired behavior:
+    // override the "i went x " text, which should be the act of reporting going
+    // once we have moved to the other room, and reported, we want to automatically examine the room.
+
+    carryOut[Room](going) { r =>
+      // room has to be connected to location
+      var connected = false
+
+      for( (d, room) <- location.connections) {
+        if(r == room){
+          connected = true
+          goingDir = d
         }
       }
+
+      if(!connected) {
+        Say(s"I can't get to $r from here.")
+      }
+      connected
+    }
+
+    report[Room](going){ r =>
+      Say(s"I went $goingDir to $r.")
+    }
+
+    after[Room](going){ r =>
+      location = r
+      LineBreak()
+      execute(examining, location)
+      location.OnEnter()
       true
     }
   }
 
 
-  object taking extends Action("take", "get") {
+  object taking extends Action("take", "get", "pick up") {
 
     carryOut(taking) {
       Say(s"I can't take nothing.")

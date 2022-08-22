@@ -93,6 +93,11 @@ object Rule {
         }
     }
 
+    inline def after[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag: ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T]) *)
+        ruleSets(r).afterRules += rule
+        rule
+    }
 
     def carryOut(r: Action, conditions: Condition*)(body: => Boolean) : ActionRule = {
         val rule = new ActionRule(body, conditions*)
@@ -132,6 +137,7 @@ object Rule {
         if (target.isDefined) {
             noun = target.get
             if(!noun.isVisible(location)){
+                //@todo maybe make this better
                 Say(s"I can't see ${noun.definite}")
                 return false
             }
@@ -159,15 +165,15 @@ object Rule {
                 return false
         }
 
+        val reportRule = ResolveOverloads(set.reportRules, targets)
+        if (reportRule.isDefined) {
+            reportRule.get.evaluate
+        }
+
         val afterRule = ResolveOverloads(set.afterRules, targets)
         if (afterRule.isDefined) {
             if (!afterRule.get.evaluate)
                 return false
-        }
-
-        val reportRule = ResolveOverloads(set.reportRules, targets)
-        if(reportRule.isDefined){
-            reportRule.get.evaluate
         }
 
         true
@@ -235,6 +241,7 @@ object Condition{
 
 class Condition( condition : => Boolean, val queryType: Query ) {
     def evaluate = condition
+
     var specificity = 1
 
     def precedence = {

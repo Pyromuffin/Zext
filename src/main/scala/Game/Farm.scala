@@ -10,7 +10,7 @@ import Zext.Actions.*
 import Zext.Rule.*
 import Zext.World.*
 
-class device extends thing {
+class device(using c : Container) extends thing {
 
   var on = false
   def off = !on
@@ -34,7 +34,7 @@ class device extends thing {
   }
 
   report[device](turningOn) { d =>
-    Say(s"I turned on $noun")
+    Say(s"You turned on $noun")
   }
 
   carryOut[device](turningOff) { d =>
@@ -48,7 +48,7 @@ class device extends thing {
   }
 
   report[device](turningOff) { d =>
-    Say(s"I turned off $noun")
+    Say(s"You turned off $noun")
   }
 
   carryOut[device](switching){ d =>
@@ -59,9 +59,24 @@ class device extends thing {
 
 
 object FarmHouse extends Room {
+
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
-  OutsideWorld connect south
+
+
+  Connect(south, OutsideWorld)
+  Connect(west, ChickenCoop)
+
+
+  carryOut[Supporter](examining) { s =>
+    Say(s.description)
+    s.contents.foreach(z => Say(z.name))
+    true
+  }
+
+  val drawer = new Supporter {
+    val pencil = ~"graphite imprisoned with carved wood."
+  } named "drawer" desc "debris collector"
 
   val tv = new device {
     name = "tv"
@@ -79,12 +94,11 @@ object FarmHouse extends Room {
     }
 
     everyTurnRules += {
-      if (on && location == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
+      if (on && location == here && Randomly(4)) Say("The tv crackles in the background")
     }
   }
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
-
   val door = ~"This is a thing you really wish you could open and close, but you can't"
 
   object coffee_machine extends device {
@@ -113,7 +127,9 @@ object FarmHouse extends Room {
   }
 
   coffee_machine.tamped = false
-  object tamping extends Action("tamp", "smack")
+  object tamping extends Action("tamp", "smack"){
+
+  }
 
 
   carryOut(tamping, coffee_machine) { cm =>
@@ -131,26 +147,37 @@ object FarmHouse extends Room {
     false
   }
 
+  report(going, OutsideWorld.asDestination, here) {
+    Say("Closing the door behind, you emerge into the sunlight")
+  }
 
 }
 
 object OutsideWorld extends Room {
-  ChickenCoop connect west
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
+  Connect(west, ChickenCoop)
 
   val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones."
 
+}
 
+
+class Animal(using c : Container) extends thing {
+  var petted = false
 }
 
 
 object ChickenCoop extends Room {
   name = "Coop"
   description = "You are in a little wooden coop. So many fluffy feathery chicken friends surround you."
-  // transitiontext = "You duck into the hatch, because doors are for losers. The chickens like it when you do things their way."
 
-  val chickens = ~"There are some cute lil chickens waiting for your love." aka "chicks" aka "chicken" aka "fluffballs" aka "cuties"
+  report(going, ChickenCoop.asDestination, OutsideWorld) {
+    Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
+  }
+
+  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "chicken" aka "fluffballs" aka "cuties"
+
 
   chickens.plural = true
 
@@ -160,8 +187,7 @@ object ChickenCoop extends Room {
 
 
 
-
-  object pet extends Action("pet", "hug", "pat", "love")
+  object petting extends Action("pet", "hug", "pat", "love")
 
   chickens.petted = false
 
@@ -173,10 +199,5 @@ object ChickenCoop extends Room {
 
     chickens.petted = true
     true
-  }
-
-  carryOut[ZextObject](tamping) { _ =>
-    Say(s"$noun doesn't give a heck. It's tamp-er proof.")
-    false
   }
 }

@@ -6,6 +6,7 @@ import Zext.Query.Property
 import Zext.Rule.*
 import Zext.World.*
 
+import java.lang.reflect.Constructor
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 
@@ -20,11 +21,12 @@ object wet extends Property
 case class initialDescription(desc : StringExpression) extends Property
 
 trait Container {
+    given c : Container = this
+
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
     var open = true
     var transparent = false
 }
-
 
 
 object ZextObject {
@@ -82,19 +84,19 @@ class ZextObject {
 }
 
 
+
 object thing {
     extension(d: StringExpression)  {
-        inline def unary_~ : thing = {
-            thing() a Macros.variableName desc d
+        inline def unary_~(using c : Container) : thing = {
+            thing() named Macros.variableName desc d
         }
     }
 }
 
 
-class thing extends ZextObject{
+class thing(using c : Container) extends ZextObject{
 
-    parentContainer = World.currentRoom
-    parentContainer.contents += this
+    c.contents += this
 
     def FixName(s : String): String  ={
         s.replace('_', ' ')
@@ -123,20 +125,6 @@ class thing extends ZextObject{
         this
     }
 
-    def and(prop: Property) : this.type = {
-        properties += prop
-        this
-    }
-
-    def a(name : String) : this.type = {
-        SetName(name)
-        this
-    }
-
-    def the(name : String) : this.type = {
-        SetName(name)
-        this
-    }
 
     def some(name : String) : this.type = {
         SetName(name)
@@ -155,7 +143,6 @@ class thing extends ZextObject{
 
     def named(name : String) : this.type = {
         SetName(name)
-        proper = true
         this
     }
 
@@ -170,6 +157,6 @@ class thing extends ZextObject{
     }
 }
 
-class Supporter extends thing with Container
+class Supporter(using c : Container) extends thing with Container
 
 

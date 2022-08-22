@@ -30,7 +30,7 @@ object Forest extends Room {
  }
 
 
- Clearing connect north
+ Connect(north, Clearing)
 }
 
 object Clearing extends Room {
