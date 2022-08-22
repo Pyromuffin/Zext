@@ -108,37 +108,37 @@ class thing extends ZextObject{
     }
 
 
-    def desc(desc : StringExpression)  ={
+    def desc(desc : StringExpression) : this.type = {
         description = desc
         this
     }
 
-    def is(prop: Property) = {
+    def is(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def are(prop: Property) = {
+    def are(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def and(prop: Property) = {
+    def and(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def a(name : String) = {
+    def a(name : String) : this.type = {
         SetName(name)
         this
     }
 
-    def the(name : String) = {
+    def the(name : String) : this.type = {
         SetName(name)
         this
     }
 
-    def some(name : String) = {
+    def some(name : String) : this.type = {
         SetName(name)
         plural = true
         indefiniteArticle = "some"
@@ -146,25 +146,25 @@ class thing extends ZextObject{
     }
 
 
-    def mass = {
+    def mass : this.type = {
         plural = true
         indefiniteArticle = "some"
         this
     }
 
 
-    def named(name : String) = {
+    def named(name : String) : this.type = {
         SetName(name)
         proper = true
         this
     }
 
-    def has(prop: Property) = {
+    def has(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def aka(s : String) = {
+    def aka(s : String) : this.type  = {
         aliases.addOne(s)
         this
     }
