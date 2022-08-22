@@ -56,13 +56,17 @@ object Rule {
         }
     }
 
+    inline def instead[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T])* )
+        ruleSets(r).insteadRules += rule
+        rule
+    }
+
     def report(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
         val rule = new ActionRule( {body; true}, conditions* )
         ruleSets(r).reportRules += rule
         rule
     }
-
-
 
     inline def report[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
         val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T])* )
