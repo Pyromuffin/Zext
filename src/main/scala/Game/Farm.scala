@@ -10,7 +10,7 @@ import Zext.Actions.*
 import Zext.Rule.*
 import Zext.World.*
 import Zext.thing.NounAmount.*
-
+import Zext.Inflector.*
 
 class device(using Container) extends thing {
 
@@ -163,7 +163,7 @@ object OutsideWorld extends Room {
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
 
-  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount plural
+  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
 
   val parsnip= ~"A single perfect parsnip, ripe and ready"
   // "Pop! You gently but firmly yank the parsnip, extricating it from its bed."
@@ -196,7 +196,7 @@ object ChickenCoop extends Room {
   "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
   "Emptiness. Like the wrong kind of void."
    */
-  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "chicken" aka "fluffballs" aka "cuties" amount plural
+  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "fluffballs" aka "cuties" amount some
 
   report(taking, chickens) {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")

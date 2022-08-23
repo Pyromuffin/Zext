@@ -29,7 +29,7 @@ object Actions {
     Understand("south", going, Direction.south)
     Understand("s", going, Direction.south)
 
-    val nowhere = Room()
+    val nowhere = Room(); nowhere.global = true
     var goingDir : Direction = null
 
     carryOut[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }

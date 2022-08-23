@@ -103,7 +103,11 @@ object Parser extends RegexParsers{
   }
 
   def NounParser(noun: ZextObject) : Parser[ZextObject] = {
-    val words = Seq(noun.name).concat(noun.aliases.toSeq)
+    var words = Seq(noun.name).concat(noun.aliases.toSeq)
+    if(noun.pluralized){
+      words = words.concat(words.map(Inflector.singularize))
+    }
+
     val parsers = words.map {
       _.toString.r ^^ { s => noun }
     }
