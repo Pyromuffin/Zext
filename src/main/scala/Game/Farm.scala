@@ -217,7 +217,7 @@ object ChickenCoop extends Room {
     true
   }
 
-  val hay = ~"a mini bundle of soft yellow hay, great for eating and sleeping on"
+  val hay = ~"a mini bundle of soft yellow hay, great for eating and sleeping on" amount some
   /*container take text "you scoop up a nice armful of hay and stuff it in your sack for later."
    if inventory already has a hay, "Not so fast, Scarecrow Steve! Leave some for the chickens"
   * */

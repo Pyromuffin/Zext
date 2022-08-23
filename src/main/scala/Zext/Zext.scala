@@ -48,6 +48,12 @@ class ZextObject {
     var parentContainer : Container = null
     ZextObject.nouns += this
 
+    def TransferTo(container: Container) = {
+        parentContainer.contents.remove(parentContainer.contents.indexOf(this))
+        parentContainer = container
+        container.contents.addOne(this)
+    }
+
     def definite : String = {
         if(proper)
             return name.toString

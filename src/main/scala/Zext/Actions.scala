@@ -5,26 +5,33 @@ import Zext.Parser.*
 import Zext.Rule.*
 import Zext.World.*
 
+import scala.collection.mutable
+
 object Actions {
+
+  val commandAliases = mutable.HashMap[String, Command]()
+
+  def Understand(str: String, action: Action, zextObject: ZextObject = null) : Unit = {
+    commandAliases.addOne(str -> Command(action, Option(zextObject)))
+  }
 
   def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
 
 
-  object goingEast extends Action("east", "e")
-  object goingWest extends Action("west", "w")
-  object goingNorth extends Action("north", "n")
-  object goingSouth extends Action("south", "s")
-
   object going extends Action("go", "travel", "walk", "run", "cartwheel"){
+
+    Understand("east", going, Direction.east)
+    Understand("e", going, Direction.east)
+    Understand("west", going, Direction.west)
+    Understand("w", going, Direction.west)
+    Understand("north", going, Direction.north)
+    Understand("n", going, Direction.north)
+    Understand("south", going, Direction.south)
+    Understand("s", going, Direction.south)
 
     val nowhere = Room()
     var goingDir : Direction = null
 
-
-    carryOut(goingEast) { goingDir = Direction.east; execute(going, location.connections.getOrElse(Direction.east, nowhere)) }
-    carryOut(goingWest) {  goingDir = Direction.west; execute(going, location.connections.getOrElse(Direction.west, nowhere)) }
-    carryOut(goingNorth) { goingDir = Direction.north; execute(going, location.connections.getOrElse(Direction.north, nowhere)) }
-    carryOut(goingSouth) { goingDir = Direction.south; execute(going, location.connections.getOrElse(Direction.south, nowhere)) }
     carryOut[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
 
     // weird hack
@@ -32,6 +39,8 @@ object Actions {
       Say(s"I can't go $goingDir from here.")
       false
     }
+
+    // you can still circumvent going direction based movements by going directly to a location... eh i'll fix it later
 
     // desired behavior:
     // override the "i went x " text, which should be the act of reporting going
@@ -75,6 +84,9 @@ object Actions {
       false
     }
 
+    instead(taking, noun.parentContainer == inventory){
+      Say(s"I shuffle around the items in my pockets, looking for $noun")
+    }
 
     instead(taking, fixed) {
       Say(s"$noun $is shoracle")
@@ -86,9 +98,7 @@ object Actions {
     }
 
     carryOut[ZextObject](taking) { n =>
-      inventory += n
-      val container = n.parentContainer.contents
-      container.remove(container.indexOf(n))
+      noun.TransferTo(inventory)
       true
     }
   }
@@ -147,7 +157,7 @@ object Actions {
   object takingInventory extends Action("inventory", "i") {
     carryOut(takingInventory) {
       var s = "I am holding "
-      for (i <- inventory) {
+      for (i <- inventory.contents) {
         s += i.indefinite + ", "
       }
       s = s.stripSuffix(", ")

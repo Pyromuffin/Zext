@@ -2,6 +2,7 @@ package Zext
 
 import Zext.Interpreter.*
 import Zext.Macros.depth
+import Zext.Parser.Command
 import Zext.Rule.*
 import Zext.World.*
 
@@ -134,42 +135,50 @@ object Rule {
         val set = ruleSets(rule)
         var targets = 0
 
+        var stackNoun : ZextObject = null
+
         if (target.isDefined) {
-            noun = target.get
-            if(!noun.isVisible(location)){
+            stackNoun = target.get
+            if(!stackNoun.isVisible(location)){
                 //@todo maybe make this better
-                Say(s"I can't see ${noun.definite}")
+                Say(s"I can't see ${stackNoun.definite}")
                 return false
             }
 
             targets = 1
         } else {
-            noun = null
+            stackNoun = null
         }
 
+        // this is pretty jank.
+        noun = stackNoun
         val beforeRule = ResolveOverloads(set.beforeRules, targets)
         if (beforeRule.isDefined) {
             if (!beforeRule.get.evaluate)
                 return false
         }
 
+        noun = stackNoun
         val insteadRule = ResolveOverloads(set.insteadRules, targets)
         if (insteadRule.isDefined) {
             if (!insteadRule.get.evaluate)
                 return false
         }
 
+        noun = stackNoun
         val carryOutRule = ResolveOverloads(set.executeRules, targets)
         if (carryOutRule.isDefined) {
             if (!carryOutRule.get.evaluate)
                 return false
         }
 
+        noun = stackNoun
         val reportRule = ResolveOverloads(set.reportRules, targets)
         if (reportRule.isDefined) {
             reportRule.get.evaluate
         }
 
+        noun = stackNoun
         val afterRule = ResolveOverloads(set.afterRules, targets)
         if (afterRule.isDefined) {
             if (!afterRule.get.evaluate)
@@ -204,26 +213,6 @@ enum Query:
 object Condition{
     // inform's precedence is something like
     // location > object > property > class > generic
-
-    /*
-    def CalculateTypeDepth(typeCondition : Class[_]) : Int = {
-        var depth = 1
-
-        val top = classOf[ZextObject]
-        //if(typeCondition == classOf[Nothing] || typeCondition == classOf[ZextObject])
-        if(typeCondition == classOf[ZextObject])
-            return 0
-
-        var superClass = typeCondition.getSuperclass
-
-        while(superClass != top){
-            depth += 1
-            superClass = superClass.getSuperclass
-        }
-
-        depth
-    }
-    */
 
     implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, Query.Generic)
     implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, Query.Object)

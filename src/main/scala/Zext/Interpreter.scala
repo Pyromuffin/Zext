@@ -120,16 +120,19 @@ object Parser extends RegexParsers{
   }
 
 
+  def GetCommand(input : String, commandParser : Parser[Command]) = {
+    val result = commandAliases.getOrElse(input, parseAll(commandParser, input).getOrElse(null) )
+    Option(result)
+  }
 
 
   def main(args: Array[String]): Unit = {
     import scala.io.StdIn.readLine
     World.Init()
 
-    
     val actions = ruleSets.keys.filter(_.verb.nonEmpty)
-    val actionParser = actions.map(VerbParser(_)).reduce( _ ||| _ )
-    val nounParser = ZextObject.nouns.map(NounParser(_)).reduce( _ ||| _)
+    val actionParser = actions.map(VerbParser).reduce( _ ||| _ )
+    val nounParser = ZextObject.nouns.map(NounParser).reduce( _ ||| _)
     val commandParser = CommandParser(actionParser, nounParser)
 
     execute(examining)
@@ -138,8 +141,8 @@ object Parser extends RegexParsers{
     while(!exit){
       print("> ")
       val input = readLine()
-      val command = parseAll(commandParser, input)
-      if(command.successful){
+      val command = GetCommand(input, commandParser)
+      if(command.nonEmpty){
         val c = command.get
         execute(c.action, c.noun)
         everyTurnRules.foreach( _.Execute() )

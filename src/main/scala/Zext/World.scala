@@ -11,7 +11,7 @@ import Zext.Rule.*
 object World extends Container {
 
   var playerName = "Farmer"
-  var inventory = ArrayBuffer[ZextObject]()
+  var inventory = new Container {}
   var location: Room = null
   var time = 10
 
