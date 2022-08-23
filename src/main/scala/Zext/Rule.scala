@@ -9,7 +9,8 @@ import Zext.World.*
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
-import scala.reflect.ClassTag
+import scala.quoted.*
+import scala.reflect.{ClassTag, TypeTest}
 
 object Rule {
 
@@ -106,13 +107,14 @@ object Rule {
         rule
     }
 
-    inline def inflict[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ Condition.fromClass[T](Query.Class))* )
+    inline def inflict[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean): ActionRule = {
+        val condition = Condition.fromClass[T](Query.Class)
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ condition)* )
         ruleSets(r).executeRules += rule
         rule
     }
 
-    def inflict[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean) (using ClassTag[T1], ClassTag[T2] ): ActionRule = {
+    def inflict[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean)(using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
         val firstCondition = Condition.fromClass[T1](Query.Class)
         val secondCondition = Condition.fromClass[T2](Query.SecondClass)
         val addedConditions = conditions :+ firstCondition :+ secondCondition
@@ -122,7 +124,7 @@ object Rule {
         rule
     }
 
-    def report[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit) (using ClassTag[T1], ClassTag[T2] ): ActionRule = {
+    def report[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit) (using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
         val firstCondition = Condition.fromClass[T1](Query.Class)
         val secondCondition = Condition.fromClass[T2](Query.SecondClass)
         val addedConditions = conditions :+ firstCondition :+ secondCondition
@@ -179,45 +181,25 @@ object Rule {
         }
 
 
-        // this is pretty jank.
-        noun = stackNoun
-        secondNoun = stackNoun2
-        val beforeRule = ResolveOverloads(set.beforeRules, targets)
-        if (beforeRule.isDefined) {
-            if (!beforeRule.get.evaluate)
-                return false
+
+        def RunRule(noun1 : ZextObject, noun2 : ZextObject, rules : ArrayBuffer[ActionRule], targetCount : Int) : Boolean = {
+            noun = noun1
+            secondNoun = noun2
+            val success = ResolveOverloads(rules, targets).forall(_.evaluate)
+            success
         }
 
-        noun = stackNoun
-        secondNoun = stackNoun2
-        val insteadRule = ResolveOverloads(set.insteadRules, targets)
-        if (insteadRule.isDefined) {
-            if (!insteadRule.get.evaluate)
-                return false
-        }
 
-        noun = stackNoun
-        secondNoun = stackNoun2
-        val carryOutRule = ResolveOverloads(set.executeRules, targets)
-        if (carryOutRule.isDefined) {
-            if (!carryOutRule.get.evaluate)
-                return false
-        }
+        if(!RunRule(stackNoun, stackNoun2, set.beforeRules, targets)) return false
 
-        noun = stackNoun
-        secondNoun = stackNoun2
-        val reportRule = ResolveOverloads(set.reportRules, targets)
-        if (reportRule.isDefined) {
-            reportRule.get.evaluate
-        }
+        if(!RunRule(stackNoun, stackNoun2, set.insteadRules, targets)) return false
 
-        noun = stackNoun
-        secondNoun = stackNoun2
-        val afterRule = ResolveOverloads(set.afterRules, targets)
-        if (afterRule.isDefined) {
-            if (!afterRule.get.evaluate)
-                return false
-        }
+        if(!RunRule(stackNoun, stackNoun2, set.executeRules, targets)) return false
+
+        if(!RunRule(stackNoun, stackNoun2, set.reportRules, targets)) return false
+
+        if(!RunRule(stackNoun, stackNoun2, set.afterRules, targets)) return false
+
 
         true
     }
@@ -253,10 +235,18 @@ object Condition{
     implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), Query.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
-    inline def fromClass[T <: ZextObject](queryType : Query = Query.Class)(implicit classTag: ClassTag[T]) : Condition = {
-        val condition = new Condition(classTag.runtimeClass.isAssignableFrom(noun.getClass), queryType)
+    inline def fromClass[T](queryType : Query = Query.Class)(using TypeTest[ZextObject, T]): Condition = {
+        val condition = new Condition(canBecome[ZextObject, T](noun), queryType)
         condition.specificity = depth[T]
         condition
+    }
+
+    def become[X, Y](x: X)(using tt: TypeTest[X, Y]): Option[Y] = x match
+        case tt(x) => Some(x)
+        case _ => None
+
+    def canBecome[X, Y](x: X)(using tt: TypeTest[X, Y]): Boolean = {
+        become[X,Y](x).isDefined
     }
 }
 

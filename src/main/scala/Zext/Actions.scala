@@ -6,6 +6,7 @@ import Zext.Rule.*
 import Zext.World.*
 
 import scala.collection.mutable
+import scala.reflect.TypeTest
 
 object Actions {
 
@@ -195,7 +196,7 @@ object Actions {
 
   object putting extends Action("put", "insert"){
 
-    type Zontainer = ZextObject & Container
+    type Zontainer =  Container & ZextObject
 
     inflict[ZextObject, Zontainer](putting){ (z1, z2) =>
 
@@ -203,6 +204,7 @@ object Actions {
         z1 transferTo z2
         true
       } else {
+        Say(s"$z2 is inaccessible")
         false
       }
     }
