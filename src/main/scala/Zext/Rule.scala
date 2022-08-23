@@ -58,7 +58,7 @@ object Rule {
     }
 
     inline def instead[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T])* )
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T](Query.Class))* )
         ruleSets(r).insteadRules += rule
         rule
     }
@@ -70,7 +70,7 @@ object Rule {
     }
 
     inline def report[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T])* )
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T](Query.Class))* )
         ruleSets(r).reportRules += rule
         rule
     }
@@ -95,29 +95,42 @@ object Rule {
     }
 
     inline def after[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag: ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T]) *)
+        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T](Query.Class)) *)
         ruleSets(r).afterRules += rule
         rule
     }
 
-    def carryOut(r: Action, conditions: Condition*)(body: => Boolean) : ActionRule = {
+    def inflict(r: Action, conditions: Condition*)(body: => Boolean) : ActionRule = {
         val rule = new ActionRule(body, conditions*)
         ruleSets(r).executeRules += rule
         rule
     }
 
-    inline def carryOut[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ Condition.fromClass[T])* )
+    inline def inflict[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean)(using tag : ClassTag[T]): ActionRule = {
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ Condition.fromClass[T](Query.Class))* )
         ruleSets(r).executeRules += rule
         rule
     }
 
-    def carryOut[T1, T2](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean) : ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]) }, conditions* )
+    def inflict[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean) (using ClassTag[T1], ClassTag[T2] ): ActionRule = {
+        val firstCondition = Condition.fromClass[T1](Query.Class)
+        val secondCondition = Condition.fromClass[T2](Query.SecondClass)
+        val addedConditions = conditions :+ firstCondition :+ secondCondition
+
+        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]) }, addedConditions* )
         ruleSets(r).executeRules += rule
         rule
     }
 
+    def report[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit) (using ClassTag[T1], ClassTag[T2] ): ActionRule = {
+        val firstCondition = Condition.fromClass[T1](Query.Class)
+        val secondCondition = Condition.fromClass[T2](Query.SecondClass)
+        val addedConditions = conditions :+ firstCondition :+ secondCondition
+
+        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]); true }, addedConditions* )
+        ruleSets(r).reportRules += rule
+        rule
+    }
 
     def ResolveOverloads(rules: ArrayBuffer[ActionRule], targets : Int): Option[ActionRule] = {
         val possible = rules.filter(r => r.targets == targets || r.generic).filter(_.possible)
@@ -131,12 +144,14 @@ object Rule {
     }
 
 
-    def execute(rule: Action, target: Option[ZextObject] = None): Boolean = {
+    def execute(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
         val set = ruleSets(rule)
         var targets = 0
 
         var stackNoun : ZextObject = null
+        var stackNoun2 : ZextObject = null
 
+        // pain
         if (target.isDefined) {
             stackNoun = target.get
             if(!stackNoun.isVisible(location)){
@@ -145,13 +160,28 @@ object Rule {
                 return false
             }
 
-            targets = 1
+            targets += 1
         } else {
             stackNoun = null
         }
 
+        if (target2.isDefined) {
+           stackNoun2 = target2.get
+            if(!stackNoun2.isVisible(location)){
+                //@todo maybe make this better
+                Say(s"I can't see ${stackNoun2.definite}")
+                return false
+            }
+
+            targets += 1
+        } else {
+            stackNoun2 = null
+        }
+
+
         // this is pretty jank.
         noun = stackNoun
+        secondNoun = stackNoun2
         val beforeRule = ResolveOverloads(set.beforeRules, targets)
         if (beforeRule.isDefined) {
             if (!beforeRule.get.evaluate)
@@ -159,6 +189,7 @@ object Rule {
         }
 
         noun = stackNoun
+        secondNoun = stackNoun2
         val insteadRule = ResolveOverloads(set.insteadRules, targets)
         if (insteadRule.isDefined) {
             if (!insteadRule.get.evaluate)
@@ -166,6 +197,7 @@ object Rule {
         }
 
         noun = stackNoun
+        secondNoun = stackNoun2
         val carryOutRule = ResolveOverloads(set.executeRules, targets)
         if (carryOutRule.isDefined) {
             if (!carryOutRule.get.evaluate)
@@ -173,12 +205,14 @@ object Rule {
         }
 
         noun = stackNoun
+        secondNoun = stackNoun2
         val reportRule = ResolveOverloads(set.reportRules, targets)
         if (reportRule.isDefined) {
             reportRule.get.evaluate
         }
 
         noun = stackNoun
+        secondNoun = stackNoun2
         val afterRule = ResolveOverloads(set.afterRules, targets)
         if (afterRule.isDefined) {
             if (!afterRule.get.evaluate)
@@ -208,7 +242,7 @@ class PersistingRule( body : => Unit) extends Rule {
 }
 
 enum Query:
-    case Generic, Class, Property, Object, Location
+    case Generic, Class, SecondClass, Property, Object, Location
 
 object Condition{
     // inform's precedence is something like
@@ -219,8 +253,8 @@ object Condition{
     implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), Query.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
-    inline def fromClass[T <: ZextObject](implicit classTag: ClassTag[T]) : Condition = {
-        val condition = new Condition(classTag.runtimeClass.isAssignableFrom(noun.getClass), Query.Class)
+    inline def fromClass[T <: ZextObject](queryType : Query = Query.Class)(implicit classTag: ClassTag[T]) : Condition = {
+        val condition = new Condition(classTag.runtimeClass.isAssignableFrom(noun.getClass), queryType)
         condition.specificity = depth[T]
         condition
     }
@@ -248,8 +282,13 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
             targets = 1
         }
 
+        // maybe wrong
         if(c.queryType == Query.Generic)
             generic = true
+    }
+
+    if(conditions.exists(_.queryType == Query.SecondClass)){
+        targets = 2
     }
 
     def specificity = {

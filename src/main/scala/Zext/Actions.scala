@@ -11,8 +11,8 @@ object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
 
-  def Understand(str: String, action: Action, zextObject: ZextObject = null) : Unit = {
-    commandAliases.addOne(str -> Command(action, Option(zextObject)))
+  def Understand(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null) : Unit = {
+    commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
   }
 
   def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
@@ -36,7 +36,7 @@ object Actions {
     val nowhere = Room(); nowhere.global = true
     var goingDir : Direction = null
 
-    carryOut[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
+    inflict[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
 
     // weird hack
     before(going, nowhere.asDestination){
@@ -50,7 +50,7 @@ object Actions {
     // override the "i went x " text, which should be the act of reporting going
     // once we have moved to the other room, and reported, we want to automatically examine the room.
 
-    carryOut[Room](going) { r =>
+    inflict[Room](going) { r =>
       // room has to be connected to location
       var connected = false
 
@@ -76,7 +76,6 @@ object Actions {
       LineBreak()
       execute(examining, location)
       location.OnEnter()
-      true
     }
   }
 
@@ -86,7 +85,7 @@ object Actions {
       Say("You stop, drop, and roll.")
     }
 
-    carryOut[ZextObject](dropping){ z =>
+    inflict[ZextObject](dropping){ z =>
       if(z.parentContainer == inventory){
         z.transferTo(location)
         true
@@ -105,7 +104,7 @@ object Actions {
 
   object taking extends Action("take", "get", "pick up") {
 
-    carryOut(taking) {
+    inflict(taking) {
       Say(s"I can't take nothing.")
       false
     }
@@ -123,7 +122,7 @@ object Actions {
       Say(s"You took $n. Wow.")
     }
 
-    carryOut[ZextObject](taking) { n =>
+    inflict[ZextObject](taking) { n =>
       noun.transferTo(inventory)
       true
     }
@@ -131,25 +130,25 @@ object Actions {
 
   object examining extends Action("examine", "x", "look", "l") {
 
-    carryOut(examining) {
+    inflict(examining) {
       execute(examining, location)
     }
 
-    carryOut[Room](examining) { r =>
+    inflict[Room](examining) { r =>
       Title(location.name)
       Say(location.description)
       true
     }
 
 
-    carryOut[Crevice](examining) { r =>
+    inflict[Crevice](examining) { r =>
       Title(location.name + " It's small! ")
       Say(location.description)
       true
     }
 
 
-    carryOut[ZextObject](examining) { n =>
+    inflict[ZextObject](examining) { n =>
       val immediate = s"$n: ${n.description}"
       Say(immediate)
       true
@@ -173,7 +172,7 @@ object Actions {
 
 
   object exiting extends Action("exit") {
-    carryOut(exiting) {
+    inflict(exiting) {
       Say(s"Goodbye $playerName")
       exit = true
       true
@@ -181,7 +180,7 @@ object Actions {
   }
 
   object takingInventory extends Action("inventory", "i") {
-    carryOut(takingInventory) {
+    inflict(takingInventory) {
       var s = "I am holding "
       for (i <- inventory.contents) {
         s += i.indefinite + ", "
@@ -190,6 +189,26 @@ object Actions {
       s += "."
       Say(s)
       true
+    }
+  }
+
+
+  object putting extends Action("put", "insert"){
+
+    type Zontainer = ZextObject & Container
+
+    inflict[ZextObject, Zontainer](putting){ (z1, z2) =>
+
+      if(z1.parentContainer == inventory && z2.isAccessible(location)){
+        z1 transferTo z2
+        true
+      } else {
+        false
+      }
+    }
+
+    report[ZextObject, Zontainer](putting) { (z1, z2) =>
+      Say(s"You put $noun into $secondNoun")
     }
   }
 }

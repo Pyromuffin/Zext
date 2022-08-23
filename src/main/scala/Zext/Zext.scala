@@ -110,8 +110,8 @@ class ZextObject {
         global || sameRoom || room == this || inInventory || connectedRoom || visibleTransitively
     }
 
-    def isAccessible = {
-
+    def isAccessible(room: Room) : Boolean = {
+        isVisible(room)
     }
 
     override def toString: String = definite
@@ -203,7 +203,7 @@ class device(using Container) extends thing {
     object turningOff extends Action("turn off", "switch off", "deactivate")
     object switching extends Action("switch", "toggle")
 
-    carryOut[device](turningOn) { d =>
+    inflict[device](turningOn) { d =>
         if (d.on) {
             Say(s"$noun is already on")
             false
@@ -217,7 +217,7 @@ class device(using Container) extends thing {
         Say(s"I turned on $noun")
     }
 
-    carryOut[device](turningOff) { d =>
+    inflict[device](turningOff) { d =>
         if (d.off) {
             Say(s"$noun is already off")
             false
@@ -231,7 +231,7 @@ class device(using Container) extends thing {
         Say(s"I turned off $noun")
     }
 
-    carryOut[device](switching){ d =>
+    inflict[device](switching){ d =>
         if(d.on) execute(turningOff, d)
         else execute(turningOn, d)
     }

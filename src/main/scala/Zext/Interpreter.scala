@@ -116,10 +116,10 @@ object Parser extends RegexParsers{
   }
 
 
-  case class Command(action: Action, noun: Option[ZextObject])
+  case class Command(action: Action, noun: Option[ZextObject], secondNoun : Option[ZextObject])
 
   def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
-    val command = actions ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1, a._2) }
+    val command = actions ~ opt("\\s+".r ~> nouns) ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1._1, a._1._2, a._2) }
     command
   }
 
@@ -148,7 +148,7 @@ object Parser extends RegexParsers{
       val command = GetCommand(input, commandParser)
       if(command.nonEmpty){
         val c = command.get
-        execute(c.action, c.noun)
+        execute(c.action, c.noun, c.secondNoun)
         everyTurnRules.foreach( _.Execute() )
       } else {
         Say("I'm very sure what you mean. But no.")

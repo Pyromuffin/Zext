@@ -24,7 +24,7 @@ object FarmHouse extends Room {
   }
 
   // probably put this somewhere better
-  carryOut[Supporter](examining) { s =>
+  inflict[Supporter](examining) { s =>
     Say(s.description)
     s.contents.foreach(z => Say(z.name))
     true
@@ -66,8 +66,6 @@ object FarmHouse extends Room {
 
     var tamped = false
 
-    proper = true
-
     offDesc = "Sleepy, just like you."
     onDesc = "Constant disturbing grinding and whining, the machine performs miracles before your eyes"
     has(fixed)
@@ -89,7 +87,7 @@ object FarmHouse extends Room {
   object tamping extends Action("tamp", "smack")
 
 
-  carryOut(tamping, coffee_machine) { cm =>
+  inflict(tamping, coffee_machine) { cm =>
     if (coffee_machine.tamped == true)
       Say ("It's as tamped as it's gonna get without your hoe")
     else
@@ -99,7 +97,7 @@ object FarmHouse extends Room {
     true
   }
 
-  carryOut[ZextObject](tamping){ _=>
+  inflict[ZextObject](tamping){ _=>
     Say (s"$noun doesn't give a heck. It's tamp-er proof.")
     false
   }
@@ -160,7 +158,7 @@ object ChickenCoop extends Room {
 
   chickens.petted = false
 
-  carryOut(petting, chickens) { c =>
+  inflict(petting, chickens) { c =>
     if (chickens.petted == true)
       Say("You pet the chickens again, extra hard. They make little contented clucks but don't love you any harder.")
     else

@@ -3,7 +3,7 @@ package Zext
 import Zext.Actions.*
 import Zext.Direction.opposing
 import Zext.Interpreter.Say
-import Zext.Rule.{after, carryOut, execute}
+import Zext.Rule.{after, inflict, execute}
 import Zext.World.{location, noun}
 
 import scala.collection.mutable
