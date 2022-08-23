@@ -120,7 +120,7 @@ object Rule {
 
 
     def ResolveOverloads(rules: ArrayBuffer[ActionRule], targets : Int): Option[ActionRule] = {
-        val possible = rules.filter(_.targets == targets).filter(_.possible)
+        val possible = rules.filter(r => r.targets == targets || r.generic).filter(_.possible)
         if (possible.isEmpty)
             return Option.empty
 
@@ -241,11 +241,15 @@ class Condition( condition : => Boolean, val queryType: Query ) {
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
     var targets = 0
+    var generic = false
 
     for(c <- conditions){
         if(c.queryType == Query.Object || c.queryType == Query.Property || c.queryType == Query.Class) {
             targets = 1
         }
+
+        if(c.queryType == Query.Generic)
+            generic = true
     }
 
     def specificity = {

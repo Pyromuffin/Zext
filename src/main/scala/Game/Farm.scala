@@ -12,52 +12,6 @@ import Zext.World.*
 import Zext.thing.NounAmount.*
 import Zext.Inflector.*
 
-class device(using Container) extends thing {
-
-  var on = false
-  def off = !on
-
-  var offDesc : StringExpression = null
-  var onDesc :  StringExpression = null
-  description = s"${if(on) onDesc else offDesc}"
-
-  object turningOn extends Action("turn on", "switch on", "activate")
-  object turningOff extends Action("turn off", "switch off", "deactivate")
-  object switching extends Action("switch", "toggle")
-
-  carryOut[device](turningOn) { d =>
-    if (d.on) {
-      Say(s"$noun is already on")
-      false
-    } else {
-      d.on = true
-      true
-    }
-  }
-
-  report[device](turningOn) { d =>
-    Say(s"I turned on $noun")
-  }
-
-  carryOut[device](turningOff) { d =>
-    if (d.off) {
-      Say(s"$noun is already off")
-      false
-    } else {
-      d.on = off
-      true
-    }
-  }
-
-  report[device](turningOff) { d =>
-    Say(s"I turned off $noun")
-  }
-
-  carryOut[device](switching){ d =>
-    if(d.on) execute(turningOff, d)
-    else execute(turningOn, d)
-  }
-}
 
 
 object FarmHouse extends Room {

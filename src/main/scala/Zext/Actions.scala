@@ -16,6 +16,10 @@ object Actions {
   }
 
   def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
+  def Randomly(strs: StringExpression*) : StringExpression = {
+    val which = util.Random.nextInt(strs.length)
+    strs(which)
+  }
 
 
   object going extends Action("go", "travel", "walk", "run", "cartwheel"){
@@ -76,6 +80,28 @@ object Actions {
     }
   }
 
+  object dropping extends Action("drop"){
+
+    report(dropping){
+      Say("You stop, drop, and roll.")
+    }
+
+    carryOut[ZextObject](dropping){ z =>
+      if(z.parentContainer == inventory){
+        z.transferTo(location)
+        true
+      }
+      else {
+        Say("Can't drop what you don't have.")
+        false
+      }
+    }
+
+    report[ZextObject](dropping){ z =>
+      Say( Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.") )
+    }
+  }
+
 
   object taking extends Action("take", "get", "pick up") {
 
@@ -98,7 +124,7 @@ object Actions {
     }
 
     carryOut[ZextObject](taking) { n =>
-      noun.TransferTo(inventory)
+      noun.transferTo(inventory)
       true
     }
   }
