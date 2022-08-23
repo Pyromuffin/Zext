@@ -21,12 +21,12 @@ object scenery extends Property
 object wet extends Property
 case class initialDescription(desc : StringExpression) extends Property
 
+
 trait Container {
     given c : Container = this
-
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
     var open = true
-    var transparent = false
+    var transparent = true
 }
 
 
@@ -35,6 +35,7 @@ object ZextObject {
 }
 
 class ZextObject {
+
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
     var name : String = ""
@@ -80,7 +81,33 @@ class ZextObject {
 
 
     def isVisible(room: Room) = {
-        global || room == parentContainer || room == this
+
+        /*
+        conditions for item visibility:
+        1) in the same container
+        2) in the player's inventory
+        3) in a transparent container contained (transitively) within the room
+        4) the current room or an adjacent room (? maybe ?),
+        5) a global object
+        */
+
+        val sameRoom = room == parentContainer
+        val inInventory = parentContainer == inventory
+        val connectedRoom = room.connections.values.exists(_ == this)
+
+        // if this breaks, i deserve it
+        val visibleTransitively = {
+            var parent = parentContainer
+            while(parent != null && parent.transparent && parent != room && parent.isInstanceOf[ZextObject]){
+                parent = parent.asInstanceOf[ZextObject].parentContainer
+            }
+
+            parent == room
+        }
+
+
+
+        global || sameRoom || room == this || inInventory || connectedRoom || visibleTransitively
     }
 
     def isAccessible = {

@@ -65,8 +65,7 @@ object FarmHouse extends Room {
   description = s"$farm is where the magic happens. That place is outside of this place."
 
   Connect(south, OutsideWorld)
-
-  report(going, OutsideWorld.asDestination, here) {
+  report(going, south, here) {
     Say("Closing the door behind, you emerge into the sunlight")
   }
 
@@ -176,7 +175,7 @@ object OutsideWorld extends Room {
   }
 
   Connect(west, ChickenCoop)
-  report(going, ChickenCoop.asDestination, here) {
+  report(going, west, here) {
     Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
   }
 

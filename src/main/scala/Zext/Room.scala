@@ -48,7 +48,6 @@ class Room extends ZextObject with Container {
 
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
-  global = true
 
   def asDestination = Condition.fromObject(this)
 
