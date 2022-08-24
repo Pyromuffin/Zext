@@ -12,19 +12,20 @@ object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
 
-  def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null) : Unit = {
+  def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
     commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
   }
 
 
-  def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
-  def Randomly(strs: StringExpression*) : StringExpression = {
+  def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
+
+  def Randomly(strs: StringExpression*): StringExpression = {
     val which = util.Random.nextInt(strs.length)
     strs(which)
   }
 
 
-  object going extends Action("go", "travel", "walk", "run", "cartwheel"){
+  object going extends Action("go", "travel", "walk", "run", "cartwheel") {
 
     UnderstandAlias("east", going, Direction.east)
     UnderstandAlias("e", going, Direction.east)
@@ -35,13 +36,16 @@ object Actions {
     UnderstandAlias("south", going, Direction.south)
     UnderstandAlias("s", going, Direction.south)
 
-    val nowhere = Room(); nowhere.global = true; nowhere.name = "nowhere"; nowhere.proper = true
-    var goingDir : Direction = null
+    val nowhere = Room();
+    nowhere.global = true;
+    nowhere.name = "nowhere";
+    nowhere.proper = true
+    var goingDir: Direction = null
 
     inflict[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
 
     // weird hack
-    before(going, nowhere.asDestination){
+    before(going, nowhere.asDestination) {
       Say(s"I can't go $goingDir from here.")
       false
     }
@@ -56,24 +60,24 @@ object Actions {
       // room has to be connected to location
       var connected = false
 
-      for( (d, room) <- location.connections) {
-        if(r == room){
+      for ((d, room) <- location.connections) {
+        if (r == room) {
           connected = true
           goingDir = d
         }
       }
 
-      if(!connected) {
+      if (!connected) {
         Say(s"I can't get to $r from here.")
       }
       connected
     }
 
-    report[Room](going){ r =>
+    report[Room](going) { r =>
       Say(s"I went $goingDir to $r.")
     }
 
-    after[Room](going){ r =>
+    after[Room](going) { r =>
       location = r
       LineBreak()
       execute(examining, location)
@@ -81,16 +85,16 @@ object Actions {
     }
   }
 
-  object dropping extends Action("drop", "abandon"){
+  object dropping extends Action("drop", "abandon") {
 
-    report(dropping){
-      Say( Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
+    report(dropping) {
+      Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
-    inflict[ZextObject](dropping){ z =>   // a/n z is noun  (this lamda has to take ZextObject argument) 
-      if(z.parentContainer == inventory){
+    inflict[ZextObject](dropping) { z => // a/n z is noun  (this lamda has to take ZextObject argument)
+      if (z.parentContainer == inventory) {
         z.transferTo(location)
         true
       }
@@ -100,37 +104,36 @@ object Actions {
       }
     }
 
-    report[ZextObject](dropping){ z =>
-      Say( Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.") )
+    report[ZextObject](dropping) { z =>
+      Say(Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate."))
     }
   }
 
- object smelling extends Action( "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize"){
+  object smelling extends Action("inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
 
-   inflict(smelling){
-     Say (Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
-    true
-   }
-   after(smelling, noun.parentContainer == inventory) {
-     Say(s"The scent of $noun is soaked through your clothing now.")
-   }
+    inflict(smelling) {
+      Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
+      true
+    }
+    after(smelling, noun.parentContainer == inventory) {
+      Say(s"The scent of $noun is soaked through your clothing now.")
+    }
 
 
+    instead(smelling, fixed) {
+      Say(s"$noun: Scentless and fixed. ")
+      false
+    }
 
-   instead(smelling, fixed) {
-     Say(s"$noun: Scentless and fixed. ")
-     false
-   }
+    report[ZextObject](smelling) { n =>
+      Say(s"You smell $n. Wow.")
+    }
 
-   report[ZextObject](smelling) { n =>
-     Say(s"You smell $n. Wow.")
-   }
+    inflict[ZextObject](smelling) { n =>
 
-   inflict[ZextObject](smelling) { n =>
-
-     true
-   }
- }
+      true
+    }
+  }
 
 
   object tasting extends Action("eat", "lick", "nom", "mouth", "nibble") {
@@ -155,7 +158,7 @@ object Actions {
       false
     }
 
-    instead(taking, noun.parentContainer == inventory){
+    instead(taking, noun.parentContainer == inventory) {
       Say(s"I shuffle around the items in my pockets, looking for $noun")
     }
 
@@ -228,18 +231,17 @@ object Actions {
     }
   }
 
-    report[Room](examining) { r =>
-      val visible = r.contents.filterNot(_ ? scenery)
-      if (!visible.isEmpty) {
-        var s = "You can see "
-        for (i <- visible) {
-          if (!i.?(scenery))
-            s += i.indefinite + ", "
-        }
-        s = s.stripSuffix(", ")
-        s += "."
-        Say(s)
+  report[Room](examining) { r =>
+    val visible = r.contents.filterNot(_ ? scenery)
+    if (!visible.isEmpty) {
+      var s = "You can see "
+      for (i <- visible) {
+        if (!i.?(scenery))
+          s += i.indefinite + ", "
       }
+      s = s.stripSuffix(", ")
+      s += "."
+      Say(s)
     }
   }
 
@@ -265,7 +267,6 @@ object Actions {
     }
   }
 
-
   object putting extends Action("put", "insert") {
 
     type Zontainer = Container & ZextObject
@@ -284,6 +285,6 @@ object Actions {
     report[ZextObject, Zontainer](putting) { (z1, z2) =>
       Say(s"You put $noun into $secondNoun")
     }
-
-
   }
+}
+
