@@ -2,7 +2,7 @@ package Zext
 
 import Zext.Interpreter.*
 import Zext.Macros.depth
-import Zext.Parser.Command
+import Zext.Parser.*
 import Zext.Rule.*
 import Zext.World.*
 
@@ -59,7 +59,7 @@ object Rule {
     }
 
     inline def instead[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T](Query.Class))* )
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class))* )
         ruleSets(r).insteadRules += rule
         rule
     }
@@ -71,7 +71,7 @@ object Rule {
     }
 
     inline def report[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T](Query.Class))* )
+        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class))* )
         ruleSets(r).reportRules += rule
         rule
     }
@@ -96,7 +96,7 @@ object Rule {
     }
 
     inline def after[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag: ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T](Query.Class)) *)
+        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class)) *)
         ruleSets(r).afterRules += rule
         rule
     }
@@ -108,15 +108,15 @@ object Rule {
     }
 
     inline def inflict[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean): ActionRule = {
-        val condition = Condition.fromClass[T](Query.Class)
+        val condition = Condition.fromClass[T](QueryPrecedence.Class)
         val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ condition)* )
         ruleSets(r).executeRules += rule
         rule
     }
 
     def inflict[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean)(using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
-        val firstCondition = Condition.fromClass[T1](Query.Class)
-        val secondCondition = Condition.fromClass[T2](Query.SecondClass)
+        val firstCondition = Condition.fromClass[T1](QueryPrecedence.Class)
+        val secondCondition = Condition.fromClass[T2](QueryPrecedence.SecondClass)
         val addedConditions = conditions :+ firstCondition :+ secondCondition
 
         val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]) }, addedConditions* )
@@ -125,8 +125,8 @@ object Rule {
     }
 
     def report[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit) (using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
-        val firstCondition = Condition.fromClass[T1](Query.Class)
-        val secondCondition = Condition.fromClass[T2](Query.SecondClass)
+        val firstCondition = Condition.fromClass[T1](QueryPrecedence.Class)
+        val secondCondition = Condition.fromClass[T2](QueryPrecedence.SecondClass)
         val addedConditions = conditions :+ firstCondition :+ secondCondition
 
         val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]); true }, addedConditions* )
@@ -223,20 +223,28 @@ class PersistingRule( body : => Unit) extends Rule {
     def Execute() = body
 }
 
-enum Query:
-    case Generic, Class, SecondClass, Property, Object, Location
+enum QueryPrecedence:
+    case Generic, Class, SecondClass, Property, Object, Containment, Location
 
 object Condition{
     // inform's precedence is something like
     // location > object > property > class > generic
 
-    implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, Query.Generic)
-    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, Query.Object)
-    implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), Query.Object)
-    implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), Query.Property)
-    implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, Query.Location)
-    inline def fromClass[T](queryType : Query = Query.Class)(using TypeTest[ZextObject, T]): Condition = {
-        val condition = new Condition(canBecome[ZextObject, T](noun), queryType)
+
+    implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, QueryPrecedence.Generic)
+    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, QueryPrecedence.Object)
+    implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), QueryPrecedence.Object)
+    implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
+    implicit def fromLocation(r : => Room) : Condition = new Condition(r == location, QueryPrecedence.Location)
+    inline def fromClass[T](queryType : QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+        val condition = new Condition(
+            {
+                val target = if(queryType == QueryPrecedence.Class) noun else secondNoun
+                val success = canBecome[ZextObject, T](target)
+                //println(s"$target sucess: $success")
+                success
+            }
+            , queryType)
         condition.specificity = depth[T]
         condition
     }
@@ -252,7 +260,7 @@ object Condition{
 
 
 
-class Condition( condition : => Boolean, val queryType: Query ) {
+class Condition( condition : => Boolean, val queryType: QueryPrecedence ) {
     def evaluate = condition
 
     var specificity = 1
@@ -268,16 +276,16 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
     var generic = false
 
     for(c <- conditions){
-        if(c.queryType == Query.Object || c.queryType == Query.Property || c.queryType == Query.Class) {
+        if(c.queryType == QueryPrecedence.Object || c.queryType == QueryPrecedence.Property || c.queryType == QueryPrecedence.Class) {
             targets = 1
         }
 
         // maybe wrong
-        if(c.queryType == Query.Generic)
+        if(c.queryType == QueryPrecedence.Generic)
             generic = true
     }
 
-    if(conditions.exists(_.queryType == Query.SecondClass)){
+    if(conditions.exists(_.queryType == QueryPrecedence.SecondClass)){
         targets = 2
     }
 
@@ -300,9 +308,11 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
 
 
-class Action(val verb : String*) extends Rule {
+class Action(val verbs : String*) extends Rule with ParsableType(PartOfSpeech.verb) {
+
+    Understand(this, verbs*)
 
     ruleSets(this) = new ActionRuleSet
-    override def toString = verb(0)
+    override def toString = verbs(0)
 }
 

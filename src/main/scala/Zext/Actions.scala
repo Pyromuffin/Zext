@@ -12,9 +12,10 @@ object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
 
-  def Understand(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null) : Unit = {
+  def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null) : Unit = {
     commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
   }
+
 
   def Randomly(one_in : Int) : Boolean = util.Random.nextInt(one_in) == 0
   def Randomly(strs: StringExpression*) : StringExpression = {
@@ -25,16 +26,16 @@ object Actions {
 
   object going extends Action("go", "travel", "walk", "run", "cartwheel"){
 
-    Understand("east", going, Direction.east)
-    Understand("e", going, Direction.east)
-    Understand("west", going, Direction.west)
-    Understand("w", going, Direction.west)
-    Understand("north", going, Direction.north)
-    Understand("n", going, Direction.north)
-    Understand("south", going, Direction.south)
-    Understand("s", going, Direction.south)
+    UnderstandAlias("east", going, Direction.east)
+    UnderstandAlias("e", going, Direction.east)
+    UnderstandAlias("west", going, Direction.west)
+    UnderstandAlias("w", going, Direction.west)
+    UnderstandAlias("north", going, Direction.north)
+    UnderstandAlias("n", going, Direction.north)
+    UnderstandAlias("south", going, Direction.south)
+    UnderstandAlias("s", going, Direction.south)
 
-    val nowhere = Room(); nowhere.global = true
+    val nowhere = Room(); nowhere.global = true; nowhere.name = "nowhere"; nowhere.proper = true
     var goingDir : Direction = null
 
     inflict[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
