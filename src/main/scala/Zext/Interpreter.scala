@@ -151,7 +151,7 @@ object Parser extends RegexParsers{
         execute(c.action, c.noun, c.secondNoun)
         everyTurnRules.foreach( _.Execute() )
       } else {
-        Say("I'm very sure what you mean. But no.")
+        Say("Redacted.")
       }
     }
   }

@@ -1,13 +1,21 @@
 Annatations
 
+are we doing get x from y?
+
+//7:24 is now
+
+how to make actions?
+
+
+whoopsie daisieess:
+haven't really tried to fix these yet, just notes for later:
+get chicken coop entrance reporting when going from Path to OutsideWorld
+can go north from OutsideWorld
+
+fucking hell why?:
+
+
+
 errorz ingame
  get hay
-Exception in thread "main" java.lang.IndexOutOfBoundsException: -1 is out of bounds (min 0, max 4)
-	at scala.collection.mutable.ArrayBuffer.remove(ArrayBuffer.scala:98)
-	at Zext.Actions$taking$.$anonfun$16(Actions.scala:91)
-	at Zext.Actions$taking$.$anonfun$17(Actions.scala:88)
-	at scala.Function0.apply$mcZ$sp(Function0.scala:39)
-	at Zext.ActionRule.evaluate(Rule.scala:274)
-	at Zext.Rule$.execute(Rule.scala:164)
-	at Zext.Parser$.main(Interpreter.scala:144)
-	at Zext.Parser.main(Interpreter.scala)
+

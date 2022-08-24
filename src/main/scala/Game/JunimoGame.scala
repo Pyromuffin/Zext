@@ -69,11 +69,11 @@ object JunimoGame {
     val startDescription = s"After a hard day toiling on fields of $farm, $farmer decides to take a break with a relaxing nap in the Secret Woods"
     Say(startDescription)
   }
-
-  before(takingInventory) {
-    if(dirty)
-      Say(s"The dust you earned from today's productive work at $farm clings to your body. A reminder of an honest job well done.")
-  }
+// I broke this and I cannot begin to guess how
+//  before(takingInventory) {
+//    if(dirty)
+//      Say(s"The dust you earned from today's productive work at $farm clings to your body. A reminder of an honest job well done.")
+//  }
 
   // inventory is something like: backpack : Pickaxe, shovel, hoe, sword, watering can, stones, fiber, sap, logs, clothes
 

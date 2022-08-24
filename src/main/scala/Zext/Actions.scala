@@ -80,13 +80,15 @@ object Actions {
     }
   }
 
-  object dropping extends Action("drop"){
+  object dropping extends Action("drop", "abandon"){
 
     report(dropping){
-      Say("You stop, drop, and roll.")
+      Say( Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
+        """You throw yourself to the floor.
+          |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
-    inflict[ZextObject](dropping){ z =>
+    inflict[ZextObject](dropping){ z =>   // a/n z is noun  (this lamda has to take ZextObject argument) 
       if(z.parentContainer == inventory){
         z.transferTo(location)
         true
@@ -98,12 +100,54 @@ object Actions {
     }
 
     report[ZextObject](dropping){ z =>
-      Say( Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.") )
+      Say( Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.") )
     }
   }
 
+ object smelling extends Action( "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize"){
 
-  object taking extends Action("take", "get", "pick up") {
+   inflict(smelling){
+     Say (Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
+    true
+   }
+   after(smelling, noun.parentContainer == inventory) {
+     Say(s"The scent of $noun is soaked through your clothing now.")
+   }
+
+
+
+   instead(smelling, fixed) {
+     Say(s"$noun: Scentless and fixed. ")
+     false
+   }
+
+   report[ZextObject](smelling) { n =>
+     Say(s"You smell $n. Wow.")
+   }
+
+   inflict[ZextObject](smelling) { n =>
+
+     true
+   }
+ }
+
+
+  object tasting extends Action("eat", "lick", "nom", "mouth", "nibble") {
+
+    inflict(tasting) {
+      execute(tasting, location)
+    }
+
+
+    inflict[ZextObject](tasting) { n =>
+      val immediate = s"$n: ${n.description}"
+      Say(immediate)
+      true
+    }
+  } //taste test
+
+
+  object taking extends Action("take", "get", "pick up", "g") {
 
     inflict(taking) {
       Say(s"I can't take nothing.")
@@ -154,7 +198,34 @@ object Actions {
       Say(immediate)
       true
     }
+  }
 
+  object examining1 extends Action("examine1", "look1") {
+
+    inflict(examining1) {
+      execute(examining1, location)
+    }
+
+    inflict[Room](examining1) { r =>
+      Title(location.name)
+      Say(location.description)
+      true
+    }
+
+
+    inflict[Crevice](examining1) { r =>
+      Title(location.name + " It's small! ")
+      Say(location.description)
+      true
+    }
+
+
+    inflict[ZextObject](examining1) { n =>
+      val immediate = s"$n: ${n.description}"
+      Say(immediate)
+      true
+    }
+  }
 
     report[Room](examining) { r =>
       val visible = r.contents.filterNot(_ ? scenery)
@@ -182,7 +253,7 @@ object Actions {
 
   object takingInventory extends Action("inventory", "i") {
     inflict(takingInventory) {
-      var s = "I am holding "
+      var s = "In your possessionary, you have "
       for (i <- inventory.contents) {
         s += i.indefinite + ", "
       }
@@ -194,13 +265,13 @@ object Actions {
   }
 
 
-  object putting extends Action("put", "insert"){
+  object putting extends Action("put", "insert") {
 
-    type Zontainer =  Container & ZextObject
+    type Zontainer = Container & ZextObject
 
-    inflict[ZextObject, Zontainer](putting){ (z1, z2) =>
+    inflict[ZextObject, Zontainer](putting) { (z1, z2) =>
 
-      if(z1.parentContainer == inventory && z2.isAccessible(location)){
+      if (z1.parentContainer == inventory && z2.isAccessible(location)) {
         z1 transferTo z2
         true
       } else {
@@ -212,5 +283,6 @@ object Actions {
     report[ZextObject, Zontainer](putting) { (z1, z2) =>
       Say(s"You put $noun into $secondNoun")
     }
+
+
   }
-}

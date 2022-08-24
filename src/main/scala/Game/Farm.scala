@@ -14,6 +14,8 @@ import Zext.Inflector.*
 
 
 
+
+
 object FarmHouse extends Room {
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
@@ -51,7 +53,6 @@ object FarmHouse extends Room {
     }
 
     everyTurnRules += {
-      if (on && location == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
     }
 
   }
@@ -110,6 +111,14 @@ object FarmHouse extends Room {
 
 }
 
+
+class Vegetable(using c : Container) extends thing {
+  var wilted = false
+  var watered = false
+  var ripe = false
+}
+
+
 object OutsideWorld extends Room {
 
   name = "Porch"
@@ -137,13 +146,33 @@ object OutsideWorld extends Room {
 class Animal(using c : Container) extends thing {
   var petted = false
 }
+
+
+object Path extends Room {
+  name = "Path to Town"
+  description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
+  val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggling, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three"
+
+  report(going, west, here) {
+    Say(Randomly("With one last glance over your shoulder, you sigh and turn towards home.", "You try to run home but you can only ever walk."))
+  }
+
+  report(going, east, here) {
+    Say(Randomly("You gird your loins, take a deep breath, and ready yourself to face The Town.", "You enter the sprawling metropolis of Stardew Valley."))
+  }
+
+  //Connect(east, Town)
+  Connect(west, OutsideWorld)
+
+}
+
 object ChickenCoop extends Room {
   name = "Coop"
-  description = "You are in a little wooden coop. So many fluffy feathery chicken friends surround you."
+  description = "You are in a little wooden coop. It smells nice. So many fluffy feathery chicken friends surround you."
 
   val void_mayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
 
-  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night."
+  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm"
   /* property empty vs full (full of mayo)
   "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
   "Emptiness. Like the wrong kind of void."
@@ -173,22 +202,69 @@ object ChickenCoop extends Room {
    if inventory already has a hay, "Not so fast, Scarecrow Steve! Leave some for the chickens"
   * */
 
+//
+//  inflict(taking, hay){
+//    if (hay.parentContainer == inventory){
+//      Say("Not so fast, Scarecrow Steve! Leave some for the chickens")
+//      false
+//    }
+//    else{
+//      val new_hay = hay
+//    }
+//  }
+  before(taking, hay){
+    if (hay.parentContainer == inventory) {
+      Say("Not so fast, Scarecrow Steve! Leave some for the chickens")
+      false
+    }
+    else
+      true
+  }
+
+  report(taking, hay, here) {
+    Say("you scoop up a nice armful of hay and stuff it in your sack for later.")
+  }
+
   after(taking, hay) {
     Say("You aren't really sure why you want that but you do.")
   }
 
   val hay_box = ~"tray of hay" is fixed aka "trough" aka "food" aka "feed"
 
-  val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine in this pleasant place" are scenery
+  val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery
 
 
   instead(going, east, this) {
     // if(no may in inventory
-    Say("but, but, the mayo, the chickens!")
+    Say("But, but, the mayo, the chickens!")
   }
 
   instead(going, north, this) {
     Say("You lift up one leg. The chickens look at you reproachfully. You change your mind about getting into the nest.")
   }
 
+
+  instead(going, west, here) {
+    val dix =
+      if (void_mayo.parentContainer == inventory) {
+        Say("you got that sweet mayo, but there's no exit there anyways.")
+        true
+      }
+      else {
+        Say("you really want that mayo")
+        false
+      }
+    if (dix) Say("The true dix are the friends you make along the way")
+    else if (!chickens.petted) Say("you really should pet the chickens, idiot")
+
+  }
+
 }
+
+
+
+
+
+
+
+
