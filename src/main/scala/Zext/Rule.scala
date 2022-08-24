@@ -134,10 +134,12 @@ object Rule {
         rule
     }
 
-    def ResolveOverloads(rules: ArrayBuffer[ActionRule], targets : Int): Option[ActionRule] = {
-        val possible = rules.filter(r => r.targets == targets || r.generic).filter(_.possible)
+    def ResolveOverloads(possible: ArrayBuffer[ActionRule], targets : Int): Option[ActionRule] = {
         if (possible.isEmpty)
             return Option.empty
+
+        if(possible.length == 1)
+            return possible.headOption
 
         val maxPrecedence = possible.map(_.precedence).max
         val maxPrecedenceRules = possible.filter(_.precedence == maxPrecedence)
@@ -185,20 +187,41 @@ object Rule {
         def RunRule(noun1 : ZextObject, noun2 : ZextObject, rules : ArrayBuffer[ActionRule], targetCount : Int) : Boolean = {
             noun = noun1
             secondNoun = noun2
-            val success = ResolveOverloads(rules, targets).forall(_.evaluate)
+            val success = ResolveOverloads(rules, targets).forall(_.exec)
             success
         }
 
+        noun = stackNoun
+        secondNoun = stackNoun2
+        // we need to evaluate any "previously" rules here... actually we want to run them before the **first** rule executes in any execution chain.
+        // this will be difficult or impossible to do without serializing the game state, which we might want to do at some point for save games, but i am not going to worry about that just yet.
+        val beforeRules = set.beforeRules.filter(r => r.targets == targets || r.generic).filter(r => r.previouslyPossible || r.possible )
+        val previouslyInsteadPossible = set.insteadRules.filter(r => r.targets == targets || r.generic).filter(_.previouslyPossible)
+        val previouslyPossibleExecute = set.executeRules.filter(r => r.targets == targets || r.generic).filter(_.previouslyPossible)
+        val previouslyPossibleReport = set.reportRules.filter(r => r.targets == targets || r.generic).filter(_.previouslyPossible)
+        val previouslyPossibleAfter = set.afterRules.filter(r => r.targets == targets || r.generic).filter(_.previouslyPossible)
 
-        if(!RunRule(stackNoun, stackNoun2, set.beforeRules, targets)) return false
+        if(!RunRule(stackNoun, stackNoun2, beforeRules, targets)) return false
 
-        if(!RunRule(stackNoun, stackNoun2, set.insteadRules, targets)) return false
+        noun = stackNoun
+        secondNoun = stackNoun2
+        val insteadPossible = set.insteadRules.filter(r => r.targets == targets || r.generic).filter(_.possible)
+        if(!RunRule(stackNoun, stackNoun2, previouslyInsteadPossible concat insteadPossible , targets)) return false
 
-        if(!RunRule(stackNoun, stackNoun2, set.executeRules, targets)) return false
+        noun = stackNoun
+        secondNoun = stackNoun2
+        val executePossible = set.executeRules.filter(r => r.targets == targets || r.generic).filter(_.possible)
+        if(!RunRule(stackNoun, stackNoun2, previouslyPossibleExecute concat executePossible, targets)) return false
 
-        if(!RunRule(stackNoun, stackNoun2, set.reportRules, targets)) return false
+        noun = stackNoun
+        secondNoun = stackNoun2
+        val reportPossible = set.reportRules.filter(r => r.targets == targets || r.generic).filter(_.possible)
+        if(!RunRule(stackNoun, stackNoun2, previouslyPossibleReport concat reportPossible, targets)) return false
 
-        if(!RunRule(stackNoun, stackNoun2, set.afterRules, targets)) return false
+        noun = stackNoun
+        secondNoun = stackNoun2
+        val afterPossible = set.afterRules.filter(r => r.targets == targets || r.generic).filter(_.possible)
+        if(!RunRule(stackNoun, stackNoun2, previouslyPossibleAfter concat afterPossible, targets)) return false
 
 
         true
@@ -260,7 +283,7 @@ object Condition{
 
 
 
-class Condition( condition : => Boolean, val queryType: QueryPrecedence ) {
+class Condition( condition : => Boolean, val queryType: QueryPrecedence, val previously : Boolean = false ) {
     def evaluate = condition
 
     var specificity = 1
@@ -297,11 +320,19 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
         conditions.map(_.precedence).foldLeft(0)( _ max _ )
     }
 
-    def possible = {
-        conditions.forall( _.evaluate )
+    def previouslyPossible = {
+        val previousConditions = conditions.filter(_.previously)
+        if(previousConditions.isEmpty)
+           false
+        else
+          previousConditions.forall( _.evaluate )
     }
 
-    def evaluate = body
+    def possible = {
+        conditions.filterNot(_.previously).forall( _.evaluate )
+    }
+
+    def exec = body
 }
 
 
