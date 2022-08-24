@@ -11,6 +11,7 @@ import Zext.Rule.*
 import Zext.World.*
 import Zext.thing.NounAmount.*
 import Zext.Inflector.*
+import Zext.device.{turningOff, turningOn}
 
 
 
@@ -53,6 +54,7 @@ object FarmHouse extends Room {
     }
 
     everyTurnRules += {
+      if (on && location == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
     }
 
   }
@@ -135,10 +137,14 @@ object OutsideWorld extends Room {
     Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")
   }
 
-  Connect(west, ChickenCoop)
   report(going, west, here) {
     Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
   }
+
+  Connect(west, ChickenCoop)
+
+  Connect(east, Path)
+
 
 }
 
@@ -161,8 +167,6 @@ object Path extends Room {
     Say(Randomly("You gird your loins, take a deep breath, and ready yourself to face The Town.", "You enter the sprawling metropolis of Stardew Valley."))
   }
 
-  //Connect(east, Town)
-  Connect(west, OutsideWorld)
 
 }
 
