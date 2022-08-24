@@ -217,6 +217,11 @@ object Parser extends RegexParsers{
 
 
   def BuildCommand(input : String, parser : Parser[(ParsableType, Option[ParsableType], Option[ParsableType])]) : Option[Command]=  {
+
+    if(commandAliases.contains(input)){
+      return Some(commandAliases(input))
+    }
+
     val result = parseAll(parser, input)
 
     if(result.isEmpty){
