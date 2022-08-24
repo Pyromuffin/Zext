@@ -2,7 +2,8 @@ package Zext
 
 import Zext.Direction.*
 import Zext.Interpreter.*
-import Zext.Query.Property
+import Zext.Parser.*
+import Zext.QueryPrecedence.Property
 import Zext.Rule.*
 import Zext.World.*
 import Zext.thing.NounAmount
@@ -30,11 +31,11 @@ trait Container {
 }
 
 
-object ZextObject {
-    val nouns = ArrayBuffer[ZextObject]()
+object ZextObject{
+    val all = ArrayBuffer[ZextObject]()
 }
 
-class ZextObject {
+class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
@@ -47,7 +48,8 @@ class ZextObject {
     var global = false
 
     var parentContainer : Container = null
-    ZextObject.nouns += this
+
+    ZextObject.all += this
 
     def transferTo(container: Container) = {
         parentContainer.contents.remove(parentContainer.contents.indexOf(this))
@@ -113,6 +115,7 @@ class ZextObject {
     def isAccessible(room: Room) : Boolean = {
         isVisible(room)
     }
+
 
     override def toString: String = definite
 }
@@ -188,16 +191,16 @@ class thing(using c : Container) extends ZextObject{
         }
         this
     }
+
+    def at (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
+    def on (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
+    def inside (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
+    def in (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
+
 }
 
-class device(using Container) extends thing {
-
-    var on = false
-    def off = !on
-
-    var offDesc : StringExpression = null
-    var onDesc :  StringExpression = null
-    description = s"${if(on) onDesc else offDesc}"
+object device {
+    // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
 
     object turningOn extends Action("turn on", "switch on", "activate")
     object turningOff extends Action("turn off", "switch off", "deactivate")
@@ -222,7 +225,7 @@ class device(using Container) extends thing {
             Say(s"$noun is already off")
             false
         } else {
-            d.on = off
+            d.on = false
             true
         }
     }
@@ -235,6 +238,18 @@ class device(using Container) extends thing {
         if(d.on) execute(turningOff, d)
         else execute(turningOn, d)
     }
+}
+
+class device(using Container) extends thing {
+
+    var on = false
+    def off = !on
+
+    var offDesc : StringExpression = null
+    var onDesc :  StringExpression = null
+    description = s"${if(on) onDesc else offDesc}"
+
+
 }
 
 

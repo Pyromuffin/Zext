@@ -21,11 +21,17 @@ object World extends Container {
     Macros.TouchEveryone(Actions)
     Macros.TouchEveryone(JunimoGame)
 
+    location = Game.FarmHouse
+
+    ZextObject.all.foreach{ z =>
+      Parser.Understand(z, z.name)
+    }
+
+
     execute(StartingGame)
 
     println("-------------")
 
-    location = Game.Path
   }
 
   var noun: ZextObject = null
