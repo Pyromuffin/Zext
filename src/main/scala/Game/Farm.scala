@@ -108,11 +108,51 @@ object FarmHouse extends Room {
     Say( str = "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down.")
   }
 
+  report(smelling, drawer, this){  //want this to be pencil but cant yet
+    Say(Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain."))
+  }
 
+  report(dropping, drawer, this) {
+     Say(str = "You drop your drawer.")
+  }
+
+  report(taking, drawer, this) {
+    Say(Randomly("You take the drawer and balance it on your head. Maybe you can carry stuff like that?", "You took the drawer out of the desk and slid in into your pants. Now you can store things in a drawer in your pants."))
+  }
 
 
 }
 
+
+object Vegetable {
+
+  before[Vegetable](taking) { v =>
+    if (v.ripe) {
+      Say("Up you go!")
+      true
+    }
+    else {
+      Say("We do not harvest the young")
+      false
+    }
+  }
+
+  before[Vegetable](examining) { v =>
+
+    if (v.wilted) {
+      Say(s"A slow tear runs down your face, but even a river of tears could not bring $noun back to life")
+    }
+    if (!v.wilted) {
+      Say(s"A slow tear of happiness runs down your cheek, adding one extra drop of moisture to your healthy $noun")
+    }
+    if (v.ripe) {
+      Say("yum yum!")
+    }
+
+    true
+  }
+
+}
 
 class Vegetable(using c : Container) extends thing {
   var wilted = false
@@ -120,8 +160,9 @@ class Vegetable(using c : Container) extends thing {
   var ripe = false
 }
 
-
 object OutsideWorld extends Room {
+
+  Vegetable
 
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
@@ -129,10 +170,14 @@ object OutsideWorld extends Room {
   val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
 
   val parsnip= ~"A single perfect parsnip, ripe and ready"
-  // "Pop! You gently but firmly yank the parsnip, extricating it from its bed."
-  //can u like hack their frikkin save file for the season or something and make it seasonally appropriate produce
-  // yeah probably
 
+  report(taking, parsnip) {
+    Say("Pop! You gently but firmly yank the parsnip, extricating it from its bed.")
+  }
+
+  val parsnips = new Vegetable named "baby parsnips" desc "These parsnips are young and unprepared to leave their homes." amount plural
+
+  val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" // ripe= false watered = false
   instead(taking, crops) {
     Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")
   }
@@ -149,15 +194,21 @@ object OutsideWorld extends Room {
 }
 
 
+
 class Animal(using c : Container) extends thing {
   var petted = false
+  before(taking, this){
+    Say (s"$noun! eye you expectantly.")
 }
+}
+
+
 
 
 object Path extends Room {
   name = "Path to Town"
   description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
-  val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggling, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three"
+  val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggle, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three" aka "fingers" aka "eels" aka "wiggly things"
 
   report(going, west, here) {
     Say(Randomly("With one last glance over your shoulder, you sigh and turn towards home.", "You try to run home but you can only ever walk."))
@@ -181,6 +232,8 @@ object ChickenCoop extends Room {
   "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
   "Emptiness. Like the wrong kind of void."
    */
+
+
   val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "fluffballs" aka "cuties" amount some
 
   report(taking, chickens) {

@@ -45,6 +45,15 @@ object Rule {
         }
     }
 
+    inline def before[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean): ActionRule = {
+        val condition = Condition.fromClass[T](QueryPrecedence.Class)
+        val rule = new ActionRule({
+            body(noun.asInstanceOf[T])
+        }, (conditions :+ condition) *)
+        ruleSets(r).beforeRules += rule
+        rule
+    }
+
 
     def instead(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
         val rule = new ActionRule(body, conditions*)

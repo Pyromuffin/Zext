@@ -109,7 +109,7 @@ object Actions {
     }
   }
 
-  object smelling extends Action("inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
+  object smelling extends Action("smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
 
     inflict(smelling) {
       Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
@@ -136,7 +136,7 @@ object Actions {
   }
 
 
-  object tasting extends Action("eat", "lick", "nom", "mouth", "nibble") {
+  object tasting extends Action("eat", "taste", "lick", "nom", "mouth", "nibble") {
 
     inflict(tasting) {
       execute(tasting, location)
