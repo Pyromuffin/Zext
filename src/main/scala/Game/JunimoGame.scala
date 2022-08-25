@@ -3,9 +3,8 @@ package Game
 import Zext.Actions.*
 import Zext.Rule.*
 import Zext.Interpreter.*
-import Zext.StringExpression
+import Zext.{Macros, StringExpression, TernaryExtension}
 import Zext.World.StartingGame
-import Zext.TernaryExtension
 
 
 /*
@@ -19,6 +18,8 @@ need to get one item to complete the collection
 grandpa's ghost needs to show up
 season detection
 */
+
+
 
 object JunimoGame {
 

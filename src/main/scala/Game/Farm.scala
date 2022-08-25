@@ -15,16 +15,13 @@ import Zext.Inflector.*
 import Zext.device.{turningOff, turningOn}
 
 
-
-
-
 object FarmHouse extends Room {
+
+  Macros.packageToucher(JunimoGame) // leave this here for now, maybe not the best place for it.
+
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
 
-
-
-  Connect(south, OutsideWorld)
   report(going, south, here) {
     Say("Closing the door behind, you emerge into the sunlight")
   }
@@ -113,7 +110,7 @@ object FarmHouse extends Room {
 
 
   inflict(tamping, coffee_machine) { cm =>
-    if (coffee_machine.tamped == true)
+    if (coffee_machine.tamped)
       Say ("It's as tamped as it's gonna get without your hoe")
     else
       Say ("You tamp dat ass")
@@ -182,9 +179,17 @@ class Vegetable(using c : Container) extends thing {
   var ripe = false
 }
 
+
+class Animal(using c : Container) extends thing {
+  var petted = false
+  before(taking, this){
+    Say (s"$noun! eye you expectantly.")
+  }
+}
+
 object OutsideWorld extends Room {
 
-  Vegetable
+  Connect(north, FarmHouse)
 
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
@@ -217,17 +222,11 @@ object OutsideWorld extends Room {
 
 
 
-class Animal(using c : Container) extends thing {
-  var petted = false
-  before(taking, this){
-    Say (s"$noun! eye you expectantly.")
-}
-}
-
 
 
 
 object Path extends Room {
+
   name = "Path to Town"
   description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
   val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggle, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three" aka "fingers" aka "eels" aka "wiggly things"

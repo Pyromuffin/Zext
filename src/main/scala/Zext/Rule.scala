@@ -70,9 +70,6 @@ object Rule {
     inline def instead[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
         val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class))* )
         rule.definitionPosition = CodePosition()
-        println(rule.definitionPosition)
-
-
         ruleSets(r).insteadRules += rule
         rule
     }

@@ -41,7 +41,6 @@ object Direction{
 }
 
 
-
 class Room extends ZextObject with Container {
 
   val here = this

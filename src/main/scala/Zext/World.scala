@@ -1,6 +1,6 @@
 package Zext
 
-import Game.JunimoGame
+import Game.{FarmHouse, JunimoGame}
 
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
@@ -18,15 +18,14 @@ object World extends Container {
   object StartingGame extends Action // for hooking.
 
   def Init(): Unit = {
-    Macros.TouchEveryone(Actions)
-    Macros.TouchEveryone(JunimoGame)
+
+    Game.Touchers
 
     currentLocation = Game.FarmHouse
 
     ZextObject.all.foreach{ z =>
       Parser.Understand(z, Seq(z.name).concat(z.aliases)* )
     }
-
 
     execute(StartingGame)
 

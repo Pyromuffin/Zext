@@ -1,5 +1,6 @@
 package Zext
 
+import scala.annotation.experimental
 import scala.quoted.*
 
 
@@ -61,17 +62,55 @@ object Macros{
     ${ packageToucherImpl('something) }
   }
 
+  @experimental
   def packageToucherImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[Any]] = {
     import quotes.reflect.*
     // assume something is a top level object
     val _package = TypeRepr.of[T].typeSymbol.owner
-    val fields = _package.declaredFields
-    val packageExpr = _package.tree.asExpr //  assertion failed: Cannot get tree of package symbol
-    val packageTree = packageExpr.asTerm
-    val fieldExprs : List[Expr[Any]] = fields.map( f => packageTree.select(f).asExpr)
+    //val packageExpr = _package.tree.asExpr //  assertion failed: Cannot get tree of package symbol
+    //val packageTree = packageExpr.asTerm
+    //val fieldExprs : List[Expr[Any]] = fields.map( f => packageTree.select(f).asExpr)
 
-    Expr.ofList(fieldExprs)
+    // select is "."
+
+    //Expr(fields.map(f => `{f.fullName)}.asExprOf[Any])
+
+    /*
+    //val fooDef = DefDef(_package, argss => Some('{println(s"Calling foo")}.asTerm))
+    val thing = Some('{println("Calling foo")}.asTerm)
+    //_package.tree.show
+
+    println("Package:" + _package)
+    println("companion class:" +  _package.companionClass)
+    println("companion module:" + _package.companionModule)
+    println("module class :" +  _package.moduleClass)
+
+    val valSymbol = Symbol.newVal(_package, "potato", TypeRepr.of[Int], Flags.Module | Flags.Final | Flags.StableRealizable, Symbol.noSymbol)
+    val className = "Vegetable"
+    val vd = ValDef(valSymbol, Some('{Game.Path}.asTerm) )
+    vd.symbol.tree.changeOwner(_package)
+    */
+
+    val fields = _package.fieldMembers
+
+
+    val valdefs = fields.filter(f => f.isValDef && !f.flags.is(Flags.Synthetic) && !f.fullName.contains('$')) // weird incremental $ things added for pain purposes
+    //valdefs.foreach(vd => println(vd))
+    //valdefs.foreach(vd => println(vd.tree))
+    //val valdefsTerms = valdefs.map(_.tree.asInstanceOf[ValDef])
+    //valdefsTerms.foreach(vd => println(vd.rhs.map(_.show)))
+
+    val packageTerm = Ident(_package.companionModule.termRef)
+   //println(packageTerm)
+
+    //Apply(Select(  New(Ident(Forest)),     <init>),List())
+    //ValDef(FarmHouse,Ident(FarmHouse$),Apply(Select(New(Ident(FarmHouse$)),<init>),List()))
+
+    val exprs = valdefs.map(packageTerm.select(_).asExpr)
+
+    Expr.ofList(exprs)
   }
+
 
 
   inline def CodePosition() : String = {
