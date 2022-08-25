@@ -4,6 +4,7 @@ import Zext.Parser.*
 import Zext.*
 import Zext.Interpreter.*
 import Zext.thing.*
+import Zext.device.*
 import Zext.Direction.*
 import JunimoGame.*
 import Zext.Actions.*
@@ -21,6 +22,8 @@ object FarmHouse extends Room {
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
 
+
+
   Connect(south, OutsideWorld)
   report(going, south, here) {
     Say("Closing the door behind, you emerge into the sunlight")
@@ -35,7 +38,26 @@ object FarmHouse extends Room {
 
   val drawer = new Supporter {
     val pencil = ~"graphite imprisoned with carved wood."
+
+    Understand(pencil, "prisoner"){
+      pencil.parentContainer == this
+    }
+
+    report[ZextObject](taking, pencil, this had pencil){ _ =>
+      Say("The prisoner is free of their shackles")
+    }
+
+    instead[thing, thing](putting, pencil, this.asSecondNoun) { (_,_) =>
+      Say("the pencil squeals \"No! I will never go back!\"")
+    }
+
+    report[thing, thing](putting, this.asSecondNoun) { (_,_) =>
+      Say(s"the drawer eases open to accept $noun")
+    }
+
+
   } named "drawer" desc "debris collector"
+
 
 
   val tv = new device {
@@ -54,7 +76,7 @@ object FarmHouse extends Room {
     }
 
     everyTurnRules += {
-      if (on && location == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
+      if (on && currentLocation == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
     }
 
   }
@@ -82,7 +104,7 @@ object FarmHouse extends Room {
     }
 
     everyTurnRules += {
-      if (on && location == FarmHouse && Randomly(4)) Say("The coffee machine looms")
+      if (on && currentLocation == FarmHouse && Randomly(4)) Say("The coffee machine looms")
     }
   }
 

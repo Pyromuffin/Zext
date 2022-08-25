@@ -4,7 +4,7 @@ import Zext.Actions.*
 import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.Rule.{after, inflict, execute}
-import Zext.World.{location, noun}
+import Zext.World.{currentLocation, noun}
 
 import scala.collection.mutable
 

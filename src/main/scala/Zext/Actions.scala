@@ -4,6 +4,7 @@ import Zext.Interpreter.*
 import Zext.Parser.*
 import Zext.Rule.*
 import Zext.World.*
+import Zext.ZextObject.*
 
 import scala.collection.mutable
 import scala.reflect.TypeTest
@@ -40,48 +41,35 @@ object Actions {
     nowhere.global = true;
     nowhere.name = "nowhere";
     nowhere.proper = true
-    var goingDir: Direction = null
 
-    inflict[Direction](going) { d => goingDir = d; execute(going, location.connections.getOrElse(d, nowhere)) }
-
-    // weird hack
-    before(going, nowhere.asDestination) {
-      Say(s"I can't go $goingDir from here.")
-      false
-    }
+    /// inflict[Direction](going) { d => goingDir = d; execute(going, currentLocation.connections.getOrElse(d, nowhere)) }
 
     // you can still circumvent going direction based movements by going directly to a location... eh i'll fix it later
-
     // desired behavior:
     // override the "i went x " text, which should be the act of reporting going
     // once we have moved to the other room, and reported, we want to automatically examine the room.
 
-    inflict[Room](going) { r =>
-      // room has to be connected to location
-      var connected = false
+    inflict[Direction](going) { d =>
+      val connected = currentLocation.connections.contains(d)
 
-      for ((d, room) <- location.connections) {
-        if (r == room) {
-          connected = true
-          goingDir = d
-        }
+      if(!connected){
+        Say(s"You can't go $d")
       }
 
-      if (!connected) {
-        Say(s"I can't get to $r from here.")
-      }
       connected
     }
 
-    report[Room](going) { r =>
-      Say(s"I went $goingDir to $r.")
+    report[Direction](going) { d =>
+      val room = currentLocation.connections(d)
+      Say(s"I went $d to $room.")
     }
 
-    after[Room](going) { r =>
-      location = r
+    after[Direction](going) { d =>
+      val room = currentLocation.connections(d)
+      currentLocation = room
       LineBreak()
-      execute(examining, location)
-      location.OnEnter()
+      execute(examining, currentLocation)
+      currentLocation.OnEnter()
     }
   }
 
@@ -95,7 +83,7 @@ object Actions {
 
     inflict[ZextObject](dropping) { z => // a/n z is noun  (this lamda has to take ZextObject argument)
       if (z.parentContainer == inventory) {
-        z.transferTo(location)
+        z.transferTo(currentLocation)
         true
       }
       else {
@@ -115,13 +103,14 @@ object Actions {
       Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
       true
     }
-    after(smelling, noun.parentContainer == inventory) {
+
+    after[ZextObject](smelling, inventory has noun) { z =>
       Say(s"The scent of $noun is soaked through your clothing now.")
     }
 
 
     instead(smelling, fixed) {
-      Say(s"$noun: Scentless and fixed. ")
+      Say(s"$noun: Scentless and fixed.")
       false
     }
 
@@ -139,7 +128,7 @@ object Actions {
   object tasting extends Action("eat", "taste", "lick", "nom", "mouth", "nibble") {
 
     inflict(tasting) {
-      execute(tasting, location)
+      execute(tasting, currentLocation)
     }
 
 
@@ -158,7 +147,7 @@ object Actions {
       false
     }
 
-    instead(taking, noun.parentContainer == inventory) {
+    instead[ZextObject](taking, inventory has noun) { z =>
       Say(s"I shuffle around the items in my pockets, looking for $noun")
     }
 
@@ -180,19 +169,19 @@ object Actions {
   object examining extends Action("examine", "x", "look", "l") {
 
     inflict(examining) {
-      execute(examining, location)
+      execute(examining, currentLocation)
     }
 
     inflict[Room](examining) { r =>
-      Title(location.name)
-      Say(location.description)
+      Title(currentLocation.name)
+      Say(currentLocation.description)
       true
     }
 
 
     inflict[Crevice](examining) { r =>
-      Title(location.name + " It's small! ")
-      Say(location.description)
+      Title(currentLocation.name + " It's small! ")
+      Say(currentLocation.description)
       true
     }
 
@@ -207,19 +196,19 @@ object Actions {
   object examining1 extends Action("examine1", "look1") {
 
     inflict(examining1) {
-      execute(examining1, location)
+      execute(examining1, currentLocation)
     }
 
     inflict[Room](examining1) { r =>
-      Title(location.name)
-      Say(location.description)
+      Title(currentLocation.name)
+      Say(currentLocation.description)
       true
     }
 
 
     inflict[Crevice](examining1) { r =>
-      Title(location.name + " It's small! ")
-      Say(location.description)
+      Title(currentLocation.name + " It's small! ")
+      Say(currentLocation.description)
       true
     }
 
@@ -273,7 +262,7 @@ object Actions {
 
     inflict[ZextObject, Zontainer](putting) { (z1, z2) =>
 
-      if (z1.parentContainer == inventory && z2.isAccessible(location)) {
+      if (z1.parentContainer == inventory && z2.isAccessible(currentLocation)) {
         z1 transferTo z2
         true
       } else {

@@ -12,7 +12,7 @@ object World extends Container {
 
   var playerName = "Farmer"
   var inventory = new Container {}
-  var location: Room = null
+  var currentLocation: Room = null
   var time = 10
 
   object StartingGame extends Action // for hooking.
@@ -21,10 +21,10 @@ object World extends Container {
     Macros.TouchEveryone(Actions)
     Macros.TouchEveryone(JunimoGame)
 
-    location = Game.FarmHouse
+    currentLocation = Game.FarmHouse
 
     ZextObject.all.foreach{ z =>
-      Parser.Understand(z, z.name)
+      Parser.Understand(z, Seq(z.name).concat(z.aliases)* )
     }
 
 

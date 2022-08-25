@@ -110,9 +110,7 @@ object Parser extends RegexParsers{
 
   def NounParser(noun: ZextObject) : Parser[ZextObject] = {
     var words = Seq(noun.name).concat(noun.aliases.toSeq)
-    if(noun.pluralized){
-      words = words.concat(words.map(Inflector.singularize))
-    }
+ 
 
     val parsers = words.map {
       _.toString.r ^^ { s => noun }
@@ -253,7 +251,7 @@ object Parser extends RegexParsers{
     World.Init()
 
     execute(examining)
-    location.OnEnter()
+    currentLocation.OnEnter()
 
     while(!exit){
       val commandParser = BuildParser2()
@@ -263,6 +261,7 @@ object Parser extends RegexParsers{
       val command = BuildCommand(input, commandParser)
       if(command.nonEmpty){
         val c = command.get
+        EvaluatePreviouslyConditions(c.action, c.noun, c.secondNoun)
         execute(c.action, c.noun, c.secondNoun)
         everyTurnRules.foreach( _.Execute() )
       } else {

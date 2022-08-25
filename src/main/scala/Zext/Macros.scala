@@ -74,10 +74,24 @@ object Macros{
   }
 
 
-
-  inline def varvarName : String = {
-    ${ varvarNameImpl }
+  inline def CodePosition() : String = {
+    ${ CodePositionImpl }
   }
+
+  def CodePositionImpl(using Quotes): Expr[String] = {
+    import quotes.reflect.*
+    //val pos = Symbol.spliceOwner.owner.pos
+    val pos = Option(Position.ofMacroExpansion)
+    if(pos.isDefined){
+      val p = pos.get
+      Expr(p.sourceFile.name + ":" + (p.startLine + 1))
+    } else {
+      Expr("unknown source position")
+    }
+
+  }
+
+
 
 
   inline def variableName : String = {
@@ -87,12 +101,6 @@ object Macros{
   def variableNameImpl(using Quotes): Expr[String] = {
     import quotes.reflect.*
     val callee = Symbol.spliceOwner.owner
-    Expr(callee.name)
-  }
-
-  def varvarNameImpl(using Quotes): Expr[String] = {
-    import quotes.reflect.*
-    val callee = Symbol.spliceOwner.owner.owner
     Expr(callee.name)
   }
 

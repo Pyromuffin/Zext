@@ -28,6 +28,10 @@ trait Container {
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
     var open = true
     var transparent = true
+
+    def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
+    def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
+
 }
 
 
@@ -118,6 +122,11 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
 
     override def toString: String = definite
+
+    def asSecondNoun : Condition = {
+        Condition(secondNoun == this, QueryPrecedence.SecondObject)
+    }
+
 }
 
 
@@ -147,8 +156,12 @@ class thing(using c : Container) extends ZextObject{
     def SetName(s : String): Unit = {
         val fixed = FixName(s)
         name = fixed
-        val words = fixed.split(' ')
-        if(words.length > 1) aliases.addAll(words)
+
+        /*
+        if(noun.pluralized){
+            words = words.concat(words.map(Inflector.singularize))
+        }
+        */
     }
 
 
@@ -192,10 +205,6 @@ class thing(using c : Container) extends ZextObject{
         this
     }
 
-    def at (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
-    def on (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
-    def inside (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
-    def in (container: Container) = Condition(this.parentContainer == container, QueryPrecedence.Containment)
 
 }
 
