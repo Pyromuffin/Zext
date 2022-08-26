@@ -256,39 +256,28 @@ object ChickenCoop extends Room {
     true
   }
 
+  val hay_pile =  ~"a tangle of straw, bane of needle searchers." aka "hay trough" aka "trough" aka "feed"
+
   val hay = ~"a mini bundle of soft yellow hay, great for eating and sleeping on" amount some
-  /*container take text "you scoop up a nice armful of hay and stuff it in your sack for later."
-   if inventory already has a hay, "Not so fast, Scarecrow Steve! Leave some for the chickens"
-  * */
+  hay transferTo nowhere
 
-//
-//  inflict(taking, hay){
-//    if (hay.parentContainer == inventory){
-//      Say("Not so fast, Scarecrow Steve! Leave some for the chickens")
-//      false
-//    }
-//    else{
-//      val new_hay = hay
-//    }
-//  }
-  before(taking, hay){
-    if (hay.parentContainer == player) {
+  Understand(hay_pile, "hay"){
+    hay.parentContainer == nowhere
+  }
+
+  instead(taking, hay_pile){
+    if(hay.parentContainer == nowhere){
+      Say("you scoop up a nice armful of hay and stuff it in your sack for later.")
+      hay transferTo player
+    } else {
       Say("Not so fast, Scarecrow Steve! Leave some for the chickens")
-      false
     }
-    else
-      true
   }
 
-  report(taking, hay, here) {
-    Say("you scoop up a nice armful of hay and stuff it in your sack for later.")
-  }
 
   after(taking, hay) {
     Say("You aren't really sure why you want that but you do.")
   }
-
-  val hay_box = ~"tray of hay" is fixed aka "trough" aka "food" aka "feed"
 
   val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery
 

@@ -122,14 +122,18 @@ object Parser extends RegexParsers{
 
   def WordParser(str : String, parsables: Seq[Parsable[ParsableType]]) : Option[Parser[ParsableType]] = {
     // first check if word conditions are applicable, if not splode
-    val possible = parsables.filter(_.possible)
-    if(possible.isEmpty)
-      return None
+    val possibles = parsables.filter(_.possible)
 
-    if(possible.length > 1)
-      println(s"AMBIGUOUS ! $str")
+    if (possibles.isEmpty)
+      return Option.empty
 
-    val parser = str.r ^^ {s => possible.head.target}
+    val maxPrecedence = possibles.map(_.precedence).max
+    val maxPrecedenceParsables = possibles.filter(_.precedence == maxPrecedence)
+    val bestParsable = maxPrecedenceParsables.maxBy(_.specificity)
+
+    // println(s"AMBIGUOUS ! $str")
+
+    val parser = str.r ^^ {s => bestParsable.target}
 
     Some(parser)
   }
@@ -149,6 +153,15 @@ object Parser extends RegexParsers{
   case class Parsable[+T](target : T, conditions : Condition*){
 
     def possible = conditions.forall(_.evaluate)
+
+    def specificity = {
+      conditions.map( _.specificity ).sum
+    }
+
+    def precedence = {
+      conditions.map(_.precedence).foldLeft(0)( _ max _ )
+    }
+
   }
 
   val understandables = mutable.HashMap[String, Seq[Parsable[ParsableType]]]()
