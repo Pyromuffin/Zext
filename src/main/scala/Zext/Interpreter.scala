@@ -53,16 +53,23 @@ object Interpreter{
 
   def Capitalize(str : String): String = {
 
+    val endingPunctuation = Seq('.', '?', '!')
     val sentences = ArrayBuffer[String]()
     var lastPunctuationIndex = 0
     for(c <- str.zipWithIndex){
-      if(c._1 == '.' || c._1 == '!' || c._1 == '?' ) {
+      if(endingPunctuation.contains(c._1) && c._2 != str.length) {
         sentences += str.substring(lastPunctuationIndex, c._2 + 1).stripPrefix(" ").stripSuffix(" ").capitalize
         lastPunctuationIndex = c._2 + 1
       }
     }
+    sentences += str.substring(lastPunctuationIndex, str.length).stripPrefix(" ").stripSuffix(" ").capitalize
 
-    val ret = sentences.foldRight("")( _ + " " + _)
+
+    var ret = sentences.foldRight("")( _ + " " + _).stripSuffix(" ")
+    if(!endingPunctuation.contains(str.last)){
+      ret += '.'
+    }
+
     ret
   }
 

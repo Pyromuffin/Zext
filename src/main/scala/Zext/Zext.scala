@@ -37,6 +37,63 @@ trait Container {
 
 object ZextObject{
     val all = ArrayBuffer[ZextObject]()
+
+    object device {
+        // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
+
+        object turningOn extends Action(1,"turn on", "switch on", "activate")
+        object turningOff extends Action(1,"turn off", "switch off", "deactivate")
+        object switching extends Action(1,"switch", "toggle")
+
+        inflict(turningOn, of[device]) {
+            val d = noun.as[device]
+            if (d.on) {
+                Say(s"$noun is already on")
+                false
+            } else {
+                d.on = true
+                true
+            }
+        }
+
+        report(turningOn, of[device]) {
+            Say(s"I turned on $noun")
+        }
+
+        inflict(turningOff, of[device]) {
+            val d = noun.as[device]
+            if (d.off) {
+                Say(s"$noun is already off")
+                false
+            } else {
+                d.on = false
+                true
+            }
+        }
+
+        report(turningOff, of[device]) {
+            Say(s"I turned off $noun")
+        }
+
+        inflict(switching, of[device]){
+            val d = noun.as[device]
+            if(d.on) execute(turningOff, d)
+            else execute(turningOn, d)
+        }
+    }
+
+    class device(using Container) extends thing {
+
+        var on = false
+        def off = !on
+
+        var offDesc : StringExpression = null
+        var onDesc :  StringExpression = null
+        description = s"${if(on) onDesc else offDesc}"
+    }
+
+
+    class Supporter(using c : Container) extends thing with Container
 }
 
 class ZextObject extends ParsableType(PartOfSpeech.noun) with reflect.Selectable {
@@ -206,66 +263,10 @@ class thing(using c : Container) extends ZextObject{
         }
         this
     }
-
-
-}
-
-object device {
-    // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
-
-    object turningOn extends Action(1,"turn on", "switch on", "activate")
-    object turningOff extends Action(1,"turn off", "switch off", "deactivate")
-    object switching extends Action(1,"switch", "toggle")
-
-    private def d = noun.as[device]
-
-    inflict(turningOn, of[device]) {
-        if (d.on) {
-            Say(s"$noun is already on")
-            false
-        } else {
-            d.on = true
-            true
-        }
-    }
-
-    report(turningOn, of[device]) {
-        Say(s"I turned on $noun")
-    }
-
-    inflict(turningOff, of[device]) {
-        if (d.off) {
-            Say(s"$noun is already off")
-            false
-        } else {
-            d.on = false
-            true
-        }
-    }
-
-    report(turningOff, of[device]) {
-        Say(s"I turned off $noun")
-    }
-
-    inflict(switching, of[device]){
-        if(d.on) execute(turningOff, d)
-        else execute(turningOn, d)
-    }
-}
-
-class device(using Container) extends thing {
-
-    var on = false
-    def off = !on
-
-    var offDesc : StringExpression = null
-    var onDesc :  StringExpression = null
-    description = s"${if(on) onDesc else offDesc}"
-
-
 }
 
 
-class Supporter(using c : Container) extends thing with Container
+
+
 
 
