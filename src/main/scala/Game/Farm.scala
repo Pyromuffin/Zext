@@ -46,6 +46,8 @@ object FarmHouse extends Room {
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
+    
+    
 
   }
 
@@ -92,7 +94,7 @@ object FarmHouse extends Room {
   }
 
   coffee_machine.tamped = false
-  object tamping extends Action(1, "tamp", "smack")
+  object tamping extends Action(1, "tamp", "smack", "compress")
 
 
   inflict(tamping, coffee_machine) {
@@ -141,7 +143,7 @@ object Vegetable {
       Say(s"A slow tear of happiness runs down your cheek, adding one extra drop of moisture to your healthy $noun")
     }
     if (v.ripe) {
-      Say("yum yum!")
+      Say("Yum yum!")
     }
 
     true
@@ -229,7 +231,7 @@ object ChickenCoop extends Room {
 
   val void_mayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
 
-  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm"
+  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm" aka "machine"
   /* property empty vs full (full of mayo)
   "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
   "Emptiness. Like the wrong kind of void."
@@ -279,7 +281,7 @@ object ChickenCoop extends Room {
     Say("You aren't really sure why you want that but you do.")
   }
 
-  val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery
+  val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery aka "odor" aka "scents" aka "aroma"
 
 
   instead(going, east, this) {
