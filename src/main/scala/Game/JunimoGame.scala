@@ -3,7 +3,7 @@ package Game
 import Zext.Actions.*
 import Zext.Rule.*
 import Zext.Interpreter.*
-import Zext.{Macros, StringExpression, TernaryExtension}
+import Zext.{Macros, StringExpression, TernaryExtension, player}
 import Zext.World.StartingGame
 
 
@@ -33,6 +33,7 @@ object JunimoGame {
   var gender : Gender = Gender.octagon
   var rigidity : Int = 0
   var maxEncumbrance = 10
+  def encumbrance = maxEncumbrance - player.contents.length
   var dirty = true
 
 
@@ -69,6 +70,8 @@ object JunimoGame {
 
     val startDescription = s"After a hard day toiling on fields of $farm, $farmer decides to take a break with a relaxing nap in the Secret Woods"
     Say(startDescription)
+
+    true
   }
 // I broke this and I cannot begin to guess how
 //  before(takingInventory) {

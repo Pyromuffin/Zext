@@ -13,6 +13,8 @@ import Zext.World.*
 import Zext.thing.NounAmount.*
 import Zext.Inflector.*
 import Zext.device.{turningOff, turningOn}
+import Condition.*
+import reflect.Selectable.*
 
 
 object FarmHouse extends Room {
@@ -22,40 +24,30 @@ object FarmHouse extends Room {
   name = s"$farm farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
 
-  report(going, south, here) {
-    Say("Closing the door behind, you emerge into the sunlight")
-  }
+  report(going, south, here) Say "Closing the door behind, you emerge into the sunlight"
+
 
   // probably put this somewhere better
-  inflict[Supporter](examining) { s =>
-    Say(s.description)
-    s.contents.foreach(z => Say(z.name))
+  inflict(examining, of[Supporter]) {
+    Say(noun.description)
+    noun.as[Supporter].contents.foreach(z => Say(z.name))
     true
   }
 
   val drawer = new Supporter {
     val pencil = ~"graphite imprisoned with carved wood."
+    name = "drawer"
+    description = "debris collector"
 
     Understand(pencil, "prisoner"){
       pencil.parentContainer == this
     }
 
-    report[ZextObject](taking, pencil, this had pencil){ _ =>
-      Say("The prisoner is free of their shackles")
-    }
+    report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
+    instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
+    report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
 
-    instead[thing, thing](putting, pencil, this.asSecondNoun) { (_,_) =>
-      Say("the pencil squeals \"No! I will never go back!\"")
-    }
-
-    report[thing, thing](putting, this.asSecondNoun) { (_,_) =>
-      Say(s"the drawer eases open to accept $noun")
-    }
-
-
-  } named "drawer" desc "debris collector"
-
-
+  }
 
   val tv = new device {
     name = "tv"
@@ -64,13 +56,8 @@ object FarmHouse extends Room {
     onDesc = "Light dances across the dome of the CRT."
     has(fixed)
 
-    report(turningOn, this) {
-      Say(s"$noun reluctantly flickers to life.")
-    }
-
-    report(turningOff, this) {
-      Say(s"With a protest of static, $noun blinks off.")
-    }
+    report(turningOn, this) Say s"$noun reluctantly flickers to life."
+    report(turningOff, this) Say s"With a protest of static, $noun blinks off."
 
     everyTurnRules += {
       if (on && currentLocation == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
@@ -79,7 +66,6 @@ object FarmHouse extends Room {
   }
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
-
   val door = ~"This is a thing you really wish you could open and close, but you can't"
 
   object coffee_machine extends device {
@@ -106,10 +92,10 @@ object FarmHouse extends Room {
   }
 
   coffee_machine.tamped = false
-  object tamping extends Action("tamp", "smack")
+  object tamping extends Action(1, "tamp", "smack")
 
 
-  inflict(tamping, coffee_machine) { cm =>
+  inflict(tamping, coffee_machine) {
     if (coffee_machine.tamped)
       Say ("It's as tamped as it's gonna get without your hoe")
     else
@@ -119,33 +105,23 @@ object FarmHouse extends Room {
     true
   }
 
-  inflict[ZextObject](tamping){ _=>
+  inflict(tamping){
     Say (s"$noun doesn't give a heck. It's tamp-er proof.")
     false
   }
-  instead(taking, coffee_machine, this){
-    Say( str = "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down.")
-  }
 
-  report(smelling, drawer, this){  //want this to be pencil but cant yet
-    Say(Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain."))
-  }
-
-  report(dropping, drawer, this) {
-     Say(str = "You drop your drawer.")
-  }
-
-  report(taking, drawer, this) {
-    Say(Randomly("You take the drawer and balance it on your head. Maybe you can carry stuff like that?", "You took the drawer out of the desk and slid in into your pants. Now you can store things in a drawer in your pants."))
-  }
-
+  instead(taking, coffee_machine) Say "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down."
+  report(smelling, drawer.pencil) Say Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain.")
+  report(dropping, drawer) Say "You drop your drawer."
+  report(taking, drawer) Say Randomly("You take the drawer and balance it on your head. Maybe you can carry stuff like that?", "You took the drawer out of the desk and slid in into your pants. Now you can store things in a drawer in your pants.")
 
 }
 
 
 object Vegetable {
 
-  before[Vegetable](taking) { v =>
+  before(taking, of[Vegetable] ) {
+    val v = noun.as[Vegetable]
     if (v.ripe) {
       Say("Up you go!")
       true
@@ -156,8 +132,8 @@ object Vegetable {
     }
   }
 
-  before[Vegetable](examining) { v =>
-
+  before(examining, of[Vegetable]) {
+    val v = noun.as[Vegetable]
     if (v.wilted) {
       Say(s"A slow tear runs down your face, but even a river of tears could not bring $noun back to life")
     }
@@ -180,11 +156,16 @@ class Vegetable(using c : Container) extends thing {
 }
 
 
+object Animal{
+  before(taking, of[Animal]){
+    Say (s"$noun! eye you expectantly.")
+    true
+  }
+}
+
 class Animal(using c : Container) extends thing {
   var petted = false
-  before(taking, this){
-    Say (s"$noun! eye you expectantly.")
-  }
+
 }
 
 object OutsideWorld extends Room {
@@ -261,12 +242,12 @@ object ChickenCoop extends Room {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")
   }
 
-  object petting extends Action("pet", "hug", "pat", "love")
+  object petting extends Action(1,"pet", "hug", "pat", "love")
 
   chickens.petted = false
 
-  inflict(petting, chickens) { c =>
-    if (chickens.petted == true)
+  inflict(petting, chickens) {
+    if (chickens.petted)
       Say("You pet the chickens again, extra hard. They make little contented clucks but don't love you any harder.")
     else
       Say("You pet each and every chicken. They let out little <3's and love you even more now.")
@@ -291,7 +272,7 @@ object ChickenCoop extends Room {
 //    }
 //  }
   before(taking, hay){
-    if (hay.parentContainer == inventory) {
+    if (hay.parentContainer == player) {
       Say("Not so fast, Scarecrow Steve! Leave some for the chickens")
       false
     }
@@ -324,7 +305,7 @@ object ChickenCoop extends Room {
 
   instead(going, west, here) {
     val dix =
-      if (void_mayo.parentContainer == inventory) {
+      if (void_mayo.parentContainer == player) {
         Say("you got that sweet mayo, but there's no exit there anyways.")
         true
       }

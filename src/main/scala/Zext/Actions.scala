@@ -8,13 +8,22 @@ import Zext.ZextObject.*
 
 import scala.collection.mutable
 import scala.reflect.TypeTest
+import Condition.*
+import Game.JunimoGame.encumbrance
+import Zext.player.playerName
 
 object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
 
+
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
     commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
+  }
+
+
+  def UnderstandAlias(strs: Seq[String], action: Action, zextObject1: ZextObject, zextObject2: ZextObject) : Unit = {
+    commandAliases.addAll(strs.map( _ -> Command(action, Option(zextObject1), Option(zextObject2))))
   }
 
 
@@ -26,7 +35,9 @@ object Actions {
   }
 
 
-  object going extends Action("go", "travel", "walk", "run", "cartwheel") {
+  object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
+
+    instead(going, reflexively) Say "You don't have to go right now."
 
     UnderstandAlias("east", going, Direction.east)
     UnderstandAlias("e", going, Direction.east)
@@ -37,10 +48,7 @@ object Actions {
     UnderstandAlias("south", going, Direction.south)
     UnderstandAlias("s", going, Direction.south)
 
-    val nowhere = Room();
-    nowhere.global = true;
-    nowhere.name = "nowhere";
-    nowhere.proper = true
+
 
     /// inflict[Direction](going) { d => goingDir = d; execute(going, currentLocation.connections.getOrElse(d, nowhere)) }
 
@@ -49,7 +57,8 @@ object Actions {
     // override the "i went x " text, which should be the act of reporting going
     // once we have moved to the other room, and reported, we want to automatically examine the room.
 
-    inflict[Direction](going) { d =>
+    inflict(going, of[Direction]) {
+      val d = noun.as[Direction]
       val connected = currentLocation.connections.contains(d)
 
       if(!connected){
@@ -59,31 +68,34 @@ object Actions {
       connected
     }
 
-    report[Direction](going) { d =>
+    report(going, of[Direction]) {
+      val d = noun.as[Direction]
       val room = currentLocation.connections(d)
       Say(s"I went $d to $room.")
     }
 
-    after[Direction](going) { d =>
+    after(going, of[Direction]) {
+      val d = noun.as[Direction]
       val room = currentLocation.connections(d)
-      currentLocation = room
+      player.Move(room)
       LineBreak()
       execute(examining, currentLocation)
       currentLocation.OnEnter()
     }
   }
 
-  object dropping extends Action("drop", "abandon") {
+  object dropping extends Action(1,"drop", "abandon") {
 
-    report(dropping) {
+    report(dropping, reflexively) {
       Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
-    inflict[ZextObject](dropping) { z => // a/n z is noun  (this lamda has to take ZextObject argument)
-      if (z.parentContainer == inventory) {
-        z.transferTo(currentLocation)
+
+    inflict(dropping) {
+      if (noun.parentContainer == player) {
+        noun.transferTo(currentLocation)
         true
       }
       else {
@@ -92,150 +104,116 @@ object Actions {
       }
     }
 
-    report[ZextObject](dropping) { z =>
-      Say(Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate."))
-    }
+    report(dropping) Say Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
+
   }
 
-  object smelling extends Action("smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
+  object smelling extends Action(1,"smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
 
-    inflict(smelling) {
+    inflict(smelling, reflexively) {
       Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
       true
     }
 
-    after[ZextObject](smelling, inventory has noun) { z =>
+    after(smelling, player has noun) {
       Say(s"The scent of $noun is soaked through your clothing now.")
     }
 
+    instead(smelling, fixed) Say "$noun: Scentless and fixed."
 
-    instead(smelling, fixed) {
-      Say(s"$noun: Scentless and fixed.")
-      false
-    }
+    // implement scent property somehow.
+    report(smelling) Say s"You smell $noun. Wow."
 
-    report[ZextObject](smelling) { n =>
-      Say(s"You smell $n. Wow.")
-    }
-
-    inflict[ZextObject](smelling) { n =>
-
-      true
-    }
   }
 
 
-  object tasting extends Action("eat", "taste", "lick", "nom", "mouth", "nibble") {
+  object tasting extends Action( 1,"eat", "taste", "lick", "nom", "mouth", "nibble") {
 
-    inflict(tasting) {
+
+    inflict(tasting, reflexively) {
+      Say("Slurp!")
       execute(tasting, currentLocation)
     }
 
-
-    inflict[ZextObject](tasting) { n =>
-      val immediate = s"$n: ${n.description}"
+    inflict(tasting) {
+      val immediate = s"$noun: ${noun.description}"
       Say(immediate)
       true
     }
   } //taste test
 
 
-  object taking extends Action("take", "get", "pick up", "g") {
+  object taking extends Action(1,"take", "get", "pick up", "g") {
 
-    inflict(taking) {
-      Say(s"I can't take nothing.")
-      false
-    }
 
-    instead[ZextObject](taking, inventory has noun) { z =>
+    instead(taking, reflexively) Say s"I can't take nothing."
+
+    instead(taking, player has noun) {
       Say(s"I shuffle around the items in my pockets, looking for $noun")
     }
 
     instead(taking, fixed) {
       Say(s"$noun $is shoracle")
-      false
     }
 
-    report[ZextObject](taking) { n =>
-      Say(s"You took $n. Wow.")
+    report(taking) {
+      Say(s"You slip $noun into your backpack.")
     }
 
-    inflict[ZextObject](taking) { n =>
-      noun.transferTo(inventory)
+    after(taking){
+      Say(s"$encumbrance slots left.")
+    }
+
+    inflict(taking) {
+      noun.transferTo(player)
       true
     }
+
+    inflict(examining, of[Room]) {
+      Title(currentLocation.name)
+      Say(currentLocation.description)
+      true
+    }
+
+    after(examining, of[Room]) {
+      val r = noun.as[Room]
+      val visible = r.contents.filterNot(_ ? scenery)
+      if (!visible.isEmpty) {
+        var s = "You can see "
+        for (i <- visible) {
+          if (!i.?(scenery))
+            s += i.indefinite + ", "
+        }
+        s = s.stripSuffix(", ")
+        s += "."
+        Say(s)
+      }
+    }
+
   }
 
-  object examining extends Action("examine", "x", "look", "l") {
+  object examining extends Action(1,"examine", "x", "look", "l") {
 
-    inflict(examining) {
+    instead(examining, reflexively) {
       execute(examining, currentLocation)
     }
 
-    inflict[Room](examining) { r =>
-      Title(currentLocation.name)
-      Say(currentLocation.description)
-      true
-    }
-
-
-    inflict[Crevice](examining) { r =>
+    inflict(examining, of[Crevice]) {
       Title(currentLocation.name + " It's small! ")
       Say(currentLocation.description)
       true
     }
 
 
-    inflict[ZextObject](examining) { n =>
-      val immediate = s"$n: ${n.description}"
+    inflict(examining) {
+      val immediate = s"$noun: ${noun.description}"
       Say(immediate)
       true
     }
   }
 
-  object examining1 extends Action("examine1", "look1") {
 
-    inflict(examining1) {
-      execute(examining1, currentLocation)
-    }
-
-    inflict[Room](examining1) { r =>
-      Title(currentLocation.name)
-      Say(currentLocation.description)
-      true
-    }
-
-
-    inflict[Crevice](examining1) { r =>
-      Title(currentLocation.name + " It's small! ")
-      Say(currentLocation.description)
-      true
-    }
-
-
-    inflict[ZextObject](examining1) { n =>
-      val immediate = s"$n: ${n.description}"
-      Say(immediate)
-      true
-    }
-  }
-
-  report[Room](examining) { r =>
-    val visible = r.contents.filterNot(_ ? scenery)
-    if (!visible.isEmpty) {
-      var s = "You can see "
-      for (i <- visible) {
-        if (!i.?(scenery))
-          s += i.indefinite + ", "
-      }
-      s = s.stripSuffix(", ")
-      s += "."
-      Say(s)
-    }
-  }
-
-
-  object exiting extends Action("exit") {
+  object exiting extends Action(0,"exit") {
     inflict(exiting) {
       Say(s"Goodbye $playerName")
       exit = true
@@ -243,10 +221,10 @@ object Actions {
     }
   }
 
-  object takingInventory extends Action("inventory", "i") {
+  object takingInventory extends Action(0,"inventory", "i") {
     inflict(takingInventory) {
       var s = "In your possessionary, you have "
-      for (i <- inventory.contents) {
+      for (i <- player.contents) {
         s += i.indefinite + ", "
       }
       s = s.stripSuffix(", ")
@@ -256,24 +234,24 @@ object Actions {
     }
   }
 
-  object putting extends Action("put", "insert") {
+  object putting extends Action(2,"put", "insert") {
 
     type Zontainer = Container & ZextObject
 
-    inflict[ZextObject, Zontainer](putting) { (z1, z2) =>
 
-      if (z1.parentContainer == inventory && z2.isAccessible(currentLocation)) {
-        z1 transferTo z2
+    inflict(putting, of[Zontainer].secondly) {
+
+      if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation)) {
+        noun transferTo secondNoun.as[Container]
         true
       } else {
-        Say(s"$z2 is inaccessible")
+        Say(s"$secondNoun is inaccessible")
         false
       }
     }
 
-    report[ZextObject, Zontainer](putting) { (z1, z2) =>
-      Say(s"You put $noun into $secondNoun")
-    }
+    report(putting, of[Zontainer].secondly) Say s"You put $noun into $secondNoun"
+
   }
 }
 

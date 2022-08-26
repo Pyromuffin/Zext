@@ -7,21 +7,51 @@ import Zext.*
 import Zext.Actions.*
 import Zext.Rule.*
 
+object reflexively extends ZextObject {
+  name = "reflexively"
+  global = true
+}
+
+object nowhere extends Room {
+  global = true
+  name = "nowhere"
+  proper = true
+}
+
+
+object player extends ZextObject with Container {
+
+  name = "player"
+  properties += scenery
+
+  parentContainer = nowhere
+  nowhere.contents += this
+
+  var playerName = "Farmer"
+
+  def Move(room: Room): Unit ={
+    transferTo(room)
+  }
+
+}
+
+
+
 
 object World extends Container {
 
-  var playerName = "Farmer"
-  var inventory = new Container {}
-  var currentLocation: Room = null
+
+
+  def currentLocation = player.parentContainer.asInstanceOf[Room]
   var time = 10
 
-  object StartingGame extends Action // for hooking.
+  object StartingGame extends Action(0) // for hooking.
 
   def Init(): Unit = {
 
     Game.Touchers
 
-    currentLocation = Game.FarmHouse
+    player.Move(Game.FarmHouse)
 
     ZextObject.all.foreach{ z =>
       Parser.Understand(z, Seq(z.name).concat(z.aliases)* )
@@ -35,6 +65,7 @@ object World extends Container {
 
   var noun: ZextObject = null
   var secondNoun: ZextObject = null
+
 
   object is {
     override def toString: String = noun.be

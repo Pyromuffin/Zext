@@ -11,7 +11,7 @@ import Zext.thing.NounAmount
 import java.lang.reflect.Constructor
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
-
+import Condition.*
 
 trait Property
 
@@ -39,7 +39,7 @@ object ZextObject{
     val all = ArrayBuffer[ZextObject]()
 }
 
-class ZextObject extends ParsableType(PartOfSpeech.noun) {
+class ZextObject extends ParsableType(PartOfSpeech.noun) with reflect.Selectable {
 
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"
@@ -98,7 +98,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
         */
 
         val sameRoom = room == parentContainer
-        val inInventory = parentContainer == inventory
+        val inInventory = parentContainer == player
         val connectedRoom = room.connections.values.exists(_ == this)
 
         // if this breaks, i deserve it
@@ -126,6 +126,8 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     def asSecondNoun : Condition = {
         Condition(secondNoun == this, QueryPrecedence.SecondObject)
     }
+
+    def as[T] = this.asInstanceOf[T]
 
 }
 
@@ -211,11 +213,13 @@ class thing(using c : Container) extends ZextObject{
 object device {
     // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
 
-    object turningOn extends Action("turn on", "switch on", "activate")
-    object turningOff extends Action("turn off", "switch off", "deactivate")
-    object switching extends Action("switch", "toggle")
+    object turningOn extends Action(1,"turn on", "switch on", "activate")
+    object turningOff extends Action(1,"turn off", "switch off", "deactivate")
+    object switching extends Action(1,"switch", "toggle")
 
-    inflict[device](turningOn) { d =>
+    private def d = noun.as[device]
+
+    inflict(turningOn, of[device]) {
         if (d.on) {
             Say(s"$noun is already on")
             false
@@ -225,11 +229,11 @@ object device {
         }
     }
 
-    report[device](turningOn) { d =>
+    report(turningOn, of[device]) {
         Say(s"I turned on $noun")
     }
 
-    inflict[device](turningOff) { d =>
+    inflict(turningOff, of[device]) {
         if (d.off) {
             Say(s"$noun is already off")
             false
@@ -239,11 +243,11 @@ object device {
         }
     }
 
-    report[device](turningOff) { d =>
+    report(turningOff, of[device]) {
         Say(s"I turned off $noun")
     }
 
-    inflict[device](switching){ d =>
+    inflict(switching, of[device]){
         if(d.on) execute(turningOff, d)
         else execute(turningOn, d)
     }

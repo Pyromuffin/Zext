@@ -250,7 +250,7 @@ object Parser extends RegexParsers{
     import scala.io.StdIn.readLine
     World.Init()
 
-    execute(examining)
+    execute(examining, reflexively)
     currentLocation.OnEnter()
 
     while(!exit){
