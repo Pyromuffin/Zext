@@ -2,18 +2,9 @@ package Game
 
 import Zext.Parser.*
 import Zext.*
-import Zext.Interpreter.*
-import Zext.thing.*
-import Zext.Direction.*
+import Zext.exports.*
 import JunimoGame.*
-import Zext.Actions.*
-import Zext.Rule.*
-import Zext.World.*
-import Zext.thing.NounAmount.*
-import Zext.Inflector.*
-import Zext.ZextObject.device.*
-import Condition.*
-import Zext.ZextObject.*
+
 
 import reflect.Selectable.*
 
@@ -45,13 +36,9 @@ object FarmHouse extends Room {
     }
 
 
-
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
-    
-    
-
   }
 
   val tv = new device {
@@ -185,7 +172,7 @@ object OutsideWorld extends Room {
   name = "Porch"
   description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west."
 
-  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some aka "crop" aka "plants"
+  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
 
   val parsnip= ~"A single perfect parsnip, ripe and ready just for you"
 
@@ -198,7 +185,49 @@ object OutsideWorld extends Room {
 
   val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" aka "babies" aka "seedling" // ripe= false watered = false
 
-  instead(taking, Seq(crops, parsnips, seedlings)){Say(s"You have failed. $noun remains where it is.")}
+  instead(taking, Seq(crops, parsnips, seedlings)) Say s"You have failed. $noun remains where it is."
+
+  object watering_can extends thing {
+    var waterAmount = 0
+  }
+  watering_can named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
+
+  after(examining, watering_can){
+    if(watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed flops across the basin of the watering can"))
+    if(watering_can.waterAmount == 1) Say("a paucity of water glints in the pail")
+    if(watering_can.waterAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
+    if(watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
+    if(watering_can.waterAmount == 4) Say("the can brims with life giving manna")
+    if(watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
+  }
+
+  object filling extends Action(1, "fill", "submerge", "refill", "dunk")
+
+  inflict(filling, watering_can){
+    Say("You submerge the watering can in the pond, filling it with potential")
+    watering_can.waterAmount = 5
+    true
+  }
+
+  object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate")
+  instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when look at the person on the other side of the screen")
+
+  inflict(watering, of[Vegetable]){ val v = noun.as[Vegetable]
+    if watering_can.waterAmount > 0 then
+      v.watered = true
+      watering_can.waterAmount = watering_can.waterAmount - 1
+      true
+    else
+      Say(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor")
+      false
+  }
+
+  report(watering){
+    Say(s"You spritz $noun, and it somehow seems happier")
+  }
+
+
+
 
   instead(taking, crops) {
     Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")

@@ -22,6 +22,20 @@ object scenery extends Property
 object wet extends Property
 case class initialDescription(desc : StringExpression) extends Property
 
+object exports{
+    export Interpreter.*
+    export Rule.*
+    export Condition.*
+    export World.*
+    export Direction.*
+    export ZextObject.*
+    export Actions.*
+    export Inflector.*
+    export Zext.thing.*
+    export Zext.thing.NounAmount.*
+    export ZextObject.device.*
+}
+
 
 trait Container {
     given c : Container = this
