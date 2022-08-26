@@ -239,8 +239,7 @@ object Actions {
     type Zontainer = Container & ZextObject
 
 
-    inflict(putting, of[Zontainer].secondly) {
-
+    inflict(putting, ofSecond[Zontainer]) {
       if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation)) {
         noun transferTo secondNoun.as[Container]
         true
@@ -250,7 +249,7 @@ object Actions {
       }
     }
 
-    report(putting, of[Zontainer].secondly) Say s"You put $noun into $secondNoun"
+    report(putting, ofSecond[Zontainer]) Say s"You put $noun into $secondNoun"
 
   }
 }

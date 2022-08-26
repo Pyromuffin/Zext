@@ -31,7 +31,8 @@ trait Container {
 
     def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
     def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
-
+    def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
+    def lacked(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment, true)
 }
 
 

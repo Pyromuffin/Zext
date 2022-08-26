@@ -211,7 +211,7 @@ object Rule {
         If both the room gone from (the "...in..." or "...from..." room, whichever is given) and the room gone to (the "... to..." room) are constrained, then the constraints are looked at in the order from-room followed by to-room, since an action which goes to room Z could start in many different places and thus is likely to be more general.
         Giving a place as a specific room beats giving only the name of a region; if region R is entirely within region S, then a rule applying in R beats a rule applying in S. (Note that regions can only overlap if one is contained in the other, so this does not lead to ambiguity.)
         Law III.2.3 - Action/Where/In The Presence Of. A more specific "...in the presence of..." clause beats a less specific one. (This is again a constraint on where the action can take place, but it's now a potentially a constraint which could be passed in many different places at different times, so it's the most likely to be achieved and therefore the last to be considered of the Laws on Where.)
-        Law III.3.1 - Action/What/Second Thing Acted On. A more specific constraint on the second noun beats a less specific. Thus "putting something in the wooden box" beats "putting something in a container".
+        Law III.3.1 - Action/What/Second Thing Acted On. A more specific constraint on the second noun beats a less specific. Thus " putting something in the wooden box" beats "putting something in a container".
         Law III.3.2 - Action/What/Thing Acted On. A more specific constraint on the first noun beats a less specific. Thus "taking a container which is on a supporter" beats "taking a container".
         In the case of "going" actions, the first noun is a direction. The special constraint "going nowhere" (which means: a direction in which the actor's location has no map connection) is considered more general than any other constraint placed on the first noun, but more specific than having no constraint at all. Thus "Instead of going north" beats "Instead of going nowhere" which beats "Instead of going".
         Law III.3.3 - Action/What/Actor Performing Action. A more specific constraint on the actor beats a less specific.
@@ -264,7 +264,7 @@ object Rule {
         }
 
         if( !target2.forall( _.isVisible(currentLocation))) {
-            Say(s"I can't see ${target.get.definite}")
+            Say(s"I can't see ${target2.get.definite}")
             return false
         }
 
@@ -326,6 +326,11 @@ object Condition{
         of[T](QueryPrecedence.Class)
     }
 
+    inline def ofSecond[T](using TypeTest[ZextObject, T]): Condition = {
+        of[T](QueryPrecedence.SecondClass)
+    }
+
+
     inline def of[T](queryType : QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
         val condition = new Condition(
             {
@@ -356,13 +361,6 @@ class Condition( condition : => Boolean, var queryType: QueryPrecedence, var pre
     var specificity = 1
 
     def precedence = queryType.ordinal
-
-    def secondly : this.type = {
-        queryType = QueryPrecedence.SecondClass
-        this
-    }
-
-
 }
 
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
