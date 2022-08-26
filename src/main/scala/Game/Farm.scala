@@ -22,10 +22,10 @@ object FarmHouse extends Room {
 
   Macros.packageToucher(JunimoGame) // leave this here for now, maybe not the best place for it.
 
-  name = s"$farm farmhouse"
+  name = s"$farm Farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
 
-  report(going, south, here) Say "Closing the door behind, you emerge into the sunlight"
+  report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
 
   // probably put this somewhere better
@@ -44,6 +44,8 @@ object FarmHouse extends Room {
       pencil.parentContainer == this
     }
 
+
+
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
@@ -54,8 +56,8 @@ object FarmHouse extends Room {
 
   val tv = new device {
     name = "tv"
-    aliases.addOne("television")
-    offDesc = "The tv lies dormant, you can turn it on."
+    aliases.addOne("television").addOne("TV")
+    offDesc = "The tv lies dormant, ready to be turned on."
     onDesc = "Light dances across the dome of the CRT."
     has(fixed)
 
@@ -71,9 +73,9 @@ object FarmHouse extends Room {
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
   val door = ~"This is a thing you really wish you could open and close, but you can't"
 
-  object coffee_machine extends device {
+  object coffee_machine extends device with Container {
     name = "coffee maker"
-    aliases.addOne("unholy espresso machine").addOne("coffee monster").addOne("cm")
+    aliases.addOne("unholy espresso machine").addOne("coffee monster").addOne("cm").addOne("coffee machine")
 
     var tamped = false
 
@@ -147,8 +149,13 @@ object Vegetable {
       Say("Yum yum!")
     }
 
+    if(v.watered) {Say("Nice and moist, just like they like it")}
+    else {Say("They thirst.")}
+
     true
   }
+
+
 
 }
 
@@ -176,19 +183,23 @@ object OutsideWorld extends Room {
   Connect(north, FarmHouse)
 
   name = "Porch"
-  description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop is west of here."
+  description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west."
 
-  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
+  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some aka "crop" aka "plants"
 
-  val parsnip= ~"A single perfect parsnip, ripe and ready"
+  val parsnip= ~"A single perfect parsnip, ripe and ready just for you"
 
   report(taking, parsnip) {
     Say("Pop! You gently but firmly yank the parsnip, extricating it from its bed.")
   }
 
-  val parsnips = new Vegetable named "baby parsnips" desc "These parsnips are young and unprepared to leave their homes." amount plural
+  val parsnips = new Vegetable named "baby parsnips" desc "These parsnips are young and unprepared to leave their homes." amount plural aka "parsnips"
 
-  val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" // ripe= false watered = false
+
+  val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" aka "babies" aka "seedling" // ripe= false watered = false
+
+  instead(taking, Seq(crops, parsnips, seedlings)){Say(s"You have failed. $noun remains where it is.")}
+
   instead(taking, crops) {
     Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")
   }
@@ -213,7 +224,7 @@ object Path extends Room {
 
   name = "Path to Town"
   description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
-  val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggle, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three" aka "fingers" aka "eels" aka "wiggly things"
+  val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggle, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three" aka "fingers" aka "eels" aka "wiggly things" aka ""
 
   report(going, west, here) {
     Say(Randomly("With one last glance over your shoulder, you sigh and turn towards home.", "You try to run home but you can only ever walk."))
@@ -233,6 +244,8 @@ object ChickenCoop extends Room {
   val void_mayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
 
   val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm" aka "machine"
+
+
   /* property empty vs full (full of mayo)
   "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
   "Emptiness. Like the wrong kind of void."

@@ -119,10 +119,10 @@ object Actions {
       Say(s"The scent of $noun is soaked through your clothing now.")
     }
 
-    instead(smelling, fixed) Say "$noun: Scentless and fixed."
+    instead(smelling, fixed) Say s"$noun: Scentless and fixed."
 
     // implement scent property somehow.
-    report(smelling) Say s"You smell $noun. Wow."
+    report(smelling) Say s"You smell the $noun."
 
   }
 
@@ -140,8 +140,7 @@ object Actions {
       Say(immediate)
       true
     }
-  } //taste test
-
+  }
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
@@ -161,7 +160,7 @@ object Actions {
     }
 
     after(taking){
-      Say(s"$encumbrance slots left.")
+      Say(s"$encumbrance slots left and then you DIE.")
     }
 
     inflict(taking) {
@@ -206,8 +205,9 @@ object Actions {
 
 
     inflict(examining) {
-      val immediate = s"$noun: ${noun.description}"
-      Say(immediate)
+//      val immediate = s"$noun: ${noun.description}"
+//      Say(immediate)
+        Say({noun.description})
       true
     }
   }
@@ -234,7 +234,7 @@ object Actions {
     }
   }
 
-  object putting extends Action(2,"put", "insert") {
+  object putting extends Action(2,"put", "insert", "place", "stuff", "thrust", "jam", "shove", "smash") {
 
     type Zontainer = Container & ZextObject
 
