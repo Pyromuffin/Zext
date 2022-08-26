@@ -4,7 +4,6 @@ import Zext.Parser.*
 import Zext.*
 import Zext.Interpreter.*
 import Zext.thing.*
-import Zext.device.*
 import Zext.Direction.*
 import JunimoGame.*
 import Zext.Actions.*
@@ -12,8 +11,10 @@ import Zext.Rule.*
 import Zext.World.*
 import Zext.thing.NounAmount.*
 import Zext.Inflector.*
-import Zext.device.{turningOff, turningOn}
+import Zext.ZextObject.device.*
 import Condition.*
+import Zext.ZextObject.*
+
 import reflect.Selectable.*
 
 

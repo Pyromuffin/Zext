@@ -52,10 +52,25 @@ object Interpreter{
   }
 
   def Capitalize(str : String): String = {
-    var sentences = str.split('.')
-    sentences = sentences.map(s => s.stripSuffix(" ").stripPrefix(" ").capitalize)
-    sentences.reduce( _ + ". " + _ ) + "."
 
+    val endingPunctuation = Seq('.', '?', '!')
+    val sentences = ArrayBuffer[String]()
+    var lastPunctuationIndex = 0
+    for(c <- str.zipWithIndex){
+      if(endingPunctuation.contains(c._1) && c._2 != str.length) {
+        sentences += str.substring(lastPunctuationIndex, c._2 + 1).stripPrefix(" ").stripSuffix(" ").capitalize
+        lastPunctuationIndex = c._2 + 1
+      }
+    }
+    sentences += str.substring(lastPunctuationIndex, str.length).stripPrefix(" ").stripSuffix(" ").capitalize
+
+
+    var ret = sentences.foldRight("")( _ + " " + _).stripSuffix(" ")
+    if(!endingPunctuation.contains(str.last)){
+      ret += '.'
+    }
+
+    ret
   }
 
   def Say(str: StringExpression): Unit = {

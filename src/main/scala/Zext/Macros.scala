@@ -155,7 +155,7 @@ object Macros{
     val exprTree: Term = something.asTerm
     val tpr = TypeRepr.of[T]
     val symbol = tpr.typeSymbol
-    val fields = symbol.declaredFields
+    val fields = symbol.declaredFields.filter(s => !s.flags.is(Flags.Synthetic) )
     val listExprs : List[Expr[Any]] = fields.map(exprTree.select(_).asExpr)
     Expr.ofList(listExprs)
   }
