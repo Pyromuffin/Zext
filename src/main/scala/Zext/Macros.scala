@@ -31,8 +31,10 @@ object Macros{
   inline def depth[T]: Int =
     ${depthImpl[T]}
 
-  import scala.quoted.*
 
+  inline def ObjectNames[T](something : T) : List[String] = {
+    ${ ObjectNamesImpl('something) }
+  }
 
   inline def packageToucher[T](something : T) : List[Any] = {
     ${ packageToucherImpl('something) }
@@ -77,15 +79,29 @@ object Macros{
     //valdefsTerms.foreach(vd => println(vd.rhs.map(_.show)))
 
     val packageTerm = Ident(_package.companionModule.termRef)
-   //println(packageTerm)
+    //println(packageTerm)
 
     //Apply(Select(  New(Ident(Forest)),     <init>),List())
     //ValDef(FarmHouse,Ident(FarmHouse$),Apply(Select(New(Ident(FarmHouse$)),<init>),List()))
-
     val exprs = valdefs.map(packageTerm.select(_).asExpr)
-
     Expr.ofList(exprs)
   }
+
+  def ObjectNamesImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[String]] = {
+    import quotes.reflect.*
+    // assume something is a top level object
+    val _type = TypeRepr.of[T].typeSymbol
+    val _package = _type.owner
+    val fields = _package.fieldMembers
+
+    println(_package)
+
+    val valdefs = fields.filter(f => f.isValDef && !f.flags.is(Flags.Synthetic) && !f.fullName.contains('$')) // weird incremental $ things added for pain purposes
+    val names = valdefs.map(_.fullName).map(Expr(_))
+
+    Expr.ofList(names)
+  }
+
 
 
 
@@ -159,8 +175,6 @@ def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
   var depth = 0
 
   val str = bases.map(_.fullName).reduce(_ + " " + _)
-  println(str)
-
 
   for(i <- 0 until bases.size){
     val base = bases(i)

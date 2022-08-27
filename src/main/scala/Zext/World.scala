@@ -40,7 +40,9 @@ object player extends ZextObject with Container {
 
 object World extends Container {
 
-
+  Macros.TouchEveryone(Actions)
+  Macros.TouchEveryone(ZextObject)
+  Game.allObjects
 
   def currentLocation = player.parentContainer.asInstanceOf[Room]
   var time = 10
@@ -48,9 +50,6 @@ object World extends Container {
   object StartingGame extends Action(0) // for hooking.
 
   def Init(): Unit = {
-
-    Game.Touchers
-
     player.Move(Game.FarmHouse)
 
     ZextObject.all.foreach{ z =>

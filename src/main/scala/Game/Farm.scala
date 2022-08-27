@@ -11,8 +11,6 @@ import reflect.Selectable.*
 
 object FarmHouse extends Room {
 
-  Macros.packageToucher(JunimoGame) // leave this here for now, maybe not the best place for it.
-
   name = s"$farm Farmhouse"
   description = s"$farm is where the magic happens. That place is outside of this place."
 
@@ -210,7 +208,7 @@ object OutsideWorld extends Room {
   }
 
   object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate")
-  instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when look at the person on the other side of the screen")
+  instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
 
   inflict(watering, of[Vegetable]){ val v = noun.as[Vegetable]
     if watering_can.waterAmount > 0 then
