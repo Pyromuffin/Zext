@@ -3,7 +3,7 @@ package Zext
 import Zext.Direction.*
 import Zext.Interpreter.*
 import Zext.Parser.*
-import Zext.QueryPrecedence.Property
+import Zext.QueryPrecedence.*
 import Zext.Rule.*
 import Zext.World.*
 import Zext.thing.NounAmount
@@ -112,10 +112,14 @@ object ZextObject{
     }
 
 
-    class Supporter(using c : Container) extends thing with Container
+    class Supporter(using Container) extends thing with Container
+    class Box(using Container) extends thing with Container {
+        transparent  = false
+        open = false
+    }
 }
 
-class ZextObject extends ParsableType(PartOfSpeech.noun) with reflect.Selectable {
+class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
     var definiteArticle : String = "the"
     var indefiniteArticle : String = "a"

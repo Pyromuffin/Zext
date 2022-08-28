@@ -24,7 +24,6 @@ object Rule {
     }
 
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
-    val everyTurnRules = ArrayBuffer[PersistingRule]()
 
 
 
@@ -56,8 +55,8 @@ object Rule {
         rule
     }
 
-    inline def after(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule( {body; true}, conditions*)
+    inline def after(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
+        val rule = new ActionRule( body, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
         rule
@@ -87,113 +86,7 @@ object Rule {
     }
 
 
-    /*
-        def before(r: Action, conditions: Condition*)(body: => Unit)(implicit dummyImplicit: DummyImplicit): ActionRule = {
-            before(r, conditions *) {
-                body; true
-            }
-        }
-
-        inline def before[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean): ActionRule = {
-            val condition = Condition.fromClass[T](QueryPrecedence.Class)
-            val rule = new ActionRule({
-                body(noun.asInstanceOf[T])
-            }, (conditions :+ condition) *)
-
-            rule.definitionPosition = CodePosition()
-            ruleSets(r).beforeRules += rule
-            rule
-        }
-        */
-
-
-/*
-    def instead(r: Action, conditions: Condition*)(body: => Unit)(implicit dummyImplicit: DummyImplicit): ActionRule = {
-        instead(r, conditions *) {
-            body; false
-        }
-    }
-
-    inline def instead[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); false }, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class))* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).insteadRules += rule
-        rule
-    }
-
-    inline def instead[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit)(using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
-        val firstCondition = Condition.fromClass[T1](QueryPrecedence.Class)
-        val secondCondition = Condition.fromClass[T2](QueryPrecedence.SecondClass)
-        val addedConditions = conditions :+ firstCondition :+ secondCondition
-
-        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]); false}, addedConditions* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).insteadRules += rule
-        rule
-    }
-*/
-
-
-/*
-    inline def report[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag : ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]); true }, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class))* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).reportRules += rule
-        rule
-    }
-*/
-
-
-
-
-
-
-    /*
-    inline def after[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Unit)(using tag: ClassTag[T]): ActionRule = {
-        val rule = new ActionRule( {body(noun.asInstanceOf[T]); true}, (conditions :+ Condition.fromClass[T](QueryPrecedence.Class)) *)
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).afterRules += rule
-        rule
-    }
-    */
-
-
-
-
-    /*
-    inline def inflict[T <: ZextObject](r: Action, conditions: Condition*)(body: T => Boolean): ActionRule = {
-
-        val condition = Condition.fromClass[T](QueryPrecedence.Class)
-        val rule = new ActionRule( { body(noun.asInstanceOf[T]) }, (conditions :+ condition)* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).executeRules += rule
-        rule
-    }
-
-    inline def inflict[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Boolean)(using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
-        val firstCondition = Condition.fromClass[T1](QueryPrecedence.Class)
-        val secondCondition = Condition.fromClass[T2](QueryPrecedence.SecondClass)
-        val addedConditions = conditions :+ firstCondition :+ secondCondition
-
-        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]) }, addedConditions* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).executeRules += rule
-        rule
-    }
-
-    inline def report[T1 <: ZextObject, T2 <: ZextObject](r: Action, conditions: Condition*)(body: (T1, T2) => Unit) (using TypeTest[ZextObject, T1], TypeTest[ZextObject, T2]): ActionRule = {
-        val firstCondition = Condition.fromClass[T1](QueryPrecedence.Class)
-        val secondCondition = Condition.fromClass[T2](QueryPrecedence.SecondClass)
-        val addedConditions = conditions :+ firstCondition :+ secondCondition
-
-        val rule = new ActionRule( { body(noun.asInstanceOf[T1], secondNoun.asInstanceOf[T2]); true }, addedConditions* )
-        rule.definitionPosition = CodePosition()
-        ruleSets(r).reportRules += rule
-        rule
-    }
-    */
-
-    def ResolveOverloads(possible: ArrayBuffer[ActionRule]): Option[ActionRule] = {
+    def SoryByPrecedence(possible: ArrayBuffer[ActionRule]): Seq[ActionRule] = {
         // the inform rules are something like this:
         // it seems like this is highest priority to lowest
 
@@ -224,16 +117,23 @@ object Rule {
 
 
         if (possible.isEmpty)
-            return Option.empty
+            return Seq()
 
         if(possible.length == 1)
-            return possible.headOption
+            return Seq(possible.head)
 
-        val maxPrecedence = possible.map(_.precedence).max
-        val maxPrecedenceRules = possible.filter(_.precedence == maxPrecedence)
-        val rule = maxPrecedenceRules.maxBy(_.specificity)
-        Option(rule)
+        val precedenceSets = possible.groupBy(_.precedence).toSeq
+
+        val sortedPrecedenceSets = precedenceSets.map ( kv => kv._1 -> kv._2.sortBy(-_.specificity))
+        val flat = sortedPrecedenceSets.sortBy( kv => kv._1 ).reverse.flatten(kv => kv._2)
+
+        flat
+        //val maxPrecedence = possible.map(_.precedence).max
+        //val maxPrecedenceRules = possible.filter(_.precedence == maxPrecedence)
+        //val rule = maxPrecedenceRules.maxBy(_.specificity)
+        //Option(rule)
     }
+
 
 
     val previouslySucceeded = mutable.HashSet[Condition]()
@@ -269,22 +169,27 @@ object Rule {
         }
 
 
-        def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule]) : Boolean = {
+        def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule], all : Boolean = false) : Boolean = {
 
             if(target.isDefined) SetNoun(target.get)
             if(target2.isDefined) SetSecondNoun(target2.get)
 
             val possibleRules = rules.filter(_.possible)
-            val success = ResolveOverloads(possibleRules).forall(_.exec)
-            success
+            val sorted = SoryByPrecedence(possibleRules)
+
+            if(all){
+                sorted.forall(_.exec)
+            } else {
+                sorted.headOption.forall(_.exec)
+            }
         }
 
 
-        if(!RunRule(target, target2, set.beforeRules)) return false
+        if(!RunRule(target, target2, set.beforeRules, true)) return false
         if(!RunRule(target, target2, set.insteadRules)) return false
         if(!RunRule(target, target2, set.executeRules)) return false
         if(!RunRule(target, target2, set.reportRules)) return false
-        if(!RunRule(target, target2, set.afterRules)) return false
+        if(!RunRule(target, target2, set.afterRules, true)) return false
 
         true
     }
@@ -363,13 +268,6 @@ class Condition( condition : => Boolean, var queryType: QueryPrecedence, var pre
 }
 
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
-
-    var generic = false
-
-    for(c <- conditions){
-        if(c.queryType == QueryPrecedence.Generic)
-            generic = true
-    }
 
     def specificity = {
         conditions.map( _.specificity ).sum

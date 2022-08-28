@@ -54,19 +54,24 @@ object Interpreter{
   def Capitalize(str : String): String = {
 
     val endingPunctuation = Seq('.', '?', '!')
+
     val sentences = ArrayBuffer[String]()
     var lastPunctuationIndex = 0
     for(c <- str.zipWithIndex){
       if(endingPunctuation.contains(c._1) && c._2 != str.length) {
-        sentences += str.substring(lastPunctuationIndex, c._2 + 1).stripPrefix(" ").stripSuffix(" ").capitalize
-        lastPunctuationIndex = c._2 + 1
+        var index = c._2
+        if(index + 1 < str.length && str(index + 1) == '\"'){
+          index += 1
+        }
+        sentences += str.substring(lastPunctuationIndex, index + 1).stripPrefix(" ").stripSuffix(" ").capitalize
+        lastPunctuationIndex = index + 1
       }
     }
     sentences += str.substring(lastPunctuationIndex, str.length).stripPrefix(" ").stripSuffix(" ").capitalize
 
 
     var ret = sentences.foldRight("")( _ + " " + _).stripSuffix(" ")
-    if(!endingPunctuation.contains(str.last)){
+    if(!endingPunctuation.contains(str.last) && str.last != '\"'){
       ret += '.'
     }
 
@@ -302,7 +307,7 @@ object Parser extends RegexParsers{
         val c = command.get
         EvaluatePreviouslyConditions(c.action, c.noun, c.secondNoun)
         execute(c.action, c.noun, c.secondNoun)
-        everyTurnRules.foreach( _.Execute() )
+        execute(being, currentLocation)
       } else {
         Say("Redacted.")
       }

@@ -37,6 +37,24 @@ object Actions {
   }
 
 
+  object being extends Action(1)
+
+  object entering extends Action(1) {
+
+    inflict(entering, of[Room]) {
+      player.Move(noun[Room])
+      LineBreak()
+      execute(examining, currentLocation)
+      true
+    }
+
+    after(entering, of[Room]){
+      noun[Room].visited = true
+      true
+    }
+
+  }
+
   object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
 
     instead(going, reflexively) Say "You don't have to go right now."
@@ -79,10 +97,9 @@ object Actions {
     after(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
-      player.Move(room)
-      LineBreak()
-      execute(examining, currentLocation)
-      currentLocation.OnEnter()
+      execute(entering, room)
+
+
     }
   }
 
@@ -111,20 +128,25 @@ object Actions {
   }
 
 
+  case class flavor(desc: StringExpression) extends Property
 
   object tasting extends Action( 1,"eat", "taste", "lick", "nom", "mouth", "nibble") {
 
+    player.properties += flavor("the inside of your mouth")
 
     inflict(tasting, reflexively) {
       Say("Slurp!")
-      execute(tasting, currentLocation)
+      execute(tasting, player)
     }
 
-    inflict(tasting) {
-      val immediate = s"$noun: ${noun.description}"
-      Say(immediate)
-      true
+    report(tasting, prop[flavor]) {
+      Say(s"$noun tastes like ${noun[flavor].desc}")
     }
+
+    report(tasting) {
+      Say(s"$noun is strangely flavorless")
+    }
+
   }
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
@@ -146,6 +168,7 @@ object Actions {
 
     after(taking){
       Say(s"$encumbrance slots left and then you DIE.")
+      true
     }
 
     inflict(taking) {
@@ -172,6 +195,7 @@ object Actions {
         s += "."
         Say(s)
       }
+      true
     }
 
   }
@@ -190,9 +214,7 @@ object Actions {
 
 
     inflict(examining) {
-//      val immediate = s"$noun: ${noun.description}"
-//      Say(immediate)
-        Say({noun.description})
+      Say({noun.description})
       true
     }
   }

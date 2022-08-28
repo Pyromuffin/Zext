@@ -16,15 +16,14 @@ object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytos
   case class scent(odor : StringExpression) extends Property
 
 
-  inflict(smelling, reflexively) {
+  report(smelling, reflexively) {
     Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
-    true
   }
 
   after(smelling, player has noun) {
     Say(s"The scent of $noun is soaked through your clothing now.")
+    true
   }
-
 
   report(smelling) Say s"You smell $noun."
   report(smelling, prop[scent]) Say s"$noun smells like ${noun[scent].odor}"
@@ -73,10 +72,7 @@ object FarmHouse extends Room {
 
     report(turningOn, this) Say s"$noun reluctantly flickers to life."
     report(turningOff, this) Say s"With a protest of static, $noun blinks off."
-
-    everyTurnRules += {
-      if (on && currentLocation == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
-    }
+    report(being, on, here, Randomly(4)) Say "The tv crackles in the background"
   }
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
@@ -98,10 +94,6 @@ object FarmHouse extends Room {
 
     report(turningOff, this) {
       Say(s"Spent but angry, $noun comes to a stop.")
-    }
-
-    everyTurnRules += {
-      if (on && currentLocation == FarmHouse && Randomly(4)) Say("The coffee machine looms")
     }
 
     object tamping extends Action(1, "tamp", "smack", "compress")
@@ -215,6 +207,7 @@ object OutsideWorld extends Room {
       if (watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
       if (watering_can.waterAmount == 4) Say("the can brims with life giving manna")
       if (watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
+      true
     }
 
     this named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
@@ -342,6 +335,7 @@ object ChickenCoop extends Room {
 
   after(taking, hay) {
     Say("You aren't really sure why you want that but you do.")
+    true
   }
 
   val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery aka "odor" aka "scents" aka "aroma"
