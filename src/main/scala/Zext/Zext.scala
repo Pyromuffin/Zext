@@ -47,6 +47,14 @@ trait Container {
     var open = true
     var transparent = true
 
+    def ContentsString : String = {
+        var s = ""
+        for (i <- c.contents) {
+            s += i.indefinite + ", "
+        }
+        s.stripSuffix(", ")
+    }
+
     def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
     def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
     def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
@@ -184,7 +192,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
         // if this breaks, i deserve it
         val visibleTransitively = {
             var parent = parentContainer
-            while(parent != null && parent.transparent && parent != room && parent.isInstanceOf[ZextObject]){
+            while(parent != null && (parent.transparent || parent.open) && parent != room && parent.isInstanceOf[ZextObject]){
                 parent = parent.asInstanceOf[ZextObject].parentContainer
             }
 
@@ -197,7 +205,18 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     }
 
     def isAccessible(room: Room) : Boolean = {
-        isVisible(room)
+
+        val accessibleTransitively = {
+            var parent = parentContainer
+            while (parent != null && parent.open && parent != room && parent.isInstanceOf[ZextObject]) {
+                parent = parent.asInstanceOf[ZextObject].parentContainer
+            }
+
+            parent == room
+        }
+
+
+        isVisible(room) && accessibleTransitively
     }
 
 

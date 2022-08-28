@@ -88,8 +88,6 @@ object Macros{
 
        val correctFlags = Flags.Final | Flags.Lazy | Flags.Module | Flags.StableRealizable
        val childrenObjects = valdef.fieldMembers.filter(f => f.isValDef && (f.flags & correctFlags).is(correctFlags) )// && f.fullName.contains("watering_can"))
-       println(valdef.toString + " " + valdef.flags.show)
-       println(childrenObjects)
 
        val objectTerm = Ident(valdef.termRef)
        val exprs = childrenObjects.map(objectTerm.select(_).asExpr)
@@ -99,7 +97,7 @@ object Macros{
 
 
     val exprs = valdefs.map(packageTerm.select(_).asExpr).concat( valdefs.flatMap(GetObjectsRecursive) )
-    println(exprs)
+    //println(exprs)
     Expr.ofList(exprs)
   }
 
@@ -111,7 +109,7 @@ object Macros{
     val _package = _type.owner
     val fields = _package.fieldMembers
 
-    println(_package)
+    //println(_package)
 
     val valdefs = fields.filter(f => f.isValDef && !f.flags.is(Flags.Synthetic) && !f.fullName.contains('$')) // weird incremental $ things added for pain purposes
     val names = valdefs.map(_.fullName).map(Expr(_))
@@ -191,7 +189,8 @@ def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
   val bases = tpe.baseClasses.filterNot( c => c.flags.is(Flags.Trait) )
   var depth = 0
 
-  val str = bases.map(_.fullName).reduce(_ + " " + _)
+
+  // val str = bases.map(_.fullName).reduce(_ + " " + _)
 
   for(i <- 0 until bases.size){
     val base = bases(i)
@@ -200,6 +199,8 @@ def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
     depth += 1
 
   }
+
+  depth = -1
 
   Expr(depth)
 

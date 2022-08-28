@@ -40,14 +40,8 @@ object FarmHouse extends Room {
 
   val butt = ~"a mysterious floating buttocks" has scent("peaches")
 
-  // probably put this somewhere better
-  inflict(examining, of[Supporter]) {
-    Say(noun.description)
-    noun[Supporter].contents.foreach(z => Say(z.name))
-    true
-  }
 
-  val drawer = new Supporter {
+  val drawer = new Box {
     val pencil = ~"graphite imprisoned with carved wood."
     name = "drawer"
     description = "debris collector"
@@ -84,9 +78,15 @@ object FarmHouse extends Room {
 
     var tamped = false
 
+    open = false
+    transparent = true
+
     offDesc = "Sleepy, just like you."
     onDesc = "Constant disturbing grinding and whining, the machine performs miracles before your eyes"
     has(fixed)
+
+
+    val coffee_grounds = ~"all that remains of yesterday's grind." amount some aka "grounds"
 
     report(turningOn, this) {
       Say(s"$noun awakens from its slumber.")

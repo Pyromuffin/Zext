@@ -152,6 +152,14 @@ object Actions {
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
 
+    before(taking){
+      if !noun.isAccessible(currentLocation) then
+        Say(s"$noun $is inaccessible") // maybe say why?
+        false
+      else
+        true
+    }
+
     instead(taking, reflexively) Say s"I can't take nothing."
 
     instead(taking, player has noun) {
@@ -175,6 +183,26 @@ object Actions {
       noun.transferTo(player)
       true
     }
+  }
+
+  object examining extends Action(1,"examine", "x", "look", "l") {
+
+    instead(examining, reflexively) {
+      execute(examining, currentLocation)
+    }
+
+    inflict(examining, of[Crevice]) {
+      Title(currentLocation.name + " It's small! ")
+      Say(currentLocation.description)
+      true
+    }
+
+
+    inflict(examining) {
+      Say({noun.description})
+      true
+    }
+
 
     inflict(examining, of[Room]) {
       Title(currentLocation.name)
@@ -195,30 +223,47 @@ object Actions {
         s += "."
         Say(s)
       }
-      true
+      false
     }
 
+    after(examining, of[Container]) {
+
+      val c = noun[Container]
+      var response = ""
+      if c.open then response +=s"$noun is open" else response += s"$noun is closed"
+
+      if (c.open  || c.transparent) {
+        response += ", "
+        if(c.contents.isEmpty)
+          response += "nothing is inside"
+        else
+          response += s"inside you can see ${c.ContentsString}"
+      }
+
+      Say(response)
+      true
+    }
   }
 
-  object examining extends Action(1,"examine", "x", "look", "l") {
 
-    instead(examining, reflexively) {
-      execute(examining, currentLocation)
+  object opening extends Action(1, "open"){
+
+    inflict(opening, of[Container]){
+      if !noun[Container].open then
+        noun[Container].open = true
+        true
+      else
+        Say(s"$noun is already open")
+        false
     }
 
-    inflict(examining, of[Crevice]) {
-      Title(currentLocation.name + " It's small! ")
-      Say(currentLocation.description)
-      true
-    }
-
-
-    inflict(examining) {
-      Say({noun.description})
-      true
+    report(opening, of[Container]) {
+      if !noun[Container].transparent then
+        Say(s"You open $noun, inside you can see ${noun[Container].ContentsString}")
+      else
+        Say(s"You open $noun")
     }
   }
-
 
   object exiting extends Action(0,"exit") {
     inflict(exiting) {

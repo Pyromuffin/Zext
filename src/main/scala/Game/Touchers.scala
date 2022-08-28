@@ -1,4 +1,4 @@
-///////////////////////////////////////////
+//13308704762900///////////////////////////
 
 package Game
 
@@ -12,6 +12,8 @@ import scala.quoted.*
 
 object Everything {
   val members = Macros.packageToucher(Game.JunimoGame)
+  Macros.TouchEveryone(Zext.Actions)
+  Macros.TouchEveryone(Zext.ZextObject)
 }
 
 

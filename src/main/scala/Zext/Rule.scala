@@ -159,12 +159,12 @@ object Rule {
         val set = ruleSets(rule)
 
         if( !target.forall( _.isVisible(currentLocation))) {
-            Say(s"I can't see ${target.get.definite}")
+            Say(s"You can't see ${target.get.definite}")
             return false
         }
 
         if( !target2.forall( _.isVisible(currentLocation))) {
-            Say(s"I can't see ${target2.get.definite}")
+            Say(s"You can't see ${target2.get.definite}")
             return false
         }
 

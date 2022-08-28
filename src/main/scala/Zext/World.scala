@@ -42,8 +42,7 @@ object player extends ZextObject with Container {
 
 object World extends Container {
 
-  Macros.TouchEveryone(Actions)
-  Macros.TouchEveryone(ZextObject)
+
   val members = Everything.members
 
   def currentLocation = player.parentContainer.asInstanceOf[Room]
