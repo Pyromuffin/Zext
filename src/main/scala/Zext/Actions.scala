@@ -60,7 +60,7 @@ object Actions {
     // once we have moved to the other room, and reported, we want to automatically examine the room.
 
     inflict(going, of[Direction]) {
-      val d = noun.as[Direction]
+      val d = noun[Direction]
       val connected = currentLocation.connections.contains(d)
 
       if(!connected){
@@ -71,13 +71,13 @@ object Actions {
     }
 
     report(going, of[Direction]) {
-      val d = noun.as[Direction]
+      val d = noun[Direction]
       val room = currentLocation.connections(d)
       Say(s"I went $d to $room.")
     }
 
     after(going, of[Direction]) {
-      val d = noun.as[Direction]
+      val d = noun[Direction]
       val room = currentLocation.connections(d)
       player.Move(room)
       LineBreak()
@@ -110,23 +110,6 @@ object Actions {
 
   }
 
-  object smelling extends Action(1,"smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
-
-    inflict(smelling, reflexively) {
-      Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
-      true
-    }
-
-    after(smelling, player has noun) {
-      Say(s"The scent of $noun is soaked through your clothing now.")
-    }
-
-    instead(smelling, fixed) Say s"$noun: Scentless and fixed."
-
-    // implement scent property somehow.
-    report(smelling) Say s"You smell the $noun."
-
-  }
 
 
   object tasting extends Action( 1,"eat", "taste", "lick", "nom", "mouth", "nibble") {
@@ -177,7 +160,7 @@ object Actions {
     }
 
     after(examining, of[Room]) {
-      val r = noun.as[Room]
+      val r = noun[Room]
       val visible = r.contents.filterNot(_ ? scenery)
       if (!visible.isEmpty) {
         var s = "You can see "
@@ -243,7 +226,7 @@ object Actions {
 
     inflict(putting, ofSecond[Zontainer]) {
       if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation)) {
-        noun transferTo secondNoun.as[Container]
+        noun transferTo secondNoun[Container]
         true
       } else {
         Say(s"$secondNoun is inaccessible")

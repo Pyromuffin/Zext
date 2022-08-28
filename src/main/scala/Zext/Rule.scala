@@ -241,8 +241,8 @@ object Rule {
     def EvaluatePreviouslyConditions(action: Action, target: Option[ZextObject] = None, target2: Option[ZextObject]): Unit = {
         previouslySucceeded.clear()
 
-        if(target.isDefined) noun = target.get
-        if(target2.isDefined) secondNoun = target2.get
+        if(target.isDefined) SetNoun(target.get)
+        if(target2.isDefined) SetSecondNoun(target2.get)
 
         // forbid using 'noun' in conditions when previously
 
@@ -271,8 +271,8 @@ object Rule {
 
         def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule]) : Boolean = {
 
-            if(target.isDefined) noun = target.get
-            if(target2.isDefined) secondNoun = target2.get
+            if(target.isDefined) SetNoun(target.get)
+            if(target2.isDefined) SetSecondNoun(target2.get)
 
             val possibleRules = rules.filter(_.possible)
             val success = ResolveOverloads(possibleRules).forall(_.exec)
@@ -316,20 +316,19 @@ object Condition{
     // location > object > property > class > generic
 
 
+    def prop[T](using tt : TypeTest[Property, T]) : Condition = new Condition(noun.properties.exists(canBecome[Property,T]), QueryPrecedence.Property)
+
     implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, QueryPrecedence.Generic)
     implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, QueryPrecedence.Object)
     implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == currentLocation, QueryPrecedence.Location)
-
     inline def of[T](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.Class)
     }
-
     inline def ofSecond[T](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.SecondClass)
     }
-
 
     inline def of[T](queryType : QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
         val condition = new Condition(

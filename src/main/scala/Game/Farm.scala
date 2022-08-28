@@ -1,12 +1,35 @@
 package Game
 
+import Game.smelling.scent
 import Zext.Parser.*
 import Zext.*
 import Zext.exports.*
 import JunimoGame.*
 
-
 import reflect.Selectable.*
+
+
+
+
+object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
+
+  case class scent(odor : StringExpression) extends Property
+
+
+  inflict(smelling, reflexively) {
+    Say(Randomly("You wrinkle your nose and lift your lips, giving' that vestigial Vomeronasal Organ another go", "Ah, the smells.", "Moved here for the grandpa, stayed for the smells."))
+    true
+  }
+
+  after(smelling, player has noun) {
+    Say(s"The scent of $noun is soaked through your clothing now.")
+  }
+
+
+  report(smelling) Say s"You smell $noun."
+  report(smelling, prop[scent]) Say s"$noun smells like ${noun[scent].odor}"
+
+}
 
 
 object FarmHouse extends Room {
@@ -16,11 +39,12 @@ object FarmHouse extends Room {
 
   report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
+  val butt = ~"a mysterious floating buttocks" has scent("peaches")
 
   // probably put this somewhere better
   inflict(examining, of[Supporter]) {
     Say(noun.description)
-    noun.as[Supporter].contents.foreach(z => Say(z.name))
+    noun[Supporter].contents.foreach(z => Say(z.name))
     true
   }
 
@@ -32,6 +56,8 @@ object FarmHouse extends Room {
     Understand(pencil, "prisoner"){
       pencil.parentContainer == this
     }
+
+    pencil has scent(Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain."))
 
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
@@ -99,7 +125,7 @@ object FarmHouse extends Room {
   }
 
 
-  report(smelling, drawer.pencil) Say Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain.")
+
   report(dropping, drawer) Say "You drop your drawer."
   report(taking, drawer) Say Randomly("You take the drawer and balance it on your head. Maybe you can carry stuff like that?", "You took the drawer out of the desk and slid in into your pants. Now you can store things in a drawer in your pants.")
 
@@ -109,7 +135,7 @@ object FarmHouse extends Room {
 object Vegetable {
 
   before(taking, of[Vegetable] ) {
-    val v = noun.as[Vegetable]
+    val v = noun[Vegetable]
     if (v.ripe) {
       Say("Up you go!")
       true
@@ -121,7 +147,7 @@ object Vegetable {
   }
 
   before(examining, of[Vegetable]) {
-    val v = noun.as[Vegetable]
+    val v = noun[Vegetable]
     if (v.wilted) {
       Say(s"A slow tear runs down your face, but even a river of tears could not bring $noun back to life")
     }
@@ -209,7 +235,7 @@ object OutsideWorld extends Room {
     instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
 
     inflict(watering, of[Vegetable]) {
-      val v = noun.as[Vegetable]
+      val v = noun[Vegetable]
       if watering_can.waterAmount > 0 then
         v.watered = true
         watering_can.waterAmount = watering_can.waterAmount - 1

@@ -254,19 +254,30 @@ object Parser extends RegexParsers{
       return None
     }
 
+
     val triple = result.get
+
+    var targets = 0
+    if(triple._2.isDefined) targets += 1
+    if(triple._3.isDefined) targets += 1
+
 
     // this kinda sucks
     if(triple._2.isDefined && triple._2.get.part == PartOfSpeech.verb)
       return None
 
+
     if(triple._3.isDefined && triple._3.get.part ==  PartOfSpeech.verb)
       return None
+
 
     if( triple._1.part == PartOfSpeech.verb ){
       val action = triple._1.asInstanceOf[Action]
       val n1 = triple._2.map( p => p.asInstanceOf[ZextObject] )
       val n2 = triple._3.map( p => p.asInstanceOf[ZextObject] )
+
+      if(action.targets != targets)
+        return None
 
       return Some(Command(action, n1, n2))
     }

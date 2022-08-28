@@ -13,6 +13,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 
+import scala.reflect.TypeTest
+
 trait Property
 
 
@@ -21,6 +23,8 @@ object fixed extends Property
 object scenery extends Property
 object wet extends Property
 case class initialDescription(desc : StringExpression) extends Property
+
+
 
 object exports{
     export Interpreter.*
@@ -61,7 +65,7 @@ object ZextObject{
         object switching extends Action(1,"switch", "toggle")
 
         inflict(turningOn, of[device]) {
-            val d = noun.as[device]
+            val d = noun[device]
             if (d.on) {
                 Say(s"$noun is already on")
                 false
@@ -76,7 +80,7 @@ object ZextObject{
         }
 
         inflict(turningOff, of[device]) {
-            val d = noun.as[device]
+            val d = noun[device]
             if (d.off) {
                 Say(s"$noun is already off")
                 false
@@ -91,7 +95,7 @@ object ZextObject{
         }
 
         inflict(switching, of[device]){
-            val d = noun.as[device]
+            val d = noun[device]
             if(d.on) execute(turningOff, d)
             else execute(turningOn, d)
         }
@@ -199,7 +203,10 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) with reflect.Selectable
         Condition(secondNoun == this, QueryPrecedence.SecondObject)
     }
 
-    def as[T] = this.asInstanceOf[T]
+    def get[T](using TypeTest[Property, T]) : Option[T] = {
+        // if a zextobject has more than one property of the same "type" then it will give ?? one
+        properties.find( canBecome[Property,T]).map( _.asInstanceOf[T])
+    }
 
 }
 
