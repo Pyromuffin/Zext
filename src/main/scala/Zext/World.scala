@@ -1,6 +1,6 @@
 package Zext
 
-import Game.{FarmHouse, JunimoGame}
+import Game.{Everything, FarmHouse, JunimoGame}
 
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
@@ -42,7 +42,7 @@ object World extends Container {
 
   Macros.TouchEveryone(Actions)
   Macros.TouchEveryone(ZextObject)
-  Game.allObjects
+  val members = Everything.members
 
   def currentLocation = player.parentContainer.asInstanceOf[Room]
   var time = 10

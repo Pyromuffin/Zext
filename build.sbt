@@ -25,6 +25,19 @@ generate1 := {
 }
 
 
+lazy val touchTouchers = taskKey[Unit]("Code generation")
+touchTouchers := {
+  println("69")
+
+  val touchersFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Touchers.scala"
+  val nanos = java.time.LocalTime.now().toNanoOfDay
+  val f = new java.io.RandomAccessFile(touchersFile, "rw")
+  f.writeBytes("//" + nanos.toString)
+  f.close()
+}
+
+
+
 lazy val generate3 = taskKey[Unit]("Code generation")
 generate3 := {
   println("4")

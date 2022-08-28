@@ -10,6 +10,10 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.annotation.experimental
 import scala.quoted.*
 
+object Everything {
+  val members = Macros.packageToucher(Game.JunimoGame)
+}
+
 
 // touched
 object CodeGen {

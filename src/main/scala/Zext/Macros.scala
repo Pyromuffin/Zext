@@ -72,7 +72,7 @@ object Macros{
     val fields = _package.fieldMembers
 
 
-    val valdefs = fields.filter(f => f.isValDef && !f.flags.is(Flags.Synthetic) && !f.fullName.contains('$')) // weird incremental $ things added for pain purposes
+    val valdefs = fields.filter(f => f.isValDef && !f.flags.is(Flags.Synthetic) && f.flags.is(Flags.Module) && !f.fullName.contains('$')) // weird incremental $ things added for pain purposes
     //valdefs.foreach(vd => println(vd))
     //valdefs.foreach(vd => println(vd.tree))
     //val valdefsTerms = valdefs.map(_.tree.asInstanceOf[ValDef])
@@ -83,9 +83,26 @@ object Macros{
 
     //Apply(Select(  New(Ident(Forest)),     <init>),List())
     //ValDef(FarmHouse,Ident(FarmHouse$),Apply(Select(New(Ident(FarmHouse$)),<init>),List()))
-    val exprs = valdefs.map(packageTerm.select(_).asExpr)
+
+     def GetObjectsRecursive(valdef: Symbol): Seq[Expr[Any]] = {
+
+       val correctFlags = Flags.Final | Flags.Lazy | Flags.Module | Flags.StableRealizable
+       val childrenObjects = valdef.fieldMembers.filter(f => f.isValDef && (f.flags & correctFlags).is(correctFlags) )// && f.fullName.contains("watering_can"))
+       println(valdef.toString + " " + valdef.flags.show)
+       println(childrenObjects)
+
+       val objectTerm = Ident(valdef.termRef)
+       val exprs = childrenObjects.map(objectTerm.select(_).asExpr)
+
+       exprs.concat(childrenObjects.flatMap(GetObjectsRecursive))
+    }
+
+
+    val exprs = valdefs.map(packageTerm.select(_).asExpr).concat( valdefs.flatMap(GetObjectsRecursive) )
+    println(exprs)
     Expr.ofList(exprs)
   }
+
 
   def ObjectNamesImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[String]] = {
     import quotes.reflect.*

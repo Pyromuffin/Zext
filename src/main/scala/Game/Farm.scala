@@ -33,13 +33,12 @@ object FarmHouse extends Room {
       pencil.parentContainer == this
     }
 
-
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
   }
 
-  val tv = new device {
+  object tv extends device {
     name = "tv"
     aliases.addOne("television").addOne("TV")
     offDesc = "The tv lies dormant, ready to be turned on."
@@ -52,7 +51,6 @@ object FarmHouse extends Room {
     everyTurnRules += {
       if (on && currentLocation == FarmHouse && Randomly(4)) Say("The tv crackles in the background")
     }
-
   }
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
@@ -79,28 +77,28 @@ object FarmHouse extends Room {
     everyTurnRules += {
       if (on && currentLocation == FarmHouse && Randomly(4)) Say("The coffee machine looms")
     }
+
+    object tamping extends Action(1, "tamp", "smack", "compress")
+
+    inflict(tamping, coffee_machine) {
+      if (coffee_machine.tamped)
+        Say("It's as tamped as it's gonna get without your hoe")
+      else
+        Say("You tamp dat ass")
+
+      coffee_machine.tamped = true
+      true
+    }
+
+    inflict(tamping) {
+      Say(s"$noun doesn't give a heck. It's tamp-er proof.")
+      false
+    }
+
+    instead(taking, coffee_machine) Say "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down."
   }
 
-  coffee_machine.tamped = false
-  object tamping extends Action(1, "tamp", "smack", "compress")
 
-
-  inflict(tamping, coffee_machine) {
-    if (coffee_machine.tamped)
-      Say ("It's as tamped as it's gonna get without your hoe")
-    else
-      Say ("You tamp dat ass")
-
-    coffee_machine.tamped = true
-    true
-  }
-
-  inflict(tamping){
-    Say (s"$noun doesn't give a heck. It's tamp-er proof.")
-    false
-  }
-
-  instead(taking, coffee_machine) Say "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down."
   report(smelling, drawer.pencil) Say Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain.")
   report(dropping, drawer) Say "You drop your drawer."
   report(taking, drawer) Say Randomly("You take the drawer and balance it on your head. Maybe you can carry stuff like that?", "You took the drawer out of the desk and slid in into your pants. Now you can store things in a drawer in your pants.")
@@ -139,9 +137,6 @@ object Vegetable {
 
     true
   }
-
-
-
 }
 
 class Vegetable(using c : Container) extends thing {
@@ -180,50 +175,54 @@ object OutsideWorld extends Room {
 
   val parsnips = new Vegetable named "baby parsnips" desc "These parsnips are young and unprepared to leave their homes." amount plural aka "parsnips"
 
-
   val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" aka "babies" aka "seedling" // ripe= false watered = false
 
   instead(taking, Seq(crops, parsnips, seedlings)) Say s"You have failed. $noun remains where it is."
 
   object watering_can extends thing {
     var waterAmount = 0
-  }
-  watering_can named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
 
-  after(examining, watering_can){
-    if(watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed flops across the basin of the watering can"))
-    if(watering_can.waterAmount == 1) Say("a paucity of water glints in the pail")
-    if(watering_can.waterAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
-    if(watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
-    if(watering_can.waterAmount == 4) Say("the can brims with life giving manna")
-    if(watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
-  }
+    after(examining, watering_can) {
+      if (watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed flops across the basin of the watering can"))
+      if (watering_can.waterAmount == 1) Say("a paucity of water glints in the pail")
+      if (watering_can.waterAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
+      if (watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
+      if (watering_can.waterAmount == 4) Say("the can brims with life giving manna")
+      if (watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
+    }
 
-  object filling extends Action(1, "fill", "submerge", "refill", "dunk")
-
-  inflict(filling, watering_can){
-    Say("You submerge the watering can in the pond, filling it with potential")
-    watering_can.waterAmount = 5
-    true
+    this named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
   }
 
-  object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate")
-  instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
 
-  inflict(watering, of[Vegetable]){ val v = noun.as[Vegetable]
-    if watering_can.waterAmount > 0 then
-      v.watered = true
-      watering_can.waterAmount = watering_can.waterAmount - 1
+  object filling extends Action(1, "fill", "submerge", "refill", "dunk"){
+
+    inflict(filling, watering_can) {
+      Say("You submerge the watering can in the pond, filling it with potential")
+      watering_can.waterAmount = 5
       true
-    else
-      Say(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor")
-      false
+    }
   }
 
-  report(watering){
-    Say(s"You spritz $noun, and it somehow seems happier")
-  }
 
+  object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate"){
+    instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
+
+    inflict(watering, of[Vegetable]) {
+      val v = noun.as[Vegetable]
+      if watering_can.waterAmount > 0 then
+        v.watered = true
+        watering_can.waterAmount = watering_can.waterAmount - 1
+        true
+      else
+        Say(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor")
+        false
+    }
+
+    report(watering) {
+      Say(s"You spritz $noun, and it somehow seems happier")
+    }
+  }
 
 
 
@@ -235,11 +234,9 @@ object OutsideWorld extends Room {
     Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
   }
 
+
   Connect(west, ChickenCoop)
-
   Connect(east, Path)
-
-
 }
 
 
@@ -285,19 +282,18 @@ object ChickenCoop extends Room {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")
   }
 
-  object petting extends Action(1,"pet", "hug", "pat", "love")
+  object petting extends Action(1,"pet", "hug", "pat", "love"){
+    inflict(petting, chickens) {
+      if (chickens.petted)
+        Say("You pet the chickens again, extra hard. They make little contented clucks but don't love you any harder.")
+      else
+        Say("You pet each and every chicken. They let out little <3's and love you even more now.")
 
-  chickens.petted = false
-
-  inflict(petting, chickens) {
-    if (chickens.petted)
-      Say("You pet the chickens again, extra hard. They make little contented clucks but don't love you any harder.")
-    else
-      Say("You pet each and every chicken. They let out little <3's and love you even more now.")
-
-    chickens.petted = true
-    true
+      chickens.petted = true
+      true
+    }
   }
+
 
   val hay_pile =  ~"a tangle of straw, bane of needle searchers." aka "hay trough" aka "trough" aka "feed"
 
