@@ -38,7 +38,32 @@ object FarmHouse extends Room {
 
   report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
-  val butt = ~"a mysterious floating buttocks" has scent("peaches")
+  val butt = new Box {
+    name = "butt"
+    description = "debris expeller"
+    report(putting, this.asSecondNoun) Say s"the butt eases open to accept $noun"
+    this has scent("peaches. no cream")
+    this has flavor("strangely flavorful")
+    open = true
+    transparent = false
+
+    before(examining,this) {
+      if (open == true) {
+        Say("Is this a buttock that I see before me? The cheeks are loose")
+        false
+      }
+      else if (open == false) {
+        Say("The cheeks are tightly pressed together")
+        Say("It's lips are sealed, as they say")
+        false
+      }
+      else {
+        Say("I dream of dix")
+        false
+      }
+    }
+
+}
 
 
   val drawer = new Box {
@@ -87,6 +112,7 @@ object FarmHouse extends Room {
 
 
     val coffee_grounds = ~"all that remains of yesterday's grind." amount some aka "grounds"
+    coffee_grounds has scent("coffee") has flavor("bitter and a little moldy, but nice")
 
     report(turningOn, this) {
       Say(s"$noun awakens from its slumber.")
@@ -224,7 +250,23 @@ object OutsideWorld extends Room {
   }
 
 
-  object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate"){
+  object emptying extends Action(1, "empty", "dump", "drain", "spill")
+
+  instead(emptying, player lacks watering_can) Say Randomly("You practice a watering can emptying motion so you don't get out of practice.", "You may not have a can, but you can still have emptiness")
+
+  inflict(emptying, watering_can) {
+    if (watering_can.waterAmount > 0) {
+      watering_can.waterAmount = 0
+      Say(Randomly("It's raining!_! T_T", "You have an empty can now. Now you can fill it again.", "The water spills over the soil, forever lost to you like the innocence of youth"))
+      true
+    }
+    else {
+      Say(Randomly("You tilt the watering can over the ground, and you could swear some vapor escaped maybe", "Nothing. there Was nothing and there IS nothing."))
+      false
+    }
+   }
+
+    object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate"){
     instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
 
     inflict(watering, of[Vegetable]) {
@@ -234,7 +276,7 @@ object OutsideWorld extends Room {
         watering_can.waterAmount = watering_can.waterAmount - 1
         true
       else
-        Say(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor")
+        Say(Randomly(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor", s"Your watering can is empty. You drool on the $noun a little just in case it helps", s"You have no water, but you hope the sweat from your brow provided moisture to $noun."))
         false
     }
 
@@ -286,7 +328,40 @@ object ChickenCoop extends Room {
 
   val void_mayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
 
-  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm" aka "machine"
+//  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm" aka "machine"
+
+
+  val mayo_machine = new Box {
+    //  val void_mayo = ~"void mayo."
+    name = "mayo machine"
+    description = "You look hopefully at the mayo machine. You left some void egg in there last night."
+
+    Understand(void_mayo) {
+      void_mayo.parentContainer == this
+    }
+  } aka "mm" aka "machine" is fixed
+
+  before(taking, void_mayo) {
+    if (void_mayo.parentContainer == player) {
+      // if (player has void_mayo){
+      Say("You fondle the void mayo in your pocket")
+      false  //what does this even do in before??
+    }
+    // else if (void_mayo.parentContainer == mayo_machine) {
+    else if (void_mayo.parentContainer == mayo_machine) {
+      Say("You lovingly extricate the void mayo from its berth.")
+      true
+    }
+    else {
+      Say("You put that mayo back where it belongs.")
+      true
+    }
+
+    //    void_mayo.parentContainer == player
+    //    player has void_mayo
+    Say("You love void mayo like your own child")
+    true
+  }
 
 
   /* property empty vs full (full of mayo)
