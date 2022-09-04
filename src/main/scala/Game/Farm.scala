@@ -6,10 +6,6 @@ import Zext.*
 import Zext.exports.*
 import JunimoGame.*
 
-import reflect.Selectable.*
-
-
-
 
 object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
 

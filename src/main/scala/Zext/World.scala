@@ -1,6 +1,5 @@
 package Zext
 
-import Game.{Everything, FarmHouse, JunimoGame}
 
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
@@ -42,8 +41,22 @@ object player extends ZextObject with Container {
 
 object World extends Container {
 
+  def TouchPackage(path: String): Unit = {
 
-  val members = Everything.members
+    val cl = ClassLoader.getSystemClassLoader
+    val resource = cl.getResource(path)
+    val dir = new java.io.File(resource.getFile)
+    val files = dir.listFiles()
+    val classNames = files.filter(f => f.getName.endsWith("$SecretHolder.class")).map(f => f.getName.stripSuffix(".class"))
+
+    classNames.foreach { cn =>
+
+      val c = Class.forName(s"$path.$cn")
+      val f = c.getMethod("Reveal")
+      f.invoke(null)
+    }
+  }
+
 
   def currentLocation = player.parentContainer.asInstanceOf[Room]
   var time = 10
@@ -51,6 +64,10 @@ object World extends Container {
   object StartingGame extends Action(0) // for hooking.
 
   def Init(): Unit = {
+
+    TouchPackage("Zext")
+    TouchPackage("Game")
+
     player.Move(Game.FarmHouse)
 
     ZextObject.all.foreach{ z =>

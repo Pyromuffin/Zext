@@ -21,9 +21,6 @@ inline def GetClass(inline expr: Boolean): Unit =
   ${ assertImpl('expr) }
 
 object Macros{
-  inline def Zebra[T](): String = ${
-  ZebraCode[T]()(using Type.of[T])
-  }
 
   inline def fullClassName[T]: String =
     ${ fullClassNameImpl[T] }
@@ -118,10 +115,27 @@ object Macros{
   }
 
 
+  inline def GetPackageObject[T](something: T): Any = {
+    ${GetPackageObjectImpl('something)}
+  }
 
+  @experimental
+  def GetPackageObjectImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[Any] = {
+    import quotes.reflect.*
+    val _type = TypeRepr.of[T].typeSymbol
+    val _package = _type.owner
+    val companion = _package.moduleClass
 
-  inline def CodePosition() : String = {
-    ${ CodePositionImpl }
+    val classof = Ident(defn.Predef_classOf.termRef)
+    val expr = TypeApply(classof, TypeTree.ref(_package) :: Nil)
+    println(expr.show)
+
+    expr.asExpr
+  }
+
+  def CodePosition() : String = {
+    "here"
+  //   ${ CodePositionImpl }
   }
 
   def CodePositionImpl(using Quotes): Expr[String] = {
@@ -168,12 +182,6 @@ object Macros{
   }
 
 }
-
-def ZebraCode[T]()(using Type[T], Quotes): Expr[String] = {
-  Expr(Type.show[T])
-}
-
-
 
 def fullClassNameImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[String] =
   import quotes.reflect.*

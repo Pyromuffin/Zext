@@ -5,6 +5,8 @@ version := "0.1"
 scalaVersion := "3.1.3"
 
 libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.1.1"
+libraryDependencies += compilerPlugin("org.mycompany" %% "scala-plugin-test" % "0.1.0-SNAPSHOT")
+
 import sbt.Attributed.data
 
 
@@ -59,6 +61,8 @@ generate4 := {
 }
 generate4 := generate4.dependsOn(Compile / compile).value
 
+
+/*
 enablePlugins(ScalaNativePlugin)
 
 import scala.scalanative.build._
@@ -67,4 +71,4 @@ nativeConfig ~= {
     .withMode(Mode.releaseFast)
     .withGC(GC.commix)
 }
-
+*/
