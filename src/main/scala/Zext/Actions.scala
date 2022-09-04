@@ -160,10 +160,12 @@ object Actions {
         true
     }
 
-    instead(taking, reflexively) Say s"I can't take nothing."
+    instead(taking, reflexively) Say s"You can't take nothing."
+
+    instead(taking, noun.compositeObject != null) Say s"You're going to have a difficult time removing $noun from ${noun.compositeObject}"
 
     instead(taking, player has noun) {
-      Say(s"I shuffle around the items in my pockets, looking for $noun")
+      Say(s"You rummage around the items in your backpack, looking for $noun")
     }
 
     instead(taking, fixed) {
@@ -174,10 +176,12 @@ object Actions {
       Say(s"You slip $noun into your backpack.")
     }
 
+    /*
     after(taking){
       Say(s"$encumbrance slots left and then you DIE.")
       true
     }
+    */
 
     inflict(taking) {
       noun.transferTo(player)

@@ -217,7 +217,7 @@ object OutsideWorld extends Room {
 
   val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" aka "babies" aka "seedling" // ripe= false watered = false
 
-  instead(taking, Seq(crops, parsnips, seedlings)) Say s"You have failed. $noun remains where it is."
+  instead(taking, crops :: parsnips :: seedlings :: Nil) Say s"You have failed. $noun remains where it is."
 
   object watering_can extends thing {
     var waterAmount = 0

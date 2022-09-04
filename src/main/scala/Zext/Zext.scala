@@ -140,6 +140,8 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     var global = false
 
     var parentContainer : Container = null
+    val parts = ArrayBuffer[ZextObject]()
+    var compositeObject : ZextObject = null
 
     ZextObject.all += this
 
@@ -174,7 +176,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     }
 
 
-    def isVisible(room: Room) = {
+    def isVisible(room: Room) : Boolean = {
 
         /*
         conditions for item visibility:
@@ -183,11 +185,14 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
         3) in a transparent container contained (transitively) within the room
         4) the current room or an adjacent room (? maybe ?),
         5) a global object
+        6) a part of a visible object
         */
 
         val sameRoom = room == parentContainer
         val inInventory = parentContainer == player
         val connectedRoom = room.connections.values.exists(_ == this)
+
+
 
         // if this breaks, i deserve it
         val visibleTransitively = {
@@ -199,9 +204,10 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
             parent == room
         }
 
+        val visibleFromComposite = compositeObject != null && compositeObject.isVisible(room)
 
 
-        global || sameRoom || room == this || inInventory || connectedRoom || visibleTransitively
+        global || sameRoom || room == this || inInventory || connectedRoom ||  visibleFromComposite || visibleTransitively
     }
 
     def isAccessible(room: Room) : Boolean = {
@@ -215,8 +221,9 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
             parent == room
         }
 
+        val acessibleFromComposite = this.compositeObject != null && this.compositeObject.isAccessible(room)
 
-        isVisible(room) && accessibleTransitively
+        isVisible(room) && (accessibleTransitively || acessibleFromComposite)
     }
 
 
@@ -229,6 +236,13 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     def get[T](using TypeTest[Property, T]) : Option[T] = {
         // if a zextobject has more than one property of the same "type" then it will give ?? one
         properties.find( canBecome[Property,T]).map( _.asInstanceOf[T])
+    }
+
+    def composes(zextObject: ZextObject): this.type = {
+        parentContainer = null
+        compositeObject = zextObject
+        zextObject.parts.addOne(this)
+        this
     }
 
 }

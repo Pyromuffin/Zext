@@ -209,11 +209,13 @@ object Parser extends RegexParsers{
 
   def BuildParser2() : Parser[(ParsableType, Option[ParsableType], Option[ParsableType])] = {
     val allParsers : Seq[Parser[ParsableType]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
-    val allParser = allParsers.reduce( _ ||| _ )
-    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in")
+    val allParser =  allParsers.reduce( _ ||| _ )
+    val space = "\\s+".r
+    val anySpace = "\\s*".r
+    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "about")
     val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
 
-    val command = allParser ~ opt("\\s+".r ~> allParser) ~ ( opt("\\s+".r ~> prepositionParser) ~> opt("\\s+".r ~> allParser)) ^^ { (a) =>
+    val command = anySpace ~> allParser ~ opt(space ~> allParser) ~ (opt(space ~> prepositionParser) ~> opt(space ~> allParser)) ^^ { (a) =>
       val action = a._1._1
       val firstNoun = a._1._2
       val secondNoun = a._2
