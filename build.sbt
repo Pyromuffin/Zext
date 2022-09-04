@@ -4,63 +4,37 @@ version := "0.1"
 
 scalaVersion := "3.1.3"
 
-libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.1.1"
-libraryDependencies += compilerPlugin("org.mycompany" %% "scala-plugin-test" % "0.1.0-SNAPSHOT")
-
-import sbt.Attributed.data
-
-
-lazy val generate1 = taskKey[Unit]("Code generation")
-generate1 := {
-  println("1")
-  val touchersFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Touchers.scala"
-  val generatedFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Generated.scala"
-
-  println("2")
-  IO.write(generatedFile, "package Game; object allObjects")
-
-  println("3")
-  val nanos = java.time.LocalTime.now().toNanoOfDay
-  val f = new java.io.RandomAccessFile(touchersFile, "rw")
-  f.writeBytes("//" + nanos.toString)
-  f.close()
-}
-
-
-lazy val touchTouchers = taskKey[Unit]("Code generation")
-touchTouchers := {
-  println("69")
-
-  val touchersFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Touchers.scala"
-  val nanos = java.time.LocalTime.now().toNanoOfDay
-  val f = new java.io.RandomAccessFile(touchersFile, "rw")
-  f.writeBytes("//" + nanos.toString)
-  f.close()
-}
+val dottyVersion = "3.1.3"
+val org = "org.pyromuffin"
 
 
 
-lazy val generate3 = taskKey[Unit]("Code generation")
-generate3 := {
-  println("4")
-  val generatedFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Generated.scala"
 
-  val r = (Compile / runner).value
-  val cp = (Compile / fullClasspath).value
-  r.run("Game.CodeGen", data(cp), Seq(generatedFile.toString), streams.value.log)
-}
+lazy val plugin = project
+  .settings(
+    name := "objectifier",
+    organization := org,
+    version := "1.0.0",
+    scalaVersion := dottyVersion,
 
-//generate3 := generate3.dependsOn(generate1).value
+    libraryDependencies += "org.scala-lang" %% "scala3-compiler" % dottyVersion % "provided"
+  )
 
-lazy val generate4 = taskKey[Unit]("Code generation")
-generate4 := {
-  val touchersFile = (Compile / sourceDirectory).value / "scala" / "Game" / "Touchers.scala"
-  val f = new java.io.RandomAccessFile(touchersFile, "rw")
-  f.writeBytes("/////////////////") // to not screw up version control. man this i stupid.
-  f.close()
-}
-generate4 := generate4.dependsOn(Compile / compile).value
+lazy val zext = (project in file("."))
+  .settings(
+    name := "Zext",
 
+    version := "0.1.0",
+    scalaVersion := dottyVersion,
+
+    libraryDependencies += compilerPlugin("org.pyromuffin" %% "objectifier" % "1.0.0"),
+    libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.1.1",
+
+  )
+
+
+lazy val root = project
+  .aggregate(plugin, zext)
 
 /*
 enablePlugins(ScalaNativePlugin)
