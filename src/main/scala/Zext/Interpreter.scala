@@ -205,38 +205,15 @@ object Parser extends RegexParsers{
 
   case class Command(action: Action, noun: Option[ZextObject], secondNoun : Option[ZextObject])
 
-  def CommandParser(actions: Parser[Action], nouns : Parser[ZextObject]) = {
-    val command = actions ~ opt("\\s+".r ~> nouns) ~ opt("\\s+".r ~> nouns) ^^ { (a) => Command(a._1._1, a._1._2, a._2) }
-    command
-  }
-
-
-  def GetCommand(input : String, commandParser : Parser[Command]) = {
-    val result = commandAliases.getOrElse(input, parseAll(commandParser, input).getOrElse(null) )
-    Option(result)
-  }
-
-
-
-  def BuildParser() = {
-
-    BuildParser2()
-
-
-    val actions = ruleSets.keys.filter(_.verbs.nonEmpty)
-    val actionParser = actions.map(VerbParser).reduce( _ ||| _ )
-    val nounParser = null // ZextObject.nouns.map(NounParser).reduce( _ ||| _)
-    val commandParser = CommandParser(actionParser, nounParser)
-
-
-    commandParser
-  }
 
 
   def BuildParser2() : Parser[(ParsableType, Option[ParsableType], Option[ParsableType])] = {
     val allParsers : Seq[Parser[ParsableType]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
     val allParser = allParsers.reduce( _ ||| _ )
-    val command = allParser ~ opt("\\s+".r ~> allParser) ~ opt("\\s+".r ~> allParser) ^^ { (a) =>
+    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in")
+    val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
+
+    val command = allParser ~ opt("\\s+".r ~> allParser) ~ ( opt("\\s+".r ~> prepositionParser) ~> opt("\\s+".r ~> allParser)) ^^ { (a) =>
       val action = a._1._1
       val firstNoun = a._1._2
       val secondNoun = a._2
