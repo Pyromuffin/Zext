@@ -142,6 +142,7 @@ object Parser extends RegexParsers{
 
   def WordParser(str : String, parsables: Seq[Parsable[ParsableType]]) : Option[Parser[ParsableType]] = {
     // first check if word conditions are applicable, if not splode
+
     val possibles = parsables.filter(_.possible)
 
     if (possibles.isEmpty)
@@ -149,11 +150,17 @@ object Parser extends RegexParsers{
 
     val maxPrecedence = possibles.map(_.precedence).max
     val maxPrecedenceParsables = possibles.filter(_.precedence == maxPrecedence)
-    val bestParsable = maxPrecedenceParsables.maxBy(_.specificity)
 
-    // println(s"AMBIGUOUS ! $str")
+    val maxSpecificity = maxPrecedenceParsables.map(_.specificity).max
+    val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
 
-    val parser = str.r ^^ {s => bestParsable.target}
+    if(bestParsables.length > 1){
+      println(str + " IS AMBIGUOUS! " + parsables.toString())
+    }
+
+    val bestParsable = bestParsables.head
+
+    val parser = str.toLowerCase ^^ {s => bestParsable.target}
 
     Some(parser)
   }
@@ -280,7 +287,7 @@ object Parser extends RegexParsers{
       val commandParser = BuildParser2()
 
       print("> ")
-      val input = readLine()
+      val input = readLine().toLowerCase
       val command = BuildCommand(input, commandParser)
       if(command.nonEmpty){
         val c = command.get

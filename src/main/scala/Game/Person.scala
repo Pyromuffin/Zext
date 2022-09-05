@@ -2,9 +2,10 @@ package Game
 
 import Game.JunimoGame.*
 import Zext.*
+import Zext.Parser.Understand
 import Zext.exports.*
 
-object talkingTo extends Action(1, "talk", "talk to", "speak to", "speak with", "yell at", "ask") {
+object talkingTo extends Action(1, "talk", "talk to", "speak to", "speak with", "yell at", "t", "ask") {
 
   after(talkingTo, of[Person]){
     noun[Person].talkedToToday = true
@@ -26,10 +27,38 @@ object talkingTo extends Action(1, "talk", "talk to", "speak to", "speak with", 
 }
 
 
-class Subject extends ZextObject {
+object talkingAbout extends Action(2, "talk about") {
+
+  /*
+  Understand(this, verbs *)
+  if (targets == 1) {
+    UnderstandAlias(verbs, this, reflexively, null)
+  }
+  */
+
+  report(talkingAbout, of[Subject], ofSecond[Person]) Say s"You broach the subject of $noun with $secondNoun, but they have nothing interesting to say."
+
+//  inflict(talkingAbout, reflexively.asSecondNoun) {
+
+  //}
+
+}
+
 
   //instead( talking about bullshit subject)
   //Say(Randomly(s"They appear to ignore you, but you can see $noun deeply thinking about $topic", s"They don't talk about $topic 'round these parts no more", s"$noun will never speak of $topic again. Not since then.", s"$noun can't believe you brought up $topic, are you out of your goddamn mind????????"))
+
+
+case class Subject(names : String*) extends ZextObject {
+  global = true
+  name = names(0)
+  aliases.addAll(names.slice(1, names.length))
+}
+
+object Subjects {
+
+  val weather = Subject("weather", "the weather", "rain", "snow", "heat", "heatwave", "wind")
+
 }
 
 
@@ -43,6 +72,7 @@ class Person(using Container) extends thing {
 
 
 object PersonHolder extends Room {
+  name = "Prison" // needs a name or ambiguity will occur with things named ""
   // i guess we can't construct people without having a room for them to start in.
 
   object MayorLewis extends Person {
@@ -56,7 +86,7 @@ object PersonHolder extends Room {
       Say(s"$noun removes his cap before speaking to you and replies \"Hey $farmer, I hope everything is going well on $farm today!\"")
     }
 
-    report(talkingTo, this, this.talkedToToday){
+    report(talkingTo, this, talkedToToday){
       Say(s"$noun dabs the sweat from his brow with a polka-dot handkerchief and replies \"Fancy seeing you again today, $farmer.\"")
     }
 
@@ -64,6 +94,7 @@ object PersonHolder extends Room {
     val cap = ~"An integral part of The Lewis Attire, the wrinkled leather cap has seen better days" composes this aka "hat"
     val sweat = ~"There are reservoirs of fluid somewhere inside Mayor Lewis, or so one might think from his liberal handkerchief use" composes this
 
+    this aka "Lewis"
   }
 
   object Linus extends Person {
@@ -94,7 +125,7 @@ object PersonHolder extends Room {
 
     val mustache = ~"A fine, full white mustache, proving you don't need beard oil to be beautiful. Ends drooping sadly or tips a-tingle with joy, a more expressive mustache you have never seen." composes this aka "beard" aka "face"//do descriptions change based on mood/situation/day/??
     val tunic = ~"Feathers, leaves, and twigs come together in a surprisingly fashionable yellow tunic" composes this aka "coat" aka "shirt" aka "dress"
-  }// aka "linus" //capitalization Redactness and how do i aka complex objects
+  }
 
 
 }
