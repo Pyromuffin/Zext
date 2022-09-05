@@ -58,8 +58,7 @@ object FarmHouse extends Room {
         false
       }
     }
-
-}
+  }
 
 
   val drawer = new Box {

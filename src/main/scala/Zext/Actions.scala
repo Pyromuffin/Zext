@@ -250,6 +250,22 @@ object Actions {
     }
   }
 
+  object closing extends Action(1, "close", "shut") {
+
+    inflict(closing, of[Container]) {
+      if noun[Container].open then
+        noun[Container].open = false
+        true
+      else
+        Say(s"$noun is already closed")
+        false
+    }
+
+    report(closing, of[Container]) Say s"You close $noun"
+
+
+  }
+
 
   object opening extends Action(1, "open"){
 
@@ -263,7 +279,7 @@ object Actions {
     }
 
     report(opening, of[Container]) {
-      if !noun[Container].transparent then
+      if !noun[Container].transparent && noun[Container].contents.nonEmpty then
         Say(s"You open $noun, inside you can see ${noun[Container].ContentsString}")
       else
         Say(s"You open $noun")
@@ -297,7 +313,10 @@ object Actions {
 
 
     inflict(putting, ofSecond[Zontainer]) {
-      if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation)) {
+      if(!secondNoun[Container].open){
+        Say(s"Grandpa's ghost isn't around at the moment, so you'll have to open $secondNoun before you put $noun inside it.")
+        false
+      } else if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation) && secondNoun[Container].open) {
         noun transferTo secondNoun[Container]
         true
       } else {
