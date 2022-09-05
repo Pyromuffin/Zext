@@ -177,9 +177,15 @@ object Parser extends RegexParsers{
 
   trait ParsableType(val part : PartOfSpeech )
 
-  case class Parsable[+T](target : T, conditions : Condition*){
+  case class Parsable[T <: ParsableType](target : T, conditions : Condition*){
 
-    def possible = conditions.forall(_.evaluate)
+    def possible = {
+      val visible = if(target.part == PartOfSpeech.noun){
+        target.asInstanceOf[ZextObject].isVisible(currentLocation)
+      } else true
+
+      conditions.forall(_.evaluate) && visible
+    }
 
     def specificity = {
       conditions.map( _.specificity ).sum

@@ -55,7 +55,7 @@ case class Subject(names : String*) extends ZextObject {
   aliases.addAll(names.slice(1, names.length))
 }
 
-object Subjects {
+object Subject {
 
   val weather = Subject("weather", "the weather", "rain", "snow", "heat", "heatwave", "wind")
 
