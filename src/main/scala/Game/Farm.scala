@@ -107,7 +107,7 @@ object FarmHouse extends Room {
     has(fixed)
 
 
-    val coffee_grounds = ~"all that remains of yesterday's grind." amount some aka "grounds"
+    val coffee_grounds = ~"all that remains of yesterday's grind." amount some aka "grounds" aka "beans"
     coffee_grounds has scent("coffee") has flavor("bitter and a little moldy, but nice")
 
     report(turningOn, this) {
@@ -188,7 +188,7 @@ class Vegetable(using c : Container) extends thing {
 
 object Animal{
   before(taking, of[Animal]){
-    Say (s"$noun! eye you expectantly.")
+    Say (s"$noun eye you expectantly.")
     true
   }
 }
@@ -322,50 +322,62 @@ object ChickenCoop extends Room {
   name = "Coop"
   description = "You are in a little wooden coop. It smells nice. So many fluffy feathery chicken friends surround you."
 
-  val void_mayo = ~"At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
-
-//  val mayo_machine = ~"You look hopefully at the mayo machine. You left some void egg in there last night." aka "mm" aka "machine"
-
 
   val mayo_machine = new Box {
-    //  val void_mayo = ~"void mayo."
+   //   val void_mayo = ~"void mayo."
     name = "mayo machine"
-    description = "You look hopefully at the mayo machine. You left some void egg in there last night."
-
-    Understand(void_mayo) {
-      void_mayo.parentContainer == this
-    }
+    description = "a mayo machine beyond your wildest dreams"
+  //  Understand(void_mayo) {
+  //    void_mayo.parentContainer == this
+  //  }
   } aka "mm" aka "machine" is fixed
+  val void_mayo = ~"Fresh void mayo. It contains universes within, in a convenient colloidal suspension. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
+  object dix extends thing{
+    name = "dix"
+    aliases.addOne("dixxx")//aka "dixxx"
+    description = "just dix"
+    properties.addOne(scenery).addOne(fixed)
+  }
+  //  Understand(void_mayo) { void_mayo.parentContainer == mayo_machine }
+  void_mayo transferTo mayo_machine //omg it took me way too long to notice that this is how you do it
 
   before(taking, void_mayo) {
     if (void_mayo.parentContainer == player) {
-      // if (player has void_mayo){
       Say("You fondle the void mayo in your pocket")
       false  //what does this even do in before??
     }
-    // else if (void_mayo.parentContainer == mayo_machine) {
     else if (void_mayo.parentContainer == mayo_machine) {
-      Say("You lovingly extricate the void mayo from its berth.")
+      Say(Randomly("You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension", "You lovingly extricate the void mayo from its berth."))
       true
     }
     else {
-      Say("You put that mayo back where it belongs.")
+      Say("You put that mayo back where it belongs. With you, always.")
       true
     }
-
-    //    void_mayo.parentContainer == player
-    //    player has void_mayo
     Say("You love void mayo like your own child")
     true
   }
 
 
-  /* property empty vs full (full of mayo)
-  "You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension"
-  "Emptiness. Like the wrong kind of void."
-   */
-
-
+ instead(examining, mayo_machine) {
+   if (mayo_machine.open == false) {
+     Say("You look hopefully at the mayo machine. You left some void egg in there last night.")
+     true
+   }
+   else {
+     if (void_mayo.parentContainer == mayo_machine) {
+       Say("There it is. At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos ")
+       true
+     }
+     else {
+       Say("Emptiness. Like the wrong kind of void.")
+       true
+     }
+   }
+   if (false) {
+     Say(mayo_machine.description)
+   }
+ }
   val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "fluffballs" aka "cuties" amount some
 
   report(taking, chickens) {
@@ -412,9 +424,16 @@ object ChickenCoop extends Room {
   val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery aka "odor" aka "scents" aka "aroma"
 
 
-  instead(going, east, this) {
-    // if(no may in inventory
-    Say("But, but, the mayo, the chickens!")
+  before(going, east, this) {
+    if(void_mayo.parentContainer == player){
+      Say("With your prize in tow, you depart")
+      true
+    }
+      //elseif you dropped the mayo elsewhere, you totally fucked lol
+    else {
+        Say("But, but, the mayo, the chickens!")
+      false
+    }
   }
 
   instead(going, north, this) {
@@ -423,7 +442,7 @@ object ChickenCoop extends Room {
 
 
   instead(going, west, here) {
-    val dix =
+    val dix1 =
       if (void_mayo.parentContainer == player) {
         Say("you got that sweet mayo, but there's no exit there anyways.")
         true
@@ -432,7 +451,7 @@ object ChickenCoop extends Room {
         Say("you really want that mayo")
         false
       }
-    if (dix) Say("The true dix are the friends you make along the way")
+    if (dix1) Say("The true dix are the friends you make along the way")
     else if (!chickens.petted) Say("you really should pet the chickens, idiot")
 
   }

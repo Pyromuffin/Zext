@@ -91,7 +91,7 @@ object Actions {
     report(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
-      Say(s"I went $d to $room.")
+      Say(s"You went $d to $room.")
     }
 
     after(going, of[Direction]) {
@@ -105,7 +105,8 @@ object Actions {
 
   object dropping extends Action(1,"drop", "abandon") {
 
-    report(dropping, reflexively) {
+    report(dropping, reflexively) { //how do i do "report(dropping, object)" vs  execute(dropping, player) to reconcile this with "cant drop what you dont have"
+     
       Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
