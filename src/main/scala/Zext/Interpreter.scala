@@ -354,26 +354,21 @@ object Parser extends RegexParsers{
       if(first.part == PartOfSpeech.verb || second.part == PartOfSpeech.verb)
         return None
 
-      if (action.targets != targets)
-        return None
 
-
-      return Some(Command(action, Some(first.asInstanceOf[ZextObject]), Some(second.asInstanceOf[ZextObject])))
+      Some(Command(action, Some(first.asInstanceOf[ZextObject]), Some(second.asInstanceOf[ZextObject])))
     }
-
     else if(triple._2.isDefined) {
       val first = Disambiguate(triple._2.get)
 
       if (first.part == PartOfSpeech.verb)
         return None
 
-      return Some(Command(action, Some(first.asInstanceOf[ZextObject]), None))
-    } else {
-
-      return Some(Command(action, None, None))
+      Some(Command(action, Some(first.asInstanceOf[ZextObject]), None))
     }
+    else {
 
-    None
+      Some(Command(action, None, None))
+    }
   }
 
   def main(args: Array[String]): Unit = {
