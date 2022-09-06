@@ -10,6 +10,7 @@ import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
 import Game.JunimoGame.encumbrance
+import Game.Person
 import Zext.player.playerName
 
 object Actions {
@@ -181,7 +182,37 @@ object Actions {
     }
   }
 
+  extension[T] (o : Option[T]) {
+    def does( something : T => Unit): Unit = {
+      if(o.isDefined)
+        something(o.get)
+    }
+  }
+
+
   object examining extends Action(1,"examine", "x", "look", "l") {
+
+
+    def ListNamesNicely(stuff : Seq[ZextObject]) : Option[String] = {
+      if(stuff.isEmpty)
+        return None
+
+      if(stuff.length == 1) {
+        return Some(stuff.head.indefinite)
+      }
+
+
+      if (stuff.length == 2) {
+        return Some(stuff.head.indefinite + " and " + stuff(1).indefinite)
+      }
+
+      var s = ""
+      for (i <- 0 until stuff.length - 1)
+        s += stuff(i).indefinite + ", "
+
+      Some(s + "and " + stuff.last.indefinite)
+    }
+
 
     instead(examining, reflexively) {
       execute(examining, currentLocation)
@@ -208,16 +239,19 @@ object Actions {
 
     after(examining, of[Room]) {
       val r = noun[Room]
-      val visible = r.contents.filterNot(_ ? scenery)
-      if(visible.isEmpty)
-        stop
+      val nonscenery = r.contents.filterNot(_ ? scenery).filterNot( _.isType[Person]).toSeq
+      val people = r.contents.filter(_.isType[Person]).toSeq
 
-      var s = "You can see "
-      for (i <- visible) {
-          s += i.indefinite + ", "
+      val nonsceneryString = ListNamesNicely(nonscenery)
+      nonsceneryString does { s =>
+        Say("You can see " + s)
       }
-      s = s.stripSuffix(", ")
-      Say(s)
+
+      val peopleString = ListNamesNicely(people)
+      peopleString does { s =>
+        val be = if( people.length > 1) "are" else "is"
+        Say(s + " " + be + " here.")
+      }
 
       false
     }
