@@ -70,8 +70,6 @@ object JunimoGame {
 
     val startDescription = s"After a hard day toiling on fields of $farm, $farmer decides to take a break with a relaxing nap in the Secret Woods"
     Say(startDescription)
-
-    true
   }
 // I broke this and I cannot begin to guess how
 //  before(takingInventory) {

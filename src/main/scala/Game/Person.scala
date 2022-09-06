@@ -9,7 +9,6 @@ object talkingTo extends Action(1, "talk", "talk to", "speak to", "speak with", 
 
   after(talkingTo, of[Person]){
     noun[Person].talkedToToday = true
-    true
   }
 
   report(talkingTo, of[Person]) {
@@ -44,7 +43,6 @@ object giving extends Action(2, "give", "bequeath", "offer") {
     noun.transferTo(p)
     p.affection += p.getApprovalOf(noun)
     p.giftGivenToday = true
-    true
   }
 
   instead(giving, of[Person]) {

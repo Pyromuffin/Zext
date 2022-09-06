@@ -18,7 +18,6 @@ object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytos
 
   after(smelling, player has noun) {
     Say(s"The scent of $noun is soaked through your clothing now.")
-    true
   }
 
   report(smelling) Say s"You smell $noun."
@@ -51,16 +50,13 @@ object FarmHouse extends Room {
     before(examining,this) {
       if (open == true) {
         Say("Is this a buttock that I see before me? The cheeks are loose")
-        false
       }
       else if (open == false) {
         Say("The cheeks are tightly pressed together")
         Say("It's lips are sealed, as they say")
-        false
       }
       else {
         Say("I dream of dix")
-        false
       }
     }
   }
@@ -131,12 +127,10 @@ object FarmHouse extends Room {
         Say("You tamp dat ass")
 
       coffee_machine.tamped = true
-      true
     }
 
     inflict(tamping) {
       Say(s"$noun doesn't give a heck. It's tamp-er proof.")
-      false
     }
 
     instead(taking, coffee_machine) Say "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down."
@@ -156,11 +150,10 @@ object Vegetable {
     val v = noun[Vegetable]
     if (v.ripe) {
       Say("Up you go!")
-      true
     }
     else {
       Say("We do not harvest the young")
-      false
+      stop
     }
   }
 
@@ -179,7 +172,6 @@ object Vegetable {
     if(v.watered) {Say("Nice and moist, just like they like it")}
     else {Say("They thirst.")}
 
-    true
   }
 }
 
@@ -193,7 +185,6 @@ class Vegetable(using c : Container) extends Thing {
 object Animal{
   before(taking, of[Animal]){
     Say (s"$noun eye you expectantly.")
-    true
   }
 }
 
@@ -233,7 +224,6 @@ object OutsideWorld extends Room {
       if (watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
       if (watering_can.waterAmount == 4) Say("the can brims with life giving manna")
       if (watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
-      true
     }
 
     this named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
@@ -245,7 +235,6 @@ object OutsideWorld extends Room {
     inflict(filling, watering_can) {
       Say("You submerge the watering can in the pond, filling it with potential")
       watering_can.waterAmount = 5
-      true
     }
   }
 
@@ -258,11 +247,10 @@ object OutsideWorld extends Room {
     if (watering_can.waterAmount > 0) {
       watering_can.waterAmount = 0
       Say(Randomly("It's raining!_! T_T", "You have an empty can now. Now you can fill it again.", "The water spills over the soil, forever lost to you like the innocence of youth"))
-      true
     }
     else {
       Say(Randomly("You tilt the watering can over the ground, and you could swear some vapor escaped maybe", "Nothing. there Was nothing and there IS nothing."))
-      false
+      stop
     }
    }
 
@@ -274,10 +262,9 @@ object OutsideWorld extends Room {
       if watering_can.waterAmount > 0 then
         v.watered = true
         watering_can.waterAmount = watering_can.waterAmount - 1
-        true
       else
         Say(Randomly(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor", s"Your watering can is empty. You drool on the $noun a little just in case it helps", s"You have no water, but you hope the sweat from your brow provided moisture to $noun."))
-        false
+        stop
     }
 
     report(watering) {
@@ -359,29 +346,28 @@ object ChickenCoop extends Room {
       true
     }
     Say("You love void mayo like your own child")
-    true
   }
 
 
- instead(examining, mayo_machine) {
-   if (mayo_machine.open == false) {
-     Say("You look hopefully at the mayo machine. You left some void egg in there last night.")
-     true
-   }
-   else {
-     if (void_mayo.parentContainer == mayo_machine) {
-       Say("There it is. At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos ")
-       true
-     }
-     else {
-       Say("Emptiness. Like the wrong kind of void.")
-       true
-     }
-   }
-   if (false) {
-     Say(mayo_machine.description)
-   }
- }
+  instead(examining, mayo_machine) {
+    if (mayo_machine.open == false) {
+      Say("You look hopefully at the mayo machine. You left some void egg in there last night.")
+      true
+    }
+    else {
+      if (void_mayo.parentContainer == mayo_machine) {
+        Say("There it is. At last, the final piece of the puzzle, the icing on the cake, the cap on the marker, the bonnet on the bee, the kangaroo in the pouch. You've been waiting for so long to be able to present this mayo to the junimos ")
+        true
+      }
+      else {
+        Say("Emptiness. Like the wrong kind of void.")
+        true
+      }
+    }
+    if (false) {
+      Say(mayo_machine.description)
+    }
+  }
   val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "fluffballs" aka "cuties" amount some
 
   report(taking, chickens) {
@@ -396,7 +382,6 @@ object ChickenCoop extends Room {
         Say("You pet each and every chicken. They let out little <3's and love you even more now.")
 
       chickens.petted = true
-      true
     }
   }
 
@@ -422,21 +407,19 @@ object ChickenCoop extends Room {
 
   after(taking, hay) {
     Say("You aren't really sure why you want that but you do.")
-    true
   }
 
   val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery aka "odor" aka "scents" aka "aroma"
 
 
   before(going, east, this) {
-    if(void_mayo.parentContainer == player){
+    if (void_mayo.parentContainer == player) {
       Say("With your prize in tow, you depart")
-      true
     }
-      //elseif you dropped the mayo elsewhere, you totally fucked lol
+    //elseif you dropped the mayo elsewhere, you totally fucked lol
     else {
-        Say("But, but, the mayo, the chickens!")
-      false
+      Say("But, but, the mayo, the chickens!")
+      stop
     }
   }
 

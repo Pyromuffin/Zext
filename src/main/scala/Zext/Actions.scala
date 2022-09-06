@@ -36,13 +36,11 @@ object Actions {
     inflict(entering, of[Room]) {
       player.Move(noun[Room])
       LineBreak()
-      execute(examining, currentLocation)
-      true
+      result(execute(examining, currentLocation))
     }
 
     after(entering, of[Room]){
       noun[Room].visited = true
-      true
     }
 
   }
@@ -75,9 +73,8 @@ object Actions {
 
       if(!connected){
         Say(s"You can't go $d")
+        stop
       }
-
-      connected
     }
 
     report(going, of[Direction]) {
@@ -89,9 +86,7 @@ object Actions {
     after(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
-      execute(entering, room)
-
-
+      result(execute(entering, room))
     }
   }
 
@@ -108,11 +103,10 @@ object Actions {
     inflict(dropping) {
       if (noun.parentContainer == player) {
         noun.transferTo(currentLocation)
-        true
       }
       else {
         Say("Can't drop what you don't have.")
-        false
+        stop
       }
     }
 
@@ -127,7 +121,7 @@ object Actions {
 
     player.properties += flavor("the inside of your mouth")
 
-    inflict(tasting, reflexively) {
+    instead(tasting, reflexively) {
       Say("Slurp!")
       execute(tasting, player)
     }
@@ -145,15 +139,17 @@ object Actions {
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
 
-    before(taking){
+    // i don't really know how i feel about check rules, but inform has them so why not
+    // they are checked after "before" and "instead" rules, so you can put generic conditions here.
+    // if you want to override these generic conditions... i'm not sure how we should do that yet.
+    // for the most part, you could just insert the contents of "check" rules at the top of inflict rules, but this has more granularity i suppose.
+    check(taking){
       if !noun.isAccessible(currentLocation) then
         Say(s"$noun $is inaccessible") // maybe say why?
-        false
-      else
-        true
+        stop
     }
 
-    instead(taking, reflexively) Say s"You can't take nothing."
+    instead(taking, reflexively) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
     instead(taking, noun.compositeObject != null) Say s"You're going to have a difficult time removing $noun from ${noun.compositeObject}"
 
@@ -178,7 +174,6 @@ object Actions {
 
     inflict(taking) {
       noun.transferTo(player)
-      true
     }
   }
 
@@ -193,25 +188,6 @@ object Actions {
   object examining extends Action(1,"examine", "x", "look", "l") {
 
 
-    def ListNamesNicely(stuff : Seq[ZextObject]) : Option[String] = {
-      if(stuff.isEmpty)
-        return None
-
-      if(stuff.length == 1) {
-        return Some(stuff.head.indefinite)
-      }
-
-
-      if (stuff.length == 2) {
-        return Some(stuff.head.indefinite + " and " + stuff(1).indefinite)
-      }
-
-      var s = ""
-      for (i <- 0 until stuff.length - 1)
-        s += stuff(i).indefinite + ", "
-
-      Some(s + "and " + stuff.last.indefinite)
-    }
 
 
     instead(examining, reflexively) {
@@ -221,20 +197,17 @@ object Actions {
     inflict(examining, of[Crevice]) {
       Title(currentLocation.name + " It's small! ")
       Say(currentLocation.description)
-      true
     }
 
 
     inflict(examining) {
       Say({noun.description})
-      true
     }
 
 
     inflict(examining, of[Room]) {
       Title(currentLocation.name)
       Say(currentLocation.description)
-      true
     }
 
     after(examining, of[Room]) {
@@ -253,7 +226,7 @@ object Actions {
         Say(s + " " + be + " here.")
       }
 
-      false
+      stop
     }
 
     after(examining, of[Container]) {
@@ -275,36 +248,35 @@ object Actions {
       }
 
       Say(response)
-      true
     }
   }
 
   object closing extends Action(1, "close", "shut") {
 
-    inflict(closing, of[Container]) {
-      if noun[Container].open then
-        noun[Container].open = false
-        true
-      else
+    check(closing, of[Container]){
+      if !noun[Container].open then
         Say(s"$noun is already closed")
-        false
+        stop
+    }
+
+    inflict(closing, of[Container]) {
+        noun[Container].open = false
     }
 
     report(closing, of[Container]) Say s"You close $noun"
-
-
   }
 
 
   object opening extends Action(1, "open"){
 
-    inflict(opening, of[Container]){
-      if !noun[Container].open then
-        noun[Container].open = true
-        true
-      else
+    check(opening, of[Container]){
+      if noun[Container].open then
         Say(s"$noun is already open")
-        false
+        stop
+    }
+
+    inflict(opening, of[Container]){
+        noun[Container].open = true
     }
 
     report(opening, of[Container]) {
@@ -319,20 +291,13 @@ object Actions {
     inflict(exiting) {
       Say(s"Goodbye $playerName")
       exit = true
-      true
     }
   }
 
   object takingInventory extends Action(0,"inventory", "i") {
     inflict(takingInventory) {
-      var s = "In your possessionary, you have "
-      for (i <- player.contents) {
-        s += i.indefinite + ", "
-      }
-      s = s.stripSuffix(", ")
-      s += "."
+      val s = "In your possessionary you have " + player.ContentsString.getOrElse("nothing")
       Say(s)
-      true
     }
   }
 
@@ -345,13 +310,12 @@ object Actions {
       //if secondNoun isPeep Say Harvey isn't around at the moment, so you cant just cut open Human to put noun inside it
       if(!secondNoun[Container].open){
         Say(s"Grandpa's ghost isn't around at the moment, so you'll have to open $secondNoun before you put $noun inside it.")
-        false
+        stop
       } else if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation) && secondNoun[Container].open) {
         noun transferTo secondNoun[Container]
-        true
       } else {
         Say(s"$secondNoun is inaccessible")
-        false
+        stop
       }
     }
 

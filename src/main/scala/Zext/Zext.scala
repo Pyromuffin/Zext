@@ -41,6 +41,27 @@ object exports{
 }
 
 
+def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
+    if (stuff.isEmpty)
+        return None
+
+    if (stuff.length == 1) {
+        return Some(stuff.head.indefinite)
+    }
+
+
+    if (stuff.length == 2) {
+        return Some(stuff.head.indefinite + " and " + stuff(1).indefinite)
+    }
+
+    var s = ""
+    for (i <- 0 until stuff.length - 1)
+        s += stuff(i).indefinite + ", "
+
+    Some(s + "and " + stuff.last.indefinite)
+}
+
+
 trait Container {
     given c : Container = this
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
@@ -48,12 +69,8 @@ trait Container {
     var transparent = true
     var automaticallyListContents = true
 
-    def ContentsString : String = {
-        var s = ""
-        for (i <- c.contents) {
-            s += i.indefinite + ", "
-        }
-        s.stripSuffix(", ")
+    def ContentsString : Option[String] = {
+       ListNamesNicely(contents.toSeq)
     }
 
     def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
@@ -283,11 +300,10 @@ object Device {
         val d = noun[Device]
         if (d.on) {
             Say(s"$noun is already on")
-            false
-        } else {
-            d.on = true
-            true
+            stop
         }
+
+        d.on = true
     }
 
     report(turningOn, of[Device]) {
@@ -298,11 +314,10 @@ object Device {
         val d = noun[Device]
         if (d.off) {
             Say(s"$noun is already off")
-            false
-        } else {
-            d.on = false
-            true
+            stop
         }
+
+        d.on = false
     }
 
     report(turningOff, of[Device]) {

@@ -19,6 +19,7 @@ object Rule {
     class ActionRuleSet {
         val beforeRules = ArrayBuffer[ActionRule]()
         val afterRules = ArrayBuffer[ActionRule]()
+        val checkRules = ArrayBuffer[ActionRule]()
         val executeRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
         val reportRules = ArrayBuffer[ActionRule]()
@@ -27,11 +28,16 @@ object Rule {
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
 
 
+    inline def check(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+        val rule = new ActionRule({body; true}, conditions *)
+        rule.definitionPosition = CodePosition()
+        ruleSets(r).checkRules += rule
+        rule
+    }
 
-    inline def before(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
 
-
-        val rule = new ActionRule(body, conditions*)
+    inline def before(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+        val rule = new ActionRule({body; true}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).beforeRules += rule
         rule
@@ -44,8 +50,8 @@ object Rule {
         rule
     }
 
-    inline def inflict(r: Action, conditions: Condition*)(body: => Boolean) : ActionRule = {
-        val rule = new ActionRule(body, conditions*)
+    inline def inflict(r: Action, conditions: Condition*)(body: => Unit) : ActionRule = {
+        val rule = new ActionRule({body; true}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).executeRules += rule
         rule
@@ -58,8 +64,9 @@ object Rule {
         rule
     }
 
-    inline def after(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
-        val rule = new ActionRule(body, conditions*)
+
+    inline def after(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+        val rule = new ActionRule({body; true}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
         rule
@@ -152,6 +159,7 @@ object Rule {
         val set = ruleSets(action)
         set.beforeRules.foreach( _.storePreviousPossibilities() )
         set.insteadRules.foreach( _.storePreviousPossibilities() )
+        set.checkRules.foreach( _.storePreviousPossibilities() )
         set.executeRules.foreach( _.storePreviousPossibilities() )
         set.reportRules.foreach( _.storePreviousPossibilities() )
         set.afterRules.foreach( _.storePreviousPossibilities() )
@@ -191,6 +199,7 @@ object Rule {
 
         if(!RunRule(target, target2, set.beforeRules, true)) return false
         if(!RunRule(target, target2, set.insteadRules)) return false
+        if(!RunRule(target, target2, set.checkRules, true)) return false
         if(!RunRule(target, target2, set.executeRules)) return false
         if(!RunRule(target, target2, set.reportRules)) return false
         if(!RunRule(target, target2, set.afterRules, true)) return false
@@ -213,13 +222,6 @@ abstract class Rule {
 }
 
 
-object PersistingRule {
-    implicit def fromUnit(body : => Unit) : PersistingRule = PersistingRule(body)
-}
-
-class PersistingRule( body : => Unit) extends Rule {
-    def Execute() = body
-}
 
 enum QueryPrecedence:
     case Generic, Class, SecondClass, Property, Containment, Object, SecondObject, Location
@@ -279,6 +281,10 @@ class ContinueException extends ControlThrowable
 class StopException extends ControlThrowable
 def continue: Unit = throw new ContinueException
 def stop: Unit = throw new StopException
+
+def result(res : Boolean) : Unit = {
+    if(res) continue else stop
+}
 
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
