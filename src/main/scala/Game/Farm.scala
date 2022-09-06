@@ -34,6 +34,10 @@ object FarmHouse extends Room {
 
   report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
+
+  val wine = ~Progressively("It is second old", "it is two seconds old", "it is three seconds old", "you can't count any further")
+  val jukebox = ~Shuffled("it's playing the theme to journey of the prarie king", "it's playing the theme to junimo kart", "it's playing the theme to the joja vending machine?" )
+
   val butt = new Box {
     name = "butt"
     description = "debris expeller"

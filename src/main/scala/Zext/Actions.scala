@@ -27,15 +27,6 @@ object Actions {
   }
 
 
-  def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
-
-  def Randomly(strs: StringExpression*): StringExpression = {
-    s"${
-      val which = util.Random.nextInt(strs.length)
-      strs(which)
-    }"
-  }
-
 
   object being extends Action(1)
 

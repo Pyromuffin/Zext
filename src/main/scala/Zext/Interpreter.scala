@@ -14,17 +14,18 @@ import scala.language.postfixOps
 import scala.reflect.TypeTest
 
 
-object StringExpression{
-  implicit def fromString(str : => String): StringExpression = {
-    new StringExpression(str)
-  }
-}
-
 
 implicit class TernaryExtension(that : Boolean) {
 
   def ?(str : StringExpression) : StringExpression = {
     if(that) str else ""
+  }
+}
+
+
+object StringExpression{
+  implicit def fromString(str : => String): StringExpression = {
+    new StringExpression(str)
   }
 }
 
@@ -35,6 +36,41 @@ class StringExpression(lazyStr : => String) {
 }
 
 
+case class Progressively(strs: StringExpression*) extends StringExpression(null) {
+  var progress = 0
+
+  override def toString: String = {
+    val ret = strs(progress).toString
+    progress = scala.math.min(progress + 1, strs.length - 1)
+    ret
+  }
+}
+
+
+case class Cycle(strs: StringExpression*) extends StringExpression(null) {
+  var cycle = 0
+
+  override def toString: String = {
+    val ret = strs(cycle).toString
+    cycle = (cycle + 1) % strs.length
+    ret
+  }
+}
+
+def Shuffled(strs: StringExpression*): StringExpression = {
+  val shuffled = scala.util.Random.shuffle(strs)
+  Cycle(shuffled *)
+}
+
+
+def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
+
+def Randomly(strs: StringExpression*): StringExpression = {
+  s"${
+    val which = util.Random.nextInt(strs.length)
+    strs(which)
+  }"
+}
 
 
 object Interpreter{
@@ -78,10 +114,11 @@ object Interpreter{
     ret
   }
 
-  def Say(str: StringExpression): Unit = {
-    if(str.toString == "") println("Empty string!!!")
+  def Say(strExpr: StringExpression): Unit = {
+    val str = strExpr.toString
+    if(str == "") println("Empty string!!!")
 
-    println( Capitalize(str.toString) )
+    println( Capitalize(str) )
   }
 
   def Title(str : StringExpression): Unit = {
@@ -192,6 +229,7 @@ object Parser extends RegexParsers{
     }
 
     def precedence = {
+      // we need to do it in this funny way so that we get zero if there are no conditions, instead of just doing .max
       conditions.map(_.precedence).foldLeft(0)( _ max _ )
     }
 
