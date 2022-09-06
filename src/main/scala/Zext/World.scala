@@ -43,7 +43,7 @@ object player extends ZextObject with Container {
     transferTo(room)
   }
 
-  this.aliases.addOne("self")
+  this.aliases.addOne("self").addOne("me").addOne(playerName)
 }
 
 

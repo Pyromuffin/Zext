@@ -308,6 +308,7 @@ object Actions {
 
 
     inflict(putting, ofSecond[Zontainer]) {
+      //if secondNoun isPeep Say Harvey isn't around at the moment, so you cant just cut open Human to put noun inside it
       if(!secondNoun[Container].open){
         Say(s"Grandpa's ghost isn't around at the moment, so you'll have to open $secondNoun before you put $noun inside it.")
         false
