@@ -26,6 +26,45 @@ object talkingTo extends Action(1, "talk", "talk to", "speak to", "speak with", 
 
 }
 
+object giving extends Action(2, "give", "bequeath", "offer") {
+
+
+  // this kinda sucks, but whatever
+  instead(giving, of[Thing], ofSecond[Person], player lacks noun) Say s"You have a lot to give, but not $noun"
+  instead(giving, of[Person], ofSecond[Thing], player lacks secondNoun) Say s"You have a lot to give, but not $secondNoun)"
+
+  inflict(giving, ofSecond[Person]) {
+    val p = secondNoun[Person]
+
+    if(p.giftGivenToday){
+      Say(s"You've already given $secondNoun a gift today, more gifts would cause an embarrassing inventory problem")
+      stop
+    }
+
+    noun.transferTo(p)
+    p.affection += p.getApprovalOf(noun)
+    p.giftGivenToday = true
+    true
+  }
+
+  instead(giving, of[Person]) {
+    execute(giving, secondNoun, noun)
+  }
+
+  report(giving, ofSecond[Person]){
+    val p = secondNoun[Person]
+    val approval = p.getApprovalOf(noun)
+    if( approval == 0){
+      Say(s"upon receiving $noun, $p weeps neutrally")
+    } else if (approval == 1){
+      Say(s"upon receiving $noun, $p glows an eerie shade of thankful")
+    } else if ( approval == -1) {
+      Say(s"upon receiving $noun, $p erupts with sparks of displeasure")
+    } else
+    Say(s"upon receiving $noun, $p emits harmless rays of ${Randomly("eye searing", "hunger inducing", "ghostly")} radiation")
+  }
+
+}
 
 object talkingAbout extends Action(2, "talk about") {
 
@@ -56,24 +95,42 @@ case class Subject(names : String*) extends ZextObject {
 }
 
 object Subject {
-
   val weather = Subject("weather", "the weather", "rain", "snow", "heat", "heatwave", "wind")
-
 }
 
 
-class Person(using Container) extends thing {
+class Person(using Container) extends Thing with Container {
 
   var affection : Int = 0
   var giftGivenToday = false //should we just literally copy paste their gift reception strings for random objects? i think it would be funny to have something in the game that does that.
   var talkedToToday = false
   proper = true
+
+  // uhh should people be containers?
+  automaticallyListContents = false
+  open = false
+  transparent = false
+
+  // override this
+  def getApprovalOf(z : ZextObject): Int = { // should be thing or ??
+     0
+  }
+
 }
 
 
 object PersonHolder extends Room {
   name = "Prison" // needs a name or ambiguity will occur with things named ""
   // i guess we can't construct people without having a room for them to start in.
+
+
+  instead(opening, of[Person]) Say "Harvey would be better suited to doing that."
+  instead(taking, of[Person]) Say s"Maybe once you get to know $noun better"
+
+  after(examining, of[Person]){
+    Say(s"Friendship Rating: ${noun[Person].affection}")
+    true
+  }
 
   object MayorLewis extends Person {
     transferTo(Town)
@@ -103,6 +160,9 @@ object PersonHolder extends Room {
     description = "Without Linus, Stardew Valley Greater Metropolitan Area would be NOTHING " +
       "Supposedly, Linus is usually alone. But you've never see him alone, not with you here"
 
+
+    // linus loves everything
+    override def getApprovalOf(z: ZextObject) = 1
 
     report(smelling, this) {
       Say(Randomly( s"$noun smells like elderberries and the call of the wild, a novel by Jack London", s"$noun smells like David Thoreau at Walden Pond", s"$noun smells like seasonally appropriate wild produce", s"You detect the aroma of anti capitalism with hints of red currant"))

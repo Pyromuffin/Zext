@@ -35,8 +35,9 @@ object FarmHouse extends Room {
   report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
 
-  val wine = ~Progressively("It is second old", "it is two seconds old", "it is three seconds old", "you can't count any further")
-  val jukebox = ~Shuffled("it's playing the theme to journey of the prarie king", "it's playing the theme to junimo kart", "it's playing the theme to the joja vending machine?" )
+  val wine = ~Progressively("It is one second old", "it is two seconds old", "it is three seconds old", "you can't count any further")
+  val jukebox = ~Shuffled("it's playing the theme to journey of the prairie king", "it's playing the theme to junimo kart", "it's playing the theme to the joja vending machine?" )
+  val hat = ~"Hat"
 
   val butt = new Box {
     name = "butt"
@@ -81,7 +82,7 @@ object FarmHouse extends Room {
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
   }
 
-  object tv extends device {
+  object tv extends Device {
     name = "tv"
     aliases.addOne("television").addOne("TV")
     offDesc = "The tv lies dormant, ready to be turned on."
@@ -96,7 +97,7 @@ object FarmHouse extends Room {
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
   val door = ~"This is a thing you really wish you could open and close, but you can't"
 
-  object coffee_machine extends device with Container {
+  object coffee_machine extends Device with Container {
     name = "coffee maker"
     aliases.addOne("unholy espresso machine").addOne("coffee monster").addOne("cm").addOne("coffee machine")
 
@@ -182,7 +183,7 @@ object Vegetable {
   }
 }
 
-class Vegetable(using c : Container) extends thing {
+class Vegetable(using c : Container) extends Thing {
   var wilted = false
   var watered = false
   var ripe = false
@@ -196,7 +197,7 @@ object Animal{
   }
 }
 
-class Animal(using c : Container) extends thing {
+class Animal(using c : Container) extends Thing {
   var petted = false
 
 }
@@ -222,7 +223,7 @@ object OutsideWorld extends Room {
 
   instead(taking, crops :: parsnips :: seedlings :: Nil) Say s"You have failed. $noun remains where it is."
 
-  object watering_can extends thing {
+  object watering_can extends Thing {
     var waterAmount = 0
 
     after(examining, watering_can) {
@@ -335,7 +336,7 @@ object ChickenCoop extends Room {
   //  }
   } aka "mm" aka "machine" is fixed
   val void_mayo = ~"Fresh void mayo. It contains universes within, in a convenient colloidal suspension. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
-  object dix extends thing{
+  object dix extends Thing{
     name = "dix"
     aliases.addOne("dixxx")//aka "dixxx"
     description = "just dix"

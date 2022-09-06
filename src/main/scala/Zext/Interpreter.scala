@@ -387,10 +387,10 @@ object Parser extends RegexParsers{
       if(command.nonEmpty){
         val c = command.get
         EvaluatePreviouslyConditions(c.action, c.noun, c.secondNoun)
-        execute(c.action, c.noun, c.secondNoun)
+        ExecuteAction(c.action, c.noun, c.secondNoun)
         execute(being, currentLocation)
       } else {
-        Say("Redacted.")
+        println("[REDACTED]")
       }
     }
   }

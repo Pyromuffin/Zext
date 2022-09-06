@@ -3,7 +3,7 @@ package Game
 import Zext.Parser.*
 import Zext.*
 import Zext.Interpreter.*
-import Zext.thing.*
+import Zext.Thing.*
 import Zext.Direction.*
 import JunimoGame.*
 import Zext.Actions.*

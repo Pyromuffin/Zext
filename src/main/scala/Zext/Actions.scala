@@ -209,22 +209,26 @@ object Actions {
     after(examining, of[Room]) {
       val r = noun[Room]
       val visible = r.contents.filterNot(_ ? scenery)
-      if (!visible.isEmpty) {
-        var s = "You can see "
-        for (i <- visible) {
-          if (!i.?(scenery))
-            s += i.indefinite + ", "
-        }
-        s = s.stripSuffix(", ")
-        s += "."
-        Say(s)
+      if(visible.isEmpty)
+        stop
+
+      var s = "You can see "
+      for (i <- visible) {
+          s += i.indefinite + ", "
       }
+      s = s.stripSuffix(", ")
+      Say(s)
+
       false
     }
 
     after(examining, of[Container]) {
 
       val c = noun[Container]
+
+      if(!c.automaticallyListContents)
+        continue
+
       var response = ""
       if c.open then response +=s"$noun is open" else response += s"$noun is closed"
 

@@ -1,6 +1,8 @@
 package Zext
 
 
+import Game.JunimoGame.*
+
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
 import Zext.Actions.*
@@ -25,6 +27,13 @@ object player extends ZextObject with Container {
   name = "player"
   properties += scenery
 
+  // describe clothes?
+  description = s"You are $farmer, heir of Grandpa, steward of $farm"
+
+  automaticallyListContents = false
+  open = false
+  transparent = false
+
   parentContainer = nowhere
   nowhere.contents += this
 
@@ -34,6 +43,7 @@ object player extends ZextObject with Container {
     transferTo(room)
   }
 
+  this.aliases.addOne("self")
 }
 
 
@@ -74,7 +84,7 @@ object World extends Container {
       Parser.Understand(z, Seq(z.name).concat(z.aliases)* )
     }
 
-    execute(StartingGame)
+    ExecuteAction(StartingGame)
 
     println("-------------")
 

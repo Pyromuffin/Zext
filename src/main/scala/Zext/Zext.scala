@@ -6,7 +6,7 @@ import Zext.Parser.*
 import Zext.QueryPrecedence.*
 import Zext.Rule.*
 import Zext.World.*
-import Zext.thing.NounAmount
+import Zext.Thing.NounAmount
 
 import java.lang.reflect.Constructor
 import scala.collection.mutable.ArrayBuffer
@@ -35,9 +35,9 @@ object exports{
     export ZextObject.*
     export Actions.*
     export Inflector.*
-    export Zext.thing.*
-    export Zext.thing.NounAmount.*
-    export ZextObject.device.*
+    export Zext.Thing.*
+    export Zext.Thing.NounAmount.*
+    export Device.*
 }
 
 
@@ -46,6 +46,7 @@ trait Container {
     var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
     var open = true
     var transparent = true
+    var automaticallyListContents = true
 
     def ContentsString : String = {
         var s = ""
@@ -65,67 +66,10 @@ trait Container {
 object ZextObject{
     val all = ArrayBuffer[ZextObject]()
 
-    object device {
-        // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
 
-        object turningOn extends Action(1,"turn on", "switch on", "activate")
-        object turningOff extends Action(1,"turn off", "switch off", "deactivate")
-        object switching extends Action(1,"switch", "toggle")
-
-        inflict(turningOn, of[device]) {
-            val d = noun[device]
-            if (d.on) {
-                Say(s"$noun is already on")
-                false
-            } else {
-                d.on = true
-                true
-            }
-        }
-
-        report(turningOn, of[device]) {
-            Say(s"I turned on $noun")
-        }
-
-        inflict(turningOff, of[device]) {
-            val d = noun[device]
-            if (d.off) {
-                Say(s"$noun is already off")
-                false
-            } else {
-                d.on = false
-                true
-            }
-        }
-
-        report(turningOff, of[device]) {
-            Say(s"I turned off $noun")
-        }
-
-        inflict(switching, of[device]){
-            val d = noun[device]
-            if(d.on) execute(turningOff, d)
-            else execute(turningOn, d)
-        }
-    }
-
-    class device(using Container) extends thing {
-
-        var on = false
-        def off = !on
-
-        var offDesc : StringExpression = null
-        var onDesc :  StringExpression = null
-        description = s"${if(on) onDesc else offDesc}"
-    }
-
-
-    class Supporter(using Container) extends thing with Container
-    class Box(using Container) extends thing with Container {
-        transparent  = false
-        open = false
-    }
 }
+
+
 
 class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
@@ -139,6 +83,8 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     var proper = false
     var global = false
 
+
+    //@todo eventually fix zextobject/thing confusion
     var parentContainer : Container = null
     val parts = ArrayBuffer[ZextObject]()
     var compositeObject : ZextObject = null
@@ -239,7 +185,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     }
 
     def composes(zextObject: ZextObject): this.type = {
-        parentContainer = null
+        this transferTo nowhere
         compositeObject = zextObject
         zextObject.parts.addOne(this)
         this
@@ -249,10 +195,10 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
 
 
-object thing {
+object Thing {
     extension(d: StringExpression)  {
-        inline def unary_~(using c : Container) : thing = {
-            thing() named Macros.variableName desc d
+        inline def unary_~(using c : Container) : Thing = {
+            Thing() named Macros.variableName desc d
         }
     }
 
@@ -262,7 +208,7 @@ object thing {
 }
 
 
-class thing(using c : Container) extends ZextObject{
+class Thing(using c : Container) extends ZextObject{
 
     parentContainer = c
     c.contents += this
@@ -325,7 +271,65 @@ class thing(using c : Container) extends ZextObject{
 }
 
 
+object Device {
+    // hey idiot, don't put these definition in a class or they're get copied every time someone makes a device~!
+    object turningOn extends Action(1, "turn on", "switch on", "activate")
+    object turningOff extends Action(1, "turn off", "switch off", "deactivate")
+    object switching extends Action(1, "switch", "toggle")
+
+    inflict(turningOn, of[Device]) {
+        val d = noun[Device]
+        if (d.on) {
+            Say(s"$noun is already on")
+            false
+        } else {
+            d.on = true
+            true
+        }
+    }
+
+    report(turningOn, of[Device]) {
+        Say(s"I turned on $noun")
+    }
+
+    inflict(turningOff, of[Device]) {
+        val d = noun[Device]
+        if (d.off) {
+            Say(s"$noun is already off")
+            false
+        } else {
+            d.on = false
+            true
+        }
+    }
+
+    report(turningOff, of[Device]) {
+        Say(s"I turned off $noun")
+    }
+
+    inflict(switching, of[Device]) {
+        val d = noun[Device]
+        if (d.on) execute(turningOff, d)
+        else execute(turningOn, d)
+    }
+}
+
+class Device(using Container) extends Thing {
+
+    var on = false
+
+    def off = !on
+
+    var offDesc: StringExpression = null
+    var onDesc: StringExpression = null
+    description = s"${if (on) onDesc else offDesc}"
+}
 
 
+class Supporter(using Container) extends Thing with Container
 
+class Box(using Container) extends Thing with Container {
+    transparent = false
+    open = false
+}
 

@@ -12,6 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
 import scala.quoted.*
 import scala.reflect.{ClassTag, TypeTest}
+import scala.util.control.{Breaks, ControlThrowable}
 
 object Rule {
 
@@ -28,6 +29,8 @@ object Rule {
 
 
     inline def before(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
+
+
         val rule = new ActionRule(body, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).beforeRules += rule
@@ -56,7 +59,7 @@ object Rule {
     }
 
     inline def after(r: Action, conditions: Condition*)(body: => Boolean): ActionRule = {
-        val rule = new ActionRule( body, conditions*)
+        val rule = new ActionRule(body, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
         rule
@@ -155,9 +158,10 @@ object Rule {
     }
 
 
-    def execute(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
+     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
         val set = ruleSets(rule)
 
+        /*
         if( !target.forall( _.isVisible(currentLocation))) {
             Say(s"You can't see ${target.get.definite}")
             return false
@@ -167,7 +171,7 @@ object Rule {
             Say(s"You can't see ${target2.get.definite}")
             return false
         }
-
+        */
 
         def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule], all : Boolean = false) : Boolean = {
 
@@ -195,7 +199,11 @@ object Rule {
     }
 
     def execute(rule: Action, target: ZextObject): Boolean = {
-        execute(rule, Some(target))
+        ExecuteAction(rule, Some(target))
+    }
+
+    def execute(rule: Action, target: ZextObject, target2: ZextObject): Boolean = {
+        ExecuteAction(rule, Some(target), Some(target2))
     }
 }
 
@@ -267,6 +275,11 @@ class Condition( condition : => Boolean, var queryType: QueryPrecedence, var pre
     def precedence = queryType.ordinal
 }
 
+class ContinueException extends ControlThrowable
+class StopException extends ControlThrowable
+def continue: Unit = throw new ContinueException
+def stop: Unit = throw new StopException
+
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
     def specificity = {
@@ -293,7 +306,16 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
     }
 
-    def exec = body
+    def exec : Boolean = {
+        val ret = try{
+            body
+        } catch {
+            case ex : ContinueException => true
+            case ex : StopException => false
+        }
+
+        ret
+    }
 }
 
 
