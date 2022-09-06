@@ -191,6 +191,8 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
         this
     }
 
+    def isType[T](using TypeTest[ZextObject, T]) = canBecome[ZextObject, T](this)
+
 }
 
 
