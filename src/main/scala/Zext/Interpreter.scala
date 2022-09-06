@@ -10,6 +10,7 @@ import Zext.World.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.io.StdIn.readLine
 import scala.language.postfixOps
 import scala.reflect.TypeTest
 
@@ -114,11 +115,11 @@ object Interpreter{
     ret
   }
 
-  def Say(strExpr: StringExpression): Unit = {
-    val str = strExpr.toString
-    if(str == "") println("Empty string!!!")
+  def Say(str: StringExpression): Unit = {
+    val strImmediate = str.toString
+    if(strImmediate == "") println("Empty string!!!")
 
-    println( Capitalize(str) )
+    println( Capitalize(strImmediate) )
   }
 
   def Title(str : StringExpression): Unit = {
@@ -177,7 +178,7 @@ object Parser extends RegexParsers{
   }
 
 
-  def WordParser(str : String, parsables: Seq[Parsable[ParsableType]]) : Option[Parser[ParsableType]] = {
+  def WordParser(str : String, parsables: Seq[Parsable[ParsableType]]) : Option[Parser[Seq[ParsableType]]] = {
     // first check if word conditions are applicable, if not splode
 
     val possibles = parsables.filter(_.possible)
@@ -192,12 +193,12 @@ object Parser extends RegexParsers{
     val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
 
     if(bestParsables.length > 1){
-      println(str + " IS AMBIGUOUS! " + parsables.toString())
+     // println(str + " IS AMBIGUOUS! " + parsables.toString())
     }
 
-    val bestParsable = bestParsables.head
+    // val bestParsable = bestParsables.head
 
-    val parser = str.toLowerCase ^^ {s => bestParsable.target}
+    val parser = str.toLowerCase ^^ {s => bestParsables.map(_.target)}
 
     Some(parser)
   }
@@ -257,9 +258,10 @@ object Parser extends RegexParsers{
   case class Command(action: Action, noun: Option[ZextObject], secondNoun : Option[ZextObject])
 
 
+  type CommandParserType = Parser[(Seq[ParsableType], Option[Seq[ParsableType]], Option[Seq[ParsableType]])]
 
-  def BuildParser2() : Parser[(ParsableType, Option[ParsableType], Option[ParsableType])] = {
-    val allParsers : Seq[Parser[ParsableType]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
+  def BuildParser2() : CommandParserType = {
+    val allParsers : Seq[Parser[Seq[ParsableType]]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
     val allParser =  allParsers.reduce( _ ||| _ )
     val space = "\\s+".r
     val anySpace = "\\s*".r
@@ -277,7 +279,47 @@ object Parser extends RegexParsers{
   }
 
 
-  def BuildCommand(input : String, parser : Parser[(ParsableType, Option[ParsableType], Option[ParsableType])]) : Option[Command]=  {
+  def Disambiguate(parsables : Seq[ParsableType]) : ParsableType = {
+
+
+    val orange = "\u001b[38;5;214m"
+
+    if(parsables.length == 1)
+      return parsables.head
+
+
+    var s = "Did you mean "
+    var index = 1
+    for(p <- parsables){
+      s += s"($orange$index$unboldControlCode) ${p.toString} or "
+      index += 1
+    }
+    s = s.stripSuffix(" or ")
+    s += "?"
+
+    Say(s)
+
+    var done = false
+    var choiceIndex = -1
+    while(!done){
+
+      print("Choose > ")
+      val choice = readLine().toLowerCase
+
+      try{
+        choiceIndex = Integer.parseInt(choice)
+      } catch {
+        case e : NumberFormatException =>
+      } finally {
+        if(choiceIndex > 0 && choiceIndex <= parsables.length)
+          done = true
+      }
+    }
+
+    parsables(choiceIndex - 1)
+  }
+
+  def BuildCommand(input : String, parser : CommandParserType) : Option[Command]=  {
 
     if(commandAliases.contains(input)){
       return Some(commandAliases(input))
@@ -289,32 +331,46 @@ object Parser extends RegexParsers{
       return None
     }
 
-
     val triple = result.get
-
     var targets = 0
     if(triple._2.isDefined) targets += 1
     if(triple._3.isDefined) targets += 1
 
+    val zeroth = Disambiguate(triple._1)
+
+    if(zeroth.part != PartOfSpeech.verb)
+      return None
+
+    val action = zeroth.asInstanceOf[Action]
+    if(action.targets != targets)
+      return None
 
     // this kinda sucks
-    if(triple._2.isDefined && triple._2.get.part == PartOfSpeech.verb)
-      return None
+    if(triple._2.isDefined && triple._3.isDefined) {
 
+      val first = Disambiguate(triple._2.get)
+      val second = Disambiguate(triple._3.get)
 
-    if(triple._3.isDefined && triple._3.get.part ==  PartOfSpeech.verb)
-      return None
-
-
-    if( triple._1.part == PartOfSpeech.verb ){
-      val action = triple._1.asInstanceOf[Action]
-      val n1 = triple._2.map( p => p.asInstanceOf[ZextObject] )
-      val n2 = triple._3.map( p => p.asInstanceOf[ZextObject] )
-
-      if(action.targets != targets)
+      if(first.part == PartOfSpeech.verb || second.part == PartOfSpeech.verb)
         return None
 
-      return Some(Command(action, n1, n2))
+      if (action.targets != targets)
+        return None
+
+
+      return Some(Command(action, Some(first.asInstanceOf[ZextObject]), Some(second.asInstanceOf[ZextObject])))
+    }
+
+    else if(triple._2.isDefined) {
+      val first = Disambiguate(triple._2.get)
+
+      if (first.part == PartOfSpeech.verb)
+        return None
+
+      return Some(Command(action, Some(first.asInstanceOf[ZextObject]), None))
+    } else {
+
+      return Some(Command(action, None, None))
     }
 
     None
