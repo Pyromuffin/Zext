@@ -71,6 +71,7 @@ object FarmHouse extends Room {
       pencil.parentContainer == this
     }
 
+    pencil has flavor(Randomly("wood. Delicious, delicious wood", "a beaver delicacy", "sitting at your desk in kindergarten", "deep thoughts", "eraser flakes"))
     pencil has scent(Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain."))
 
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
@@ -84,6 +85,7 @@ object FarmHouse extends Room {
     offDesc = "The tv lies dormant, ready to be turned on."
     onDesc = "Light dances across the dome of the CRT."
     has(fixed)
+    this has flavor(Randomly("electrostatic shock", "static", "smooth glass", "dust. When was the last time you dusted this thing?"))
 
     report(turningOn, this) Say s"$noun reluctantly flickers to life."
     report(turningOff, this) Say s"With a protest of static, $noun blinks off."
@@ -105,6 +107,7 @@ object FarmHouse extends Room {
     offDesc = "Sleepy, just like you."
     onDesc = "Constant disturbing grinding and whining, the machine performs miracles before your eyes"
     has(fixed)
+    this has flavor("coffee residue") has scent ("bitter regret")
 
 
     val coffee_grounds = ~"all that remains of yesterday's grind." amount some aka "grounds" aka "beans"
@@ -198,7 +201,7 @@ object OutsideWorld extends Room {
   Connect(north, FarmHouse)
 
   name = "Porch"
-  description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west."
+  description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west. There's a pond btw"
 
   val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
 
@@ -218,7 +221,8 @@ object OutsideWorld extends Room {
     var waterAmount = 0
 
     after(examining, watering_can) {
-      if (watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed flops across the basin of the watering can"))
+      if (watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed " +
+        "flops across the basin of the watering can"))
       if (watering_can.waterAmount == 1) Say("a paucity of water glints in the pail")
       if (watering_can.waterAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
       if (watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
@@ -342,7 +346,7 @@ object ChickenCoop extends Room {
       true
     }
     else {
-      Say("You put that mayo back where it belongs. With you, always.")
+      Say(Randomly("You hastily gather up the void mayo in a plastic baggy and stuff it in your pocket. Almost no worse for wear", "You put that mayo back where it belongs. With you, always."))
       true
     }
     Say("You love void mayo like your own child")
@@ -368,7 +372,7 @@ object ChickenCoop extends Room {
       Say(mayo_machine.description)
     }
   }
-  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicks" aka "fluffballs" aka "cuties" amount some
+  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicken" aka "chicks" aka "fluffballs" aka "cuties" amount some
 
   report(taking, chickens) {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")
@@ -411,6 +415,9 @@ object ChickenCoop extends Room {
 
   val odors = ~"The pleasant aroma of feathers and mayonnaise intertwine here" are scenery aka "odor" aka "scents" aka "aroma"
 
+  instead(smelling, this) {
+    Say("The pleasant aroma of feathers and mayonnaise intertwine here")
+  }
 
   before(going, east, this) {
     if (void_mayo.parentContainer == player) {

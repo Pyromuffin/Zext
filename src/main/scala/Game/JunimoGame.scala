@@ -52,7 +52,7 @@ object JunimoGame {
   var pantsSlot : Clothing = null
   var undergarmentSlot : Clothing = null
   var socksSlot : Clothing = null
-  var shoesSlot : Clothing = null
+  var shoesSlot : Clothing = steelToeBoots
 
   case class Clothing(name : StringExpression, fastenedDesc : StringExpression, unfastenedDesc : StringExpression, removalText : StringExpression, unfasteningText : StringExpression, var fastened: Boolean)
 

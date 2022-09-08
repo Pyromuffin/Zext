@@ -22,13 +22,13 @@ object nowhere extends Room {
 }
 
 
-object player extends ZextObject with Container {
+object player extends ZextObject with Container {  //there are two me's to disambiguate?
 
   name = "player"
   properties += scenery
 
   // describe clothes?
-  description = s"You are $farmer, heir of Grandpa, steward of $farm"
+  description = s"You are $farmer, heir of Grandpa, steward of $farm. Your readiness is currently $rigidity." + GetRigidity()
 
   automaticallyListContents = false
   open = false
@@ -43,7 +43,7 @@ object player extends ZextObject with Container {
     transferTo(room)
   }
 
-  this.aliases.addOne("self").addOne("me").addOne(playerName)
+  this.aliases.addOne("self").addOne("me").addOne(playerName).addOne(s"$farmer")
 }
 
 
