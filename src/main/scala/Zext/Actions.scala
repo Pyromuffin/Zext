@@ -9,7 +9,7 @@ import Zext.ZextObject.*
 import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
-import Game.JunimoGame.encumbrance
+import Game.JunimoGame.{GetEquipmentDescription, encumbrance}
 import Game.Person
 import Zext.player.playerName
 
@@ -249,6 +249,12 @@ object Actions {
 
       Say(response)
     }
+
+
+    after(examining, player) {
+      Say(GetEquipmentDescription())
+    }
+
   }
 
   object closing extends Action(1, "close", "shut") {

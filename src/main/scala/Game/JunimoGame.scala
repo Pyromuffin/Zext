@@ -46,13 +46,26 @@ object JunimoGame {
     fastened = true)
 
 
-  var hatSlot : Clothing = null
-  var overallsSlot : Clothing = null
-  var shirtSlot : Clothing = flannelShirt
-  var pantsSlot : Clothing = null
-  var undergarmentSlot : Clothing = null
-  var socksSlot : Clothing = null
-  var shoesSlot : Clothing = steelToeBoots
+  var hatSlot : Option[Clothing] = None
+  var overallsSlot : Option[Clothing] = None
+  var shirtSlot : Option[Clothing] = Some(flannelShirt)
+  var pantsSlot : Option[Clothing] = None
+  var undergarmentSlot : Option[Clothing] = None
+  var socksSlot : Option[Clothing] = None
+  var shoesSlot : Option[Clothing] = Some(steelToeBoots)
+
+
+  def GetEquipmentDescription() : String = {
+    var s = ""
+    s += "On your head you are wearing " + hatSlot.map(_.name).getOrElse("nothing") + ".\n"
+    s += "Your outer shell is " + overallsSlot.map(_.name).getOrElse("bare") + ".\n"
+    s += "On your upper bod is " + shirtSlot.map(_.name).getOrElse("skin") + ".\n"
+    s += "On your lower bod you are wearing " + pantsSlot.map(_.name).getOrElse("a birthday suit") + ".\n"
+    s += "Under all that betrays " + undergarmentSlot.map(_.name).getOrElse("nudity") + ".\n"
+    s += "On your toes you keep " + socksSlot.map(_.name).getOrElse("forgetting to put on socks") + ".\n"
+    s += "and " + shoesSlot.map(_.name).getOrElse("hopes alone") + " protect your feet"
+    s
+  }
 
   case class Clothing(name : StringExpression, fastenedDesc : StringExpression, unfastenedDesc : StringExpression, removalText : StringExpression, unfasteningText : StringExpression, var fastened: Boolean)
 
