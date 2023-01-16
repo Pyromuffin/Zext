@@ -9,6 +9,8 @@ val org = "org.pyromuffin"
 
 
 
+// if this doesn't compile, from sbt try:
+// plugin/publishLocal
 
 lazy val plugin = project
   .settings(
@@ -17,7 +19,7 @@ lazy val plugin = project
     version := "1.0.0",
     scalaVersion := dottyVersion,
 
-    libraryDependencies += "org.scala-lang" %% "scala3-compiler" % dottyVersion % "provided"
+    libraryDependencies += "org.scala-lang" %% "scala3-compiler" % dottyVersion
   )
 
 lazy val zext = (project in file("."))

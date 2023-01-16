@@ -38,6 +38,7 @@ object player extends ZextObject with Container {  //there are two me's to disam
   nowhere.contents += this
 
   var playerName = "Farmer"
+  var lucreHeld = 0
 
   def Move(room: Room): Unit ={
     transferTo(room)
@@ -72,6 +73,7 @@ object World extends Container {
   var time = 10
 
   object StartingGame extends Action(0) // for hooking.
+  object EndingDay extends Action(0)
 
   def Init(): Unit = {
 

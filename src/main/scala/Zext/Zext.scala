@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
+import Zext.Actions.does
 
 import scala.reflect.TypeTest
 
@@ -49,7 +50,6 @@ def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
         return Some(stuff.head.indefinite)
     }
 
-
     if (stuff.length == 2) {
         return Some(stuff.head.indefinite + " and " + stuff(1).indefinite)
     }
@@ -82,8 +82,11 @@ trait Container {
 
 object ZextObject{
     val all = ArrayBuffer[ZextObject]()
-
-
+    def Destroy(zextObject: ZextObject) = {
+        zextObject.parentContainer.contents.remove(zextObject.parentContainer.contents.indexOf(zextObject))
+        zextObject.parentContainer = null
+        // anything else?
+    }
 }
 
 
@@ -108,11 +111,12 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
 
     ZextObject.all += this
 
-    def transferTo(container: Container) = {
+    def transferTo(container: Container) : Unit = {
         parentContainer.contents.remove(parentContainer.contents.indexOf(this))
         parentContainer = container
         container.contents.addOne(this)
     }
+
 
     def definite : String = {
         if(proper)
@@ -133,6 +137,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
             return "are"
         "is"
     }
+
 
     def ?(property: Property) : Boolean =  {
         properties.contains(property)
@@ -229,6 +234,8 @@ object Thing {
 
 class Thing(using c : Container) extends ZextObject{
 
+    var valueInLucre = 0
+
     parentContainer = c
     c.contents += this
 
@@ -285,6 +292,11 @@ class Thing(using c : Container) extends ZextObject{
             pluralized = true
             indefiniteArticle = "some"
         }
+        this
+    }
+
+    def worth(value : Int) = {
+        valueInLucre = value
         this
     }
 }

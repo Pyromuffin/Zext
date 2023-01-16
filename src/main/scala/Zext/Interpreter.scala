@@ -265,7 +265,7 @@ object Parser extends RegexParsers{
     val allParser =  allParsers.reduce( _ ||| _ )
     val space = "\\s+".r
     val anySpace = "\\s*".r
-    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "about")
+    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "from", "about")
     val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
 
     val command = anySpace ~> allParser ~ opt(space ~> allParser) ~ (opt(space ~> prepositionParser) ~> opt(space ~> allParser)) ^^ { (a) =>

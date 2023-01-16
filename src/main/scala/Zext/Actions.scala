@@ -244,7 +244,7 @@ object Actions {
         if(c.contents.isEmpty)
           response += "nothing is inside"
         else
-          response += s"inside you can see ${c.ContentsString}"
+          response += s"inside you can see ${c.ContentsString.get}"
       }
 
       Say(response)
@@ -287,7 +287,7 @@ object Actions {
 
     report(opening, of[Container]) {
       if !noun[Container].transparent && noun[Container].contents.nonEmpty then
-        Say(s"You open $noun, inside you can see ${noun[Container].ContentsString}")
+        Say(s"You open $noun, inside you can see ${noun[Container].ContentsString.get}")
       else
         Say(s"You open $noun")
     }
@@ -304,6 +304,9 @@ object Actions {
     inflict(takingInventory) {
       val s = "In your possessionary you have " + player.ContentsString.getOrElse("nothing")
       Say(s)
+      if(player.lucreHeld > 0) {
+        Say(s"Your coffer holds ${player.lucreHeld} splinters of Lucre")
+      }
     }
   }
 

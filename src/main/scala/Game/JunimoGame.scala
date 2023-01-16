@@ -3,8 +3,8 @@ package Game
 import Zext.Actions.*
 import Zext.Rule.*
 import Zext.Interpreter.*
-import Zext.{Macros, StringExpression, TernaryExtension, player}
-import Zext.World.StartingGame
+import Zext.{Action, Macros, StringExpression, TernaryExtension, player, reflexively}
+import Zext.World.{EndingDay, StartingGame, currentLocation}
 
 
 /*
@@ -112,5 +112,24 @@ object JunimoGame {
     else
        "Unknown Rigidity"
   }
+
+}
+
+// idk where to put this
+object sleeping extends Action(0, "sleep", "rest", "slumber", "nap") {
+
+
+  instead(sleeping, currentLocation != FarmHouse){
+    Say("You'd rather sleep in your bed.")
+  }
+
+  report(sleeping){
+    Say("You drift away in night's embrace")
+  }
+
+  after(sleeping){
+    execute(EndingDay, reflexively)
+  }
+
 
 }
