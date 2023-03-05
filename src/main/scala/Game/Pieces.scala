@@ -48,14 +48,15 @@ object Pieces {
 
     pieces.split(amountToDrop, currentLocation)
 
-    val unitWord = if(amountToDrop == 1) pieces.unitName else pluralize(pieces.unitName)
+    val unitWord = if(amountToDrop == 1) pieces.unitName else pluralize(pieces.unitName) 
     val verb = if(amountToDrop == 1) "spills" else "spill"
 
     Say(s"$amountToDrop $unitWord of $name $verb onto the floor.")
-
     stop // don't do the usual report for dropping.
   }
 
+  // it may be tempting to create report rules for this action, but i don't have a way of changing the target of an action during the execution of a rule.
+  // this may be a useful thing at some point.
 
 }
 
@@ -81,7 +82,6 @@ class Pieces(var quantity : Int)(using c : Container) extends Thing with Cloneab
       pieces.quantity += amount
     } else {
       val other = this.clone().asInstanceOf[this.type]
-      ZextObject.all.append(other)
 
       quantity -= amount
       other.quantity = amount

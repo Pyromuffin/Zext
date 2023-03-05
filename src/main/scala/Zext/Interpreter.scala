@@ -178,6 +178,30 @@ object Parser extends RegexParsers{
   }
 
 
+  def FindAllTransitivelyAccessible(z : ZextObject) : Array[ZextObject] = {
+
+    val itemAndParts = Array(z) concat z.parts.flatMap(FindAllTransitivelyAccessible)
+
+    z match {
+      case c: Container if (c.open) =>
+        itemAndParts concat c.contents.flatMap(FindAllTransitivelyAccessible)
+
+      case _ => itemAndParts
+    }
+  }
+
+  def FindAccessibleSet() : ArrayBuffer[ZextObject] = {
+
+    val accessSet = new ArrayBuffer[ZextObject]()
+
+    accessSet.addAll(FindAllTransitivelyAccessible(currentLocation))
+    accessSet.addAll(player.contents)   // this doesn't transitively give you the contents of the player or the globals.
+    accessSet.addAll(ZextObject.globals)
+
+    accessSet
+  }
+
+
   def FindAllTransitivelyVisible(z : ZextObject) : Array[ZextObject] = {
 
     val itemAndParts = Array(z) concat z.parts.flatMap(FindAllTransitivelyVisible)
@@ -190,6 +214,7 @@ object Parser extends RegexParsers{
     }
 
   }
+
 
   def FindVisibleSet() : ArrayBuffer[ZextObject] = {
 
@@ -293,11 +318,7 @@ object Parser extends RegexParsers{
   case class Parsable[T <: ParsableType](target : T, conditions : Condition*){
 
     def possible = {
-      val visible = if(target.part == PartOfSpeech.noun){
-        target.asInstanceOf[ZextObject].isVisible(currentLocation)
-      } else true
-
-      conditions.forall(_.evaluate) && visible
+      conditions.forall(_.evaluate)
     }
 
     def specificity = {

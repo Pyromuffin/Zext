@@ -81,10 +81,8 @@ trait Container {
 
 
 object ZextObject{
-    val all = ArrayBuffer[ZextObject]()
     val globals = ArrayBuffer[ZextObject]()
     def Destroy(zextObject: ZextObject) = {
-        all.remove(all.indexOf(zextObject))
         zextObject.parentContainer.contents.remove(zextObject.parentContainer.contents.indexOf(zextObject))
         zextObject.parentContainer = null
         // anything else?
@@ -111,7 +109,7 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     val parts = ArrayBuffer[ZextObject]()
     var compositeObject : ZextObject = null
 
-    ZextObject.all += this
+    // ZextObject.all += this
 
     def transferTo(container: Container) : Unit = {
         parentContainer.contents.remove(parentContainer.contents.indexOf(this))
@@ -146,54 +144,24 @@ class ZextObject extends ParsableType(PartOfSpeech.noun) {
     }
 
 
-    def isVisible(room: Room) : Boolean = {
 
-        /*
-        conditions for item visibility:
-        1) in the same container
-        2) in the player's inventory
-        3) in a transparent container contained (transitively) within the room
-        4) the current room or an adjacent room (? maybe ?),
-        5) a global object
-        6) a part of a visible object
-        */
-
-        val sameRoom = room == parentContainer
-        val inInventory = parentContainer == player
-        val connectedRoom = room.connections.values.exists(_ == this)
-
-
-
-        // if this breaks, i deserve it
-        val visibleTransitively = {
-            var parent = parentContainer
-            while(parent != null && (parent.transparent || parent.open) && parent != room && parent.isInstanceOf[ZextObject]){
-                parent = parent.asInstanceOf[ZextObject].parentContainer
-            }
-
-            parent == room
-        }
-
-        val visibleFromComposite = compositeObject != null && compositeObject.isVisible(room)
-
-
-        global || sameRoom || room == this || inInventory || connectedRoom ||  visibleFromComposite || visibleTransitively
-    }
+    def isComposite = compositeObject != null
 
     def isAccessible(room: Room) : Boolean = {
 
-        val accessibleTransitively = {
-            var parent = parentContainer
-            while (parent != null && parent.open && parent != room && parent.isInstanceOf[ZextObject]) {
-                parent = parent.asInstanceOf[ZextObject].parentContainer
-            }
-
-            parent == room
+        if(parentContainer == room){
+            return true
         }
 
-        val acessibleFromComposite = this.compositeObject != null && this.compositeObject.isAccessible(room)
+        if(isComposite) {
+            return compositeObject.isAccessible(room)
+        }
 
-        isVisible(room) && (accessibleTransitively || acessibleFromComposite)
+        if(parentContainer != null && parentContainer.open && parentContainer.isInstanceOf[ZextObject]){
+            return parentContainer.asInstanceOf[ZextObject].isAccessible(room)
+        }
+
+        false
     }
 
 
@@ -359,8 +327,8 @@ class Device(using Container) extends Thing {
 
 class Supporter(using Container) extends Thing with Container
 
-class Box(using Container) extends Thing with Container {
-    transparent = false
-    open = false
+class Box(open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
+    transparent = open_and_transparent
+    open = open_and_transparent
 }
 

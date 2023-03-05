@@ -5,6 +5,7 @@ import Zext.Parser.*
 import Zext.*
 import Zext.exports.*
 import JunimoGame.*
+import Zext.Actions.putting.Zontainer
 
 
 object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
@@ -220,30 +221,36 @@ object Porch extends Room {
 
   val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
 
-  val parsnip= ~"A single perfect parsnip, ripe and ready just for you"
+  val parsnip= ~"A single perfect parsnip, ripe and ready just for you" worth 30
 
-  val porchLucre = Lucre(10)
-
+  // val otherLucre = new Lucre(69)
 
   object maw extends Thing with Container {
 
-    description = s"this hungry thing is the opposite of a treasure chest. Put things in and wait for it to process your refuse into Lucre. How does it work? Maru is conducting an inquiry into its mysteries."
+    description = s"this hungry thing is the opposite of a treasure chest. Maybe try putting something inside?"
     name = "The Maw"
     aliases.addOne("maw")
     maw.proper = true
     maw.transparent = false
     open = false
+    this is fixed
 
-    var lucreWaiting = 0
+    val pouch = new Box(true)
 
-    val pouch = ~s"this ${ if lucreWaiting > 0 then "engorged" else "flaccid"} sac contains the fruit of your labors" composes this aka "sac"
+    pouch.name = "pouch"
+    pouch.description =s"this ${ if pouch.contents.nonEmpty then "engorged" else "flaccid"} sac contains the fruit of your labors"
+    pouch composes this
+    pouch aka "sac"
 
 
-    instead(putting, of[Thing], this.asSecondNoun) {
+    instead(putting, pouch.asSecondNoun) Say "The maw appreciates your generosity, but this is a one sided relationship."
+
+
+    check(putting, of[Thing], this.asSecondNoun) {
       if(noun[Thing].valueInLucre <= 0){
         Say(s"The Maw rejects the ${Randomly("important", "worthless")} scent of $noun")
         stop
-      } else continue
+      }
     }
 
     report(putting, of[Thing], this.asSecondNoun){
@@ -251,6 +258,13 @@ object Porch extends Room {
     }
 
     after(examining, this){
+
+      if(pouch.contents.isEmpty)
+        continue
+
+      val lucreItem = pouch.contents(0).asInstanceOf[Lucre]
+      val lucreWaiting = lucreItem.quantity
+
       if(lucreWaiting > 0){
         if(lucreWaiting <= 100){
           Say(s"A pittance of $lucreWaiting Lucre jingles for you from within a protective pouch.")
@@ -265,35 +279,17 @@ object Porch extends Room {
     }
 
 
-  /*
-    instead(taking, lucre){
-
-      if(lucreWaiting > 0) {
-        Say("You roughly pile the Lucre into your coffer")
-        lucreWaiting = 0
-        player.lucreHeld += lucreWaiting
-      } else {
-        Say("Alas, The Maw is spent, but not for lack of trying.")
-      }
-
-    }
-    */
-
-
-
     after(World.EndingDay){
       if(currentLocation == Porch || currentLocation == FarmHouse) {
         if(this.contents.nonEmpty){
-          Say("Your rest is punctuated by dutiful munching as The Maw transmutes its burden to Lucre")
+          Say("Your rest is punctuated by The Maw's dutiful munching.")
         }
       }
 
-      for (c <- contents) {
-        lucreWaiting += c.asInstanceOf[Thing].valueInLucre
-        c.parentContainer = null
-      }
-      contents.clear()
+      val totalLucre = c.contents.map(_.asInstanceOf[Thing].valueInLucre).sum
+      c.contents.clear() // hope this is good enough to destroy the items.... i do not know.
 
+      new Lucre(totalLucre)(using pouch)
       this.open = false
     }
 

@@ -322,6 +322,11 @@ object Actions {
     }
   }
 
+  object debugging extends Action(0, "debug") {
+
+    report(debugging) Say FindVisibleSet().toString()
+  }
+
   object putting extends Action(2,"put", "insert", "place") {
 
     type Zontainer = Container & ZextObject
