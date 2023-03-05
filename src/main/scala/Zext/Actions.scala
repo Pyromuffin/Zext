@@ -331,7 +331,15 @@ object Actions {
 
     type Zontainer = Container & ZextObject
 
+
+
     check(putting, ofSecond[Zontainer]){
+
+      if(noun == secondNoun){
+        Say(s"Stepping into the fourth dimension, you put $noun into itself.")
+        stop
+      }
+
       if(noun.parentContainer != player){
         Say(s"You need to pick up $noun before putting it somewhere.")
         stop
