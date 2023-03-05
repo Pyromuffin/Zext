@@ -13,10 +13,12 @@ import Game.JunimoGame.{GetEquipmentDescription, encumbrance}
 import Game.Person
 import Zext.player.playerName
 
+import scala.collection.mutable.ArrayBuffer
+
 object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
-
+  val allActions = ArrayBuffer[Action]()
 
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
     commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
@@ -92,22 +94,27 @@ object Actions {
 
   object dropping extends Action(1,"drop", "abandon") {
 
-    report(dropping, reflexively) { //how do i do "report(dropping, object)" vs  execute(dropping, player) to reconcile this with "cant drop what you dont have"
+    // for ambiguously dropping things, don't try dropping things that are not in your inventory
+    disambiguationHint = { z =>
+      z.parentContainer == player
+    }
+
+    inflict(dropping, reflexively) {
      
       Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
-
-    inflict(dropping) {
-      if (noun.parentContainer == player) {
-        noun.transferTo(currentLocation)
-      }
-      else {
+    check(dropping) {
+      if( noun != reflexively && noun.parentContainer != player) {
         Say("Can't drop what you don't have.")
         stop
       }
+    }
+
+    inflict(dropping) {
+        noun.transferTo(currentLocation)
     }
 
     report(dropping) Say Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
@@ -137,6 +144,11 @@ object Actions {
   }
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
+
+    // for ambiguously taking things, don't try to take items that are already in your inventory.
+    disambiguationHint = { z =>
+      z.parentContainer != player
+    }
 
 
     // i don't really know how i feel about check rules, but inform has them so why not
@@ -310,22 +322,29 @@ object Actions {
     }
   }
 
-  object putting extends Action(2,"put", "insert", "place", "stuff", "thrust", "jam", "shove", "smash") {
+  object putting extends Action(2,"put", "insert", "place") {
 
     type Zontainer = Container & ZextObject
 
+    check(putting, ofSecond[Zontainer]){
+      if(noun.parentContainer != player){
+        Say(s"You need to pick up $noun before putting it somewhere.")
+        stop
+      }
 
-    inflict(putting, ofSecond[Zontainer]) {
-      //if secondNoun isPeep Say Harvey isn't around at the moment, so you cant just cut open Human to put noun inside it
-      if(!secondNoun[Container].open){
+      if (!secondNoun[Container].open) {
         Say(s"Grandpa's ghost isn't around at the moment, so you'll have to open $secondNoun before you put $noun inside it.")
         stop
-      } else if (noun.parentContainer == player && secondNoun.isAccessible(currentLocation) && secondNoun[Container].open) {
-        noun transferTo secondNoun[Container]
-      } else {
+      }
+
+      if(!secondNoun.isAccessible(currentLocation)) {
         Say(s"$secondNoun is inaccessible")
         stop
       }
+    }
+
+    inflict(putting, ofSecond[Zontainer]) {
+        noun transferTo secondNoun[Container]
     }
 
     report(putting, ofSecond[Zontainer]) Say s"You put $noun into $secondNoun"

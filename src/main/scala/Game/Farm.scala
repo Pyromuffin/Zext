@@ -199,42 +199,11 @@ class Animal(using c : Container) extends Thing {
 }
 
 
-object Pieces {
-
-}
-
-class Pieces(var quantity : Int)(using c : Container) extends Thing {
-
-  amount(some)
-
-
-  override def definite = {
-    super.definite + s" ($quantity)"
-  }
-
-  override def indefinite = {
-    super.indefinite + s" ($quantity)"
-  }
-
-  override def transferTo(container: Container) : Unit = {
-
-    val typeOfPiece = this.getClass
-    val currentlyHeld = container.contents.find(_.getClass == typeOfPiece)
-    if (currentlyHeld.nonEmpty) {
-      val pieces = currentlyHeld.get.asInstanceOf[Pieces]
-      pieces.quantity += quantity
-      Destroy(this)
-    }
-    else {
-      super.transferTo(container)
-    }
-  }
-
-}
 
 
 class Lucre(amount : Int)(using c : Container) extends Pieces(amount) {
 
+  unitName = "splinter"
   name = "Lucre"
   description = "Coarse golden splinters. They sting the hand. It's almost as if the baleful shards despise possession."
   aliases.addOne("splinters")

@@ -6,6 +6,7 @@ import Game.JunimoGame.*
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
 import Zext.Actions.*
+import Zext.Parser.BuildUnderstandables
 import Zext.Rule.*
 
 import scala.reflect.TypeTest
@@ -75,16 +76,14 @@ object World extends Container {
   object StartingGame extends Action(0) // for hooking.
   object EndingDay extends Action(0)
 
+
+
   def Init(): Unit = {
 
     TouchPackage("Zext")
     TouchPackage("Game")
 
     player.Move(Game.FarmHouse)
-
-    ZextObject.all.foreach{ z =>
-      Parser.Understand(z, Seq(z.name).concat(z.aliases)* )
-    }
 
     ExecuteAction(StartingGame)
 

@@ -82,7 +82,9 @@ trait Container {
 
 object ZextObject{
     val all = ArrayBuffer[ZextObject]()
+    val globals = ArrayBuffer[ZextObject]()
     def Destroy(zextObject: ZextObject) = {
+        all.remove(all.indexOf(zextObject))
         zextObject.parentContainer.contents.remove(zextObject.parentContainer.contents.indexOf(zextObject))
         zextObject.parentContainer = null
         // anything else?

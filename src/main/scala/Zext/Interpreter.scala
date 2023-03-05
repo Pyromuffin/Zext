@@ -8,11 +8,17 @@ import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
 import Zext.World.*
 
+import scala.io.StdIn.readLine
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.StdIn.readLine
 import scala.language.postfixOps
-import scala.reflect.TypeTest
+
+import scala.util.parsing.combinator.*
+
+// this maybe has to be the last import?
+//import scala.reflect.TypeTest
+
 
 
 
@@ -115,6 +121,22 @@ object Interpreter{
     ret
   }
 
+  def NumberPrompt(str: StringExpression) : Int = {
+    Say(str)
+    print("> ")
+    var number = readLine().toLowerCase
+    var parsed = scala.util.control.Exception.allCatch.opt( Integer.parseInt(number) )
+
+    while(parsed.isEmpty) {
+      Say("That's not a number.")
+
+      number = readLine().toLowerCase
+      parsed = scala.util.control.Exception.allCatch.opt( Integer.parseInt(number) )
+    }
+
+    parsed.get
+  }
+
   def Say(str: StringExpression): Unit = {
     val strImmediate = str.toString
     if(strImmediate == "") println("Empty string!!!")
@@ -135,7 +157,6 @@ object Interpreter{
 
 
 
-import scala.util.parsing.combinator.*
 
 
 object Parser extends RegexParsers{
@@ -154,6 +175,60 @@ object Parser extends RegexParsers{
   } else  {
     bolded = true
     boldControlCode
+  }
+
+
+  def FindAllTransitivelyVisible(z : ZextObject) : Array[ZextObject] = {
+
+    val itemAndParts = Array(z) concat z.parts.flatMap(FindAllTransitivelyVisible)
+
+    z match {
+      case c : Container if(c.transparent || c.open) =>
+          itemAndParts concat c.contents.flatMap(FindAllTransitivelyVisible)
+
+      case _ => itemAndParts
+    }
+
+  }
+
+  def FindVisibleSet() : ArrayBuffer[ZextObject] = {
+
+
+    /*
+    conditions for item visibility:
+    1) in the same container
+    2) in the player's inventory
+    3) in a transparent container contained (transitively) within the room
+    4) the current room or an adjacent room (? maybe ?),
+    5) a global object
+    6) a part of a visible object
+    */
+
+    val visibleSet = new ArrayBuffer[ZextObject]()
+
+    visibleSet.addAll( FindAllTransitivelyVisible(currentLocation) )
+    visibleSet.addAll( player.contents ) // this doesn't transitively give you the contents of the player or the globals.
+    visibleSet.addAll( ZextObject.globals )
+
+    visibleSet
+  }
+
+  def BuildUnderstandables(): Unit = {
+
+    understandables.clear()
+
+    for(a <- Actions.allActions){
+      Understand(a, a.verbs *)
+      if (a.targets == 1) {
+        UnderstandAlias(a.verbs, a, reflexively, null)
+      }
+    }
+
+    val visibleSet = FindVisibleSet()
+
+    visibleSet.foreach { z =>
+      Understand(z, Seq(z.name).concat(z.aliases) *)
+    }
   }
 
 
@@ -261,6 +336,9 @@ object Parser extends RegexParsers{
   type CommandParserType = Parser[(Seq[ParsableType], Option[Seq[ParsableType]], Option[Seq[ParsableType]])]
 
   def BuildParser2() : CommandParserType = {
+
+    BuildUnderstandables()
+
     val allParsers : Seq[Parser[Seq[ParsableType]]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
     val allParser =  allParsers.reduce( _ ||| _ )
     val space = "\\s+".r
@@ -279,13 +357,26 @@ object Parser extends RegexParsers{
   }
 
 
-  def Disambiguate(parsables : Seq[ParsableType]) : ParsableType = {
+  def Disambiguate(parsables : Seq[ParsableType], hint : ZextObject => Boolean) : ParsableType = {
 
 
     val orange = "\u001b[38;5;214m"
 
     if(parsables.length == 1)
       return parsables.head
+
+    if(hint != null){
+
+      val parsableHint : ParsableType => Boolean = {
+        case z: ZextObject => hint(z)
+        case _ => true
+      }
+
+      val likely = parsables.filter(parsableHint)
+
+      if (likely.length == 1)
+        return likely.head
+    }
 
 
     var s = "Did you mean "
@@ -336,7 +427,7 @@ object Parser extends RegexParsers{
     if(triple._2.isDefined) targets += 1
     if(triple._3.isDefined) targets += 1
 
-    val zeroth = Disambiguate(triple._1)
+    val zeroth = Disambiguate(triple._1, null)
 
     if(zeroth.part != PartOfSpeech.verb)
       return None
@@ -348,8 +439,8 @@ object Parser extends RegexParsers{
     // this kinda sucks
     if(triple._2.isDefined && triple._3.isDefined) {
 
-      val first = Disambiguate(triple._2.get)
-      val second = Disambiguate(triple._3.get)
+      val first = Disambiguate(triple._2.get, action.disambiguationHint)
+      val second = Disambiguate(triple._3.get, action.disambiguationHint)
 
       if(first.part == PartOfSpeech.verb || second.part == PartOfSpeech.verb)
         return None
@@ -358,7 +449,7 @@ object Parser extends RegexParsers{
       Some(Command(action, Some(first.asInstanceOf[ZextObject]), Some(second.asInstanceOf[ZextObject])))
     }
     else if(triple._2.isDefined) {
-      val first = Disambiguate(triple._2.get)
+      val first = Disambiguate(triple._2.get, action.disambiguationHint)
 
       if (first.part == PartOfSpeech.verb)
         return None
@@ -372,7 +463,6 @@ object Parser extends RegexParsers{
   }
 
   def main(args: Array[String]): Unit = {
-    import scala.io.StdIn.readLine
     World.Init()
 
     execute(examining, reflexively)

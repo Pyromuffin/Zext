@@ -1,6 +1,6 @@
 package Zext
 
-import Zext.Actions.{UnderstandAlias, examining}
+import Zext.Actions.{UnderstandAlias, allActions, examining}
 import Zext.Interpreter.*
 import Zext.Macros.{CodePosition, depth}
 import Zext.Parser.*
@@ -226,6 +226,15 @@ abstract class Rule {
 enum QueryPrecedence:
     case Generic, Class, SecondClass, Property, Containment, Object, SecondObject, Location
 
+
+class Condition( condition : => Boolean, var queryType: QueryPrecedence, var previously : Boolean = false ) {
+    def evaluate = condition
+
+    var specificity = 1
+
+    def precedence = queryType.ordinal
+}
+
 object Condition{
     // inform's precedence is something like
     // location > object > property > class > generic
@@ -269,13 +278,7 @@ object Condition{
 
 
 
-class Condition( condition : => Boolean, var queryType: QueryPrecedence, var previously : Boolean = false ) {
-    def evaluate = condition
 
-    var specificity = 1
-
-    def precedence = queryType.ordinal
-}
 
 class ContinueException extends ControlThrowable
 class StopException extends ControlThrowable
@@ -287,6 +290,8 @@ def result(res : Boolean) : Unit = {
 }
 
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
+
+
 
     def specificity = {
         conditions.map( _.specificity ).sum
@@ -330,10 +335,16 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
 
 class Action(val targets : Int, val verbs : String*) extends Rule with ParsableType(PartOfSpeech.verb) {
 
+    allActions.addOne(this)
+
+    var disambiguationHint : ZextObject => Boolean = null
+
+    /*
     Understand(this, verbs*)
     if(targets == 1){
         UnderstandAlias(verbs, this, reflexively,null)
     }
+    */
 
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
