@@ -29,9 +29,9 @@ lazy val zext = (project in file("."))
     version := "0.1.0",
     scalaVersion := dottyVersion,
 
-    libraryDependencies += compilerPlugin("org.pyromuffin" %% "objectifier" % "1.0.0"),
-    libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.2.0"
-
+    libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.2.0",
+    libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.12.0",
+     libraryDependencies += compilerPlugin("org.pyromuffin" %% "objectifier" % "1.0.0")
   )
 
 

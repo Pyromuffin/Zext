@@ -9,49 +9,72 @@ import Zext.Actions.*
 import Zext.Parser.BuildUnderstandables
 import Zext.Rule.*
 
+import scala.ref.WeakReference
 import scala.reflect.TypeTest
 
 object reflexively extends ZextObject {
-  name = "reflexively"
-  global = true
+  val name = "reflexively"
+  val description = ""
 }
+
+
 
 object nowhere extends Room {
-  global = true
-  name = "nowhere"
+  val name = "nowhere"
+  val description = ""
   proper = true
+
+
+  var potatos = 100
+
+  object murdering_can extends Thing {
+    override val name = "murdering can"
+    override val description = "not very nice"
+  }
+
 }
 
 
-object player extends ZextObject with Container {  //there are two me's to disambiguate?
+class Player extends ZextObject with Container {
 
-  name = "player"
+  val name = "player"
   properties += scenery
 
   // describe clothes?
-  description = s"You are $farmer, heir of Grandpa, steward of $farm. Your readiness is currently $rigidity." + GetRigidity()
+  val description = s"You are $farmer, heir of Grandpa, steward of $farm. Your readiness is currently $rigidity." + GetRigidity()
 
   automaticallyListContents = false
   open = false
   transparent = false
 
-  parentContainer = nowhere
-  nowhere.contents += this
+  // parentContainer = nowhere
+  // nowhere.contents += this
 
   var playerName = "Farmer"
-  var lucreHeld = 0
 
-  def Move(room: Room): Unit ={
+  def Move(room: Room): Unit = {
     transferTo(room)
   }
 
   this.aliases.addOne("self").addOne("me").addOne(playerName).addOne(s"$farmer")
 }
 
+class WorldState{
+
+  val globals = ArrayBuffer[ZextObject]()
+  val rooms = ArrayBuffer[Room]()
+  //var allObjects : ArrayBuffer[ZextObject] = null
+  var player = new Player
+  var time = 0
+}
 
 
+object World  {
 
-object World extends Container {
+  var currentWorld = new WorldState
+  def player = currentWorld.player
+  def currentLocation = player.parentContainer.asInstanceOf[Room]
+
 
   def TouchPackage(path: String): Unit = {
 
@@ -69,21 +92,23 @@ object World extends Container {
     }
   }
 
-
-  def currentLocation = player.parentContainer.asInstanceOf[Room]
-  var time = 10
-
   object StartingGame extends Action(0) // for hooking.
   object EndingDay extends Action(0)
-
-
 
   def Init(): Unit = {
 
     TouchPackage("Zext")
     TouchPackage("Game")
 
-    player.Move(Game.FarmHouse)
+    // currentWorld.player.Move(Game.FarmHouse)
+    player.parentContainer = Game.FarmHouse
+    Game.FarmHouse.contents.addOne(player)
+
+   // currentWorld.globals.addOne(Game.FarmHouse.butt)
+   // currentWorld.globals.addOne(Game.Porch.parsnip)
+
+    //val p = Game.Porch.parsnip.asInstanceOf[Thing]
+    //p.properties.addOne(wet)
 
     ExecuteAction(StartingGame)
 

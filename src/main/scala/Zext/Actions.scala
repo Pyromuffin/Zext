@@ -11,7 +11,7 @@ import scala.reflect.TypeTest
 import Condition.*
 import Game.JunimoGame.{GetEquipmentDescription, encumbrance}
 import Game.Person
-import Zext.player.playerName
+
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -163,7 +163,7 @@ object Actions {
 
     instead(taking, reflexively) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
-    instead(taking, noun.compositeObject != null) Say s"You're going to have a difficult time removing $noun from ${noun.compositeObject}"
+    instead(taking, noun.isComposite) Say s"You're going to have a difficult time removing $noun from ${noun.compositeObject}"
 
     instead(taking, player has noun) {
       Say(s"You rummage around the items in your backpack, looking for $noun")
@@ -200,15 +200,8 @@ object Actions {
   object examining extends Action(1,"examine", "x", "look", "l") {
 
 
-
-
     instead(examining, reflexively) {
       execute(examining, currentLocation)
-    }
-
-    inflict(examining, of[Crevice]) {
-      Title(currentLocation.name + " It's small! ")
-      Say(currentLocation.description)
     }
 
 
@@ -307,7 +300,7 @@ object Actions {
 
   object exiting extends Action(0,"exit") {
     inflict(exiting) {
-      Say(s"Goodbye $playerName")
+      Say(s"Goodbye ${player.playerName}")
       exit = true
     }
   }
@@ -316,11 +309,23 @@ object Actions {
     inflict(takingInventory) {
       val s = "In your possessionary you have " + player.ContentsString.getOrElse("nothing")
       Say(s)
-      if(player.lucreHeld > 0) {
-        Say(s"Your coffer holds ${player.lucreHeld} splinters of Lucre")
-      }
     }
   }
+
+
+  object saving extends Action(0, "save"){
+    inflict(saving){
+      Saving.SaveWorld()
+    }
+  }
+
+
+  object loading extends Action(0, "load") {
+    inflict(loading) {
+      Saving.LoadWorld()
+    }
+  }
+
 
   object debugging extends Action(0, "debug") {
 

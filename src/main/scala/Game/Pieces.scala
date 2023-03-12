@@ -60,7 +60,7 @@ object Pieces {
 
 }
 
-class Pieces(var quantity : Int)(using c : Container) extends Thing with Cloneable {
+abstract class Pieces(var quantity : Int)(using c : Container) extends Thing with Cloneable {
 
   amount(some)
 

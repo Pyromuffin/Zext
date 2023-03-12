@@ -3,8 +3,8 @@ package Game
 import Zext.Actions.*
 import Zext.Rule.*
 import Zext.Interpreter.*
-import Zext.{Action, Macros, StringExpression, TernaryExtension, player, reflexively}
-import Zext.World.{EndingDay, StartingGame, currentLocation}
+import Zext.{Action, Macros, StringExpression, TernaryExtension, reflexively}
+import Zext.World.{EndingDay, StartingGame, currentLocation, player}
 
 
 /*

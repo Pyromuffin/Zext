@@ -6,8 +6,8 @@ import Zext.exports.*
 
 object Mountains extends Room{
 
-  name = "mountains"
-  description = "Das Gebirge"
+  val name = "mountains"
+  val description = "Das Gebirge"
 
   report(being, here, Randomly(8), visited) Say "You catch hints of steam from the hot springs. Or maybe that's just your imagination. Wishful thinking"
 

@@ -6,14 +6,15 @@ import Zext.Condition.canBecome
 import Zext.Interpreter.*
 import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
+import Zext.Saving.*
 import Zext.World.*
 
+import java.io.{FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
 import scala.io.StdIn.readLine
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.StdIn.readLine
 import scala.language.postfixOps
-
 import scala.util.parsing.combinator.*
 
 // this maybe has to be the last import?
@@ -36,7 +37,7 @@ object StringExpression{
   }
 }
 
-class StringExpression(lazyStr : => String) {
+class StringExpression(lazyStr : => String) extends Serializable{
   override def toString: String = {
     lazyStr
   }
@@ -196,7 +197,7 @@ object Parser extends RegexParsers{
 
     accessSet.addAll(FindAllTransitivelyAccessible(currentLocation))
     accessSet.addAll(player.contents)   // this doesn't transitively give you the contents of the player or the globals.
-    accessSet.addAll(ZextObject.globals)
+    accessSet.addAll(World.currentWorld.globals)
 
     accessSet
   }
@@ -233,7 +234,7 @@ object Parser extends RegexParsers{
 
     visibleSet.addAll( FindAllTransitivelyVisible(currentLocation) )
     visibleSet.addAll( player.contents ) // this doesn't transitively give you the contents of the player or the globals.
-    visibleSet.addAll( ZextObject.globals )
+    visibleSet.addAll( World.currentWorld.globals )
 
     visibleSet
   }
@@ -482,6 +483,12 @@ object Parser extends RegexParsers{
       Some(Command(action, None, None))
     }
   }
+
+
+  object potato extends Serializable {
+    var dirt = 5
+  }
+
 
   def main(args: Array[String]): Unit = {
     World.Init()

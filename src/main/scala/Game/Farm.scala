@@ -6,6 +6,9 @@ import Zext.*
 import Zext.exports.*
 import JunimoGame.*
 import Zext.Actions.putting.Zontainer
+import org.apache.commons.lang3.reflect.FieldUtils
+
+import java.io.ObjectOutputStream
 
 
 object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytose", "flehm", "flehmen", "sniff", "nasalize") {
@@ -29,8 +32,8 @@ object smelling extends Action(1, "smell", "inhale", "snort", "vape", "endocytos
 
 object FarmHouse extends Room {
 
-  name = s"$farm Farmhouse"
-  description = s"$farm is where the magic happens. That place is outside of this place."
+  val name = s"$farm Farmhouse"
+  val description = s"$farm is where the magic happens. That place is outside of this place."
 
   report(going, south, here) Say "Closing the door behind you, you emerge into the sunlight"
 
@@ -40,8 +43,8 @@ object FarmHouse extends Room {
   val hat = ~"Hat"
 
   val butt = new Box {
-    name = "butt"
-    description = "debris expeller"
+    val name = "butt"
+    val description = "debris expeller"
     report(putting, this.asSecondNoun) Say s"the butt eases open to accept $noun"
     this has scent("peaches. no cream")
     this has flavor("strangely flavorful")
@@ -65,8 +68,8 @@ object FarmHouse extends Room {
 
   val drawer = new Box {
     val pencil = ~"graphite imprisoned with carved wood." worth 100
-    name = "drawer"
-    description = "debris collector"
+    val name = "drawer"
+    val description = "debris collector"
 
     Understand(pencil, "prisoner"){
       pencil.parentContainer == this
@@ -81,7 +84,7 @@ object FarmHouse extends Room {
   }
 
   object tv extends Device {
-    name = "tv"
+    val name = "tv"
     aliases.addOne("television").addOne("TV")
     offDesc = "The tv lies dormant, ready to be turned on."
     onDesc = "Light dances across the dome of the CRT."
@@ -99,7 +102,7 @@ object FarmHouse extends Room {
   val houseLucre = Lucre(100)
 
   object coffee_machine extends Device with Container {
-    name = "coffee maker"
+    val name = "coffee maker"
     aliases.addOne("unholy espresso machine").addOne("coffee monster").addOne("cm").addOne("coffee machine")
 
     var tamped = false
@@ -181,7 +184,7 @@ object Vegetable {
   }
 }
 
-class Vegetable(using c : Container) extends Thing {
+abstract class Vegetable(using c : Container) extends Thing {
   var wilted = false
   var watered = false
   var ripe = false
@@ -194,7 +197,7 @@ object Animal{
   }
 }
 
-class Animal(using c : Container) extends Thing {
+abstract class Animal(using c : Container) extends Thing {
   var petted = false
 
 }
@@ -205,42 +208,48 @@ class Animal(using c : Container) extends Thing {
 class Lucre(amount : Int)(using c : Container) extends Pieces(amount) {
 
   unitName = "splinter"
-  name = "Lucre"
-  description = "Coarse golden splinters. They sting the hand. It's almost as if the baleful shards despise possession."
+  override val name = "Lucre"
+  override val description = "Coarse golden splinters. They sting the hand. It's almost as if the baleful shards despise possession."
   aliases.addOne("splinters")
 
 }
 
 
+enum LiquidType {
+  case water, lava, snot, lube
+}
+
+trait LiquidHolder {
+  var liquidAmount : Int
+  var liquidType : LiquidType
+}
+
 object Porch extends Room {
+
 
   Connect(north, FarmHouse)
 
-  name = "Porch"
-  description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west. There's a pond btw"
+  val name = "Porch"
+  val description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west. There's a pond btw"
+  val parsnip = ~"A single perfect parsnip, ripe and ready just for you" worth 30
 
-  val crops = ~"You have lovely little fwends growing in neat stupid fucking rows divided by pointless cobblestones." aka "plants" amount some
+  val maw = new Box {
 
-  val parsnip= ~"A single perfect parsnip, ripe and ready just for you" worth 30
-
-  // val otherLucre = new Lucre(69)
-
-  object maw extends Thing with Container {
-
-    description = s"this hungry thing is the opposite of a treasure chest. Maybe try putting something inside?"
-    name = "The Maw"
+    val description = s"this hungry thing is the opposite of a treasure chest. Maybe try putting something inside?"
+    val name = "The Maw"
     aliases.addOne("maw")
-    maw.proper = true
-    maw.transparent = false
+    proper = true
+    transparent = false
     open = false
     this is fixed
 
-    val pouch = new Box(true)
+    val pouch = new Box(true){
+      val name = "pouch"
+      val description = s"this ${if contents.nonEmpty then "engorged" else "flaccid"} sac contains the fruit of your labors"
+      this aka "sac"
+    }
 
-    pouch.name = "pouch"
-    pouch.description =s"this ${ if pouch.contents.nonEmpty then "engorged" else "flaccid"} sac contains the fruit of your labors"
     pouch composes this
-    pouch aka "sac"
 
 
     instead(putting, pouch.asSecondNoun) Say "The maw appreciates your generosity, but this is a one sided relationship."
@@ -269,7 +278,7 @@ object Porch extends Room {
         if(lucreWaiting <= 100){
           Say(s"A pittance of $lucreWaiting Lucre jingles for you from within a protective pouch.")
         }
-        else if (lucreWaiting <= 10000) {
+        else if (lucreWaiting <= 1000) {
           Say(s"A pile of $lucreWaiting Lucre bulges from within a protective pouch.")
         }
         else {
@@ -280,7 +289,7 @@ object Porch extends Room {
 
 
     after(World.EndingDay){
-      if(currentLocation == Porch || currentLocation == FarmHouse) {
+      if(currentLocation == this || currentLocation == FarmHouse) {
         if(this.contents.nonEmpty){
           Say("Your rest is punctuated by The Maw's dutiful munching.")
         }
@@ -292,36 +301,32 @@ object Porch extends Room {
       new Lucre(totalLucre)(using pouch)
       this.open = false
     }
-
-
-
-
   }
 
   report(taking, parsnip) {
     Say("Pop! You gently but firmly yank the parsnip, extricating it from its bed.")
+    if(!maw.open) Say("The Maw eyes your parsnips.")
+    else Say("Sticky strands of drool drip from the toothy maw.")
   }
 
-  val parsnips = new Vegetable named "baby parsnips" desc "These parsnips are young and unprepared to leave their homes." amount plural aka "parsnips"
-
-  val seedlings = new Vegetable named "seedlings" desc "There guys look dry and sad" aka "babies" aka "seedling" // ripe= false watered = false
-
-  instead(taking, crops :: parsnips :: seedlings :: Nil) Say s"You have failed. $noun remains where it is."
 
   object watering_can extends Thing {
-    var waterAmount = 0
+    var liquidAmount = 0
+    var liquidType = LiquidType.water
+    val name = "watering can"
+    val description = "you never felt like upgrading your copper watering can. it is jealous of the other tools."
 
-    after(examining, watering_can) {
-      if (watering_can.waterAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed " +
+    after(examining, this) {
+      if (liquidAmount == 0) Say(Randomly("It's bone dry", "it's spent", "A miniature tumbleweed " +
         "flops across the basin of the watering can"))
-      if (watering_can.waterAmount == 1) Say("a paucity of water glints in the pail")
-      if (watering_can.waterAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
-      if (watering_can.waterAmount == 3) Say("a mysterious liquid obscures the bottom")
-      if (watering_can.waterAmount == 4) Say("the can brims with life giving manna")
-      if (watering_can.waterAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
+      if (liquidAmount == 1) Say("a paucity of water glints in the pail")
+      if (liquidAmount == 2) Say("a hollow hymn rings as the can sloshes weakly")
+      if (liquidAmount == 3) Say("a mysterious liquid obscures the bottom")
+      if (liquidAmount == 4) Say("the can brims with life giving manna")
+      if (liquidAmount == 5) Say("the weight of potential is literally quite substantial, your frail arms have atrophied from over-reliance on iridium irrigation technology")
     }
 
-    this named "watering can" aka "can" aka "water can" aka "pail" aka "bucket" desc "you never felt like upgrading your copper watering can. it is jealous of the other tools."
+    this aka "can" aka "water can" aka "pail" aka "bucket"
   }
 
 
@@ -329,7 +334,7 @@ object Porch extends Room {
 
     inflict(filling, watering_can) {
       Say("You submerge the watering can in the pond, filling it with potential")
-      watering_can.waterAmount = 5
+      watering_can.liquidAmount = 5
     }
   }
 
@@ -339,8 +344,8 @@ object Porch extends Room {
   instead(emptying, player lacks watering_can) Say Randomly("You practice a watering can emptying motion so you don't get out of practice.", "You may not have a can, but you can still have emptiness")
 
   inflict(emptying, watering_can) {
-    if (watering_can.waterAmount > 0) {
-      watering_can.waterAmount = 0
+    if (watering_can.liquidAmount > 0) {
+      watering_can.liquidAmount = 0
       Say(Randomly("It's raining!_! T_T", "You have an empty can now. Now you can fill it again.", "The water spills over the soil, forever lost to you like the innocence of youth"))
     }
     else {
@@ -354,9 +359,9 @@ object Porch extends Room {
 
     inflict(watering, of[Vegetable]) {
       val v = noun[Vegetable]
-      if watering_can.waterAmount > 0 then
+      if watering_can.liquidAmount > 0 then
         v.watered = true
-        watering_can.waterAmount = watering_can.waterAmount - 1
+        watering_can.liquidAmount = watering_can.liquidAmount - 1
       else
         Say(Randomly(s"You tilt the watering can expectantly over $noun, but the dry vessel provides no succor", s"Your watering can is empty. You drool on the $noun a little just in case it helps", s"You have no water, but you hope the sweat from your brow provided moisture to $noun."))
         stop
@@ -369,9 +374,7 @@ object Porch extends Room {
 
 
 
-  instead(taking, crops) {
-    Say("They are just babies! Don't be a cradle robber. Wait until they're old enough to eat at least.")
-  }
+
 
   report(going, west, here) {
     Say("You duck into the hatch, because doors are for losers. The chickens like it when you do things their way.")
@@ -389,8 +392,8 @@ object Porch extends Room {
 
 object Path extends Room {
 
-  name = "Path to Town"
-  description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
+  val name = "Path to Town"
+  val description = s"You are on the slow journey, at walking pace, from $farm to The Greater SDV Area"
   val three_wiggly_things_in_the_ground = ~"There are some creepy little periscopes. They dance and wriggle, begging you for a tamping. If only you still had your hoe." aka "strings" aka "three" aka "fingers" aka "eels" aka "wiggly things"
 
   report(going, west, here) {
@@ -405,26 +408,19 @@ object Path extends Room {
 }
 
 object ChickenCoop extends Room {
-  name = "Coop"
-  description = "You are in a little wooden coop. It smells nice. So many fluffy feathery chicken friends surround you."
+  val name = "Coop"
+  val description = "You are in a little wooden coop. It smells nice. So many fluffy feathery chicken friends surround you."
 
 
   val mayo_machine = new Box {
    //   val void_mayo = ~"void mayo."
-    name = "mayo machine"
-    description = "a mayo machine beyond your wildest dreams"
+    val name = "mayo machine"
+    val description = "a mayo machine beyond your wildest dreams"
   //  Understand(void_mayo) {
   //    void_mayo.parentContainer == this
   //  }
   } aka "mm" aka "machine" is fixed
   val void_mayo = ~"Fresh void mayo. It contains universes within, in a convenient colloidal suspension. It's black, with red glistening spots. It's beautiful." aka "mayo" aka "mayonnaise"
-  object dix extends Thing{
-    name = "dix"
-    aliases.addOne("dixxx")//aka "dixxx"
-    description = "just dix"
-    properties.addOne(scenery).addOne(fixed)
-  }
-  //  Understand(void_mayo) { void_mayo.parentContainer == mayo_machine }
   void_mayo transferTo mayo_machine //omg it took me way too long to notice that this is how you do it
 
   before(taking, void_mayo) {
@@ -463,7 +459,11 @@ object ChickenCoop extends Room {
       Say(mayo_machine.description)
     }
   }
-  val chickens = new Animal named "chickens" desc "There are some cute lil chickens waiting for your love." aka "chicken" aka "chicks" aka "fluffballs" aka "cuties" amount some
+  val chickens = new Animal{
+    val name = "chickens"
+    override val description = "There are some cute lil chickens waiting for your love."
+    this aka "chicken" aka "chicks" aka "fluffballs" aka "cuties" amount some
+  }
 
   report(taking, chickens) {
     Say("You scoop up every chicken and shove them in your trousers. They purr contentedly, sending vibrations through your body")

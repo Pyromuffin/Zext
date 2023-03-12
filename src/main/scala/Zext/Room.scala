@@ -11,8 +11,9 @@ import scala.collection.mutable
 enum Direction extends ZextObject {
   case north, east, south, west
 
+  override val name: String = ""
+  override val description: StringExpression = ""
   proper = true
-  global = true
 }
 
 
@@ -20,6 +21,7 @@ enum Direction extends ZextObject {
 
 object Direction{
 
+  /*
   north.name = "north"
   north.aliases += "n"
   south.name = "south"
@@ -28,6 +30,7 @@ object Direction{
   east.aliases += "e"
   west.name = "west"
   west.aliases += "w"
+  */
 
   def opposing(direction: Direction) = {
     var ret : Direction = north
@@ -41,13 +44,13 @@ object Direction{
 }
 
 
-class Room extends ZextObject with Container {
+abstract class Room extends ZextObject with Container {
+
+  World.currentWorld.rooms.append(this)
 
   val here = this
-
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
-
   def asDestination = Condition.fromObject(this)
 
   def OnEnter(): Unit = {
@@ -60,5 +63,3 @@ class Room extends ZextObject with Container {
   }
 
 }
-
-class Crevice extends Room

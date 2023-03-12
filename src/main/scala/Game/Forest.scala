@@ -14,9 +14,9 @@ import Zext.Rule.*
 
 object Forest extends Room {
 
- name = "secret woods"
+ val name = "secret woods"
 
- description = "A splash of birds paint cotton-ball clouds into the sky. Seams of bark and branch are splayed with jigsaw leaf shadows. A verdant and inviting musk wafts from a clearing in the trees to the north." +
+ val description = "A splash of birds paint cotton-ball clouds into the sky. Seams of bark and branch are splayed with jigsaw leaf shadows. A verdant and inviting musk wafts from a clearing in the trees to the north." +
  "You are dozing on a soft tuft of grass."
 
  val birds = ~"Chirps punctuate the rustling of branches in the breeze" are scenery
@@ -34,8 +34,8 @@ object Forest extends Room {
 }
 
 object Clearing extends Room {
- name = "clearing"
- description = "Shrubs dot the perimeter of this modestly exposed gap in the overgrowth."
+ val name = "clearing"
+ val description = "Shrubs dot the perimeter of this modestly exposed gap in the overgrowth."
 
 
 }

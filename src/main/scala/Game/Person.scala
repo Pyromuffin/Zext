@@ -76,7 +76,7 @@ object talkingAbout extends Action(2, "talk about") {
   */
 
   //instead( talking about bullshit subject)
-  report(talkingAbout, of[Subject], ofSecond[Person])   Say(Randomly(s"You broach the subject of $noun with $secondNoun, but they have nothing interesting to say.", s"They appear to ignore you, but you can see $secondNoun deeply thinking about $noun", s"They don't talk about $noun 'round these parts no more", s"$secondNoun will never speak of $noun again. Not since then.", s"$secondNoun can't believe you brought up $noun, are you out of your goddamn mind????????"))
+  // report(talkingAbout, of[Subject], ofSecond[Person])   Say(Randomly(s"You broach the subject of $noun with $secondNoun, but they have nothing interesting to say.", s"They appear to ignore you, but you can see $secondNoun deeply thinking about $noun", s"They don't talk about $noun 'round these parts no more", s"$secondNoun will never speak of $noun again. Not since then.", s"$secondNoun can't believe you brought up $noun, are you out of your goddamn mind????????"))
   //Say s"You broach the subject of $noun with $secondNoun, but they have nothing interesting to say."
 
 //  inflict(talkingAbout, reflexively.asSecondNoun) {
@@ -86,9 +86,9 @@ object talkingAbout extends Action(2, "talk about") {
 }
 
 
+/*
 case class Subject(names : String*) extends ZextObject {
-  global = true
-  name = names(0)
+  val name = names(0)
   aliases.addAll(names.slice(1, names.length))
 }
 
@@ -96,10 +96,10 @@ object Subject {
   val weather = Subject("weather", "the weather", "rain", "snow", "heat", "heatwave", "wind", "cold")
   val friendship = Subject("me", "us", "friendship", "you", "relationship")
 }
+*/
 
 
-
-class Person(using Container) extends Thing with Container {
+abstract class Person(using Container) extends Thing with Container {
 
   var affection : Int = 0
   var giftGivenToday = false //should we just literally copy paste their gift reception strings for random objects? i think it would be funny to have something in the game that does that.
@@ -120,7 +120,8 @@ class Person(using Container) extends Thing with Container {
 
 
 object PersonHolder extends Room {
-  name = "Prison" // needs a name or ambiguity will occur with things named ""
+  val name = "Prison" // needs a name or ambiguity will occur with things named ""
+  val description = "hell"
   // i guess we can't construct people without having a room for them to start in.
 
 
@@ -166,8 +167,8 @@ object PersonHolder extends Room {
 
   object MayorLewis extends Person {
     transferTo(Town)
-    name = "Mayor Lewis"
-    description = "Somewhere between dapper and disheveled, Lewis is the mayor of Pelican Town. Seemingly always busy, but never doing anything, mayoral duties are mysterious indeed. " +
+    val name = "Mayor Lewis"
+    val description = "Somewhere between dapper and disheveled, Lewis is the mayor of Pelican Town. Seemingly always busy, but never doing anything, mayoral duties are mysterious indeed. " +
       "Mayor Lewis has too many things to do, and too much time to do them. Regardless of his responsibilities (or lack thereof), he always has a moment to spare for you."
 
 
@@ -188,8 +189,8 @@ object PersonHolder extends Room {
 
   object Linus extends Person {
     transferTo(Path)
-    name = "Linus"
-    description = "Without Linus, Stardew Valley Greater Metropolitan Area would be NOTHING " +
+    val name = "Linus"
+    val description = "Without Linus, Stardew Valley Greater Metropolitan Area would be NOTHING " +
       "Supposedly, Linus is usually alone. But you've never see him alone, not with you here"
 
 

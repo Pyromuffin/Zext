@@ -243,7 +243,7 @@ object Condition{
     def prop[T](using tt : TypeTest[Property, T]) : Condition = new Condition(noun.properties.exists(canBecome[Property,T]), QueryPrecedence.Property)
 
     implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, QueryPrecedence.Generic)
-    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z == noun, QueryPrecedence.Object)
+    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
     implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
     implicit def fromLocation(r : => Room) : Condition = new Condition(r == currentLocation, QueryPrecedence.Location)
