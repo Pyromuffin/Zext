@@ -104,9 +104,10 @@ case class ZextObjectSerializationProxy(index : Int){
 @SerialVersionUID(100L)
 abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable {
 
+    val dynamic = false
+
     var objectID = allObjects.length
     allObjects.addOne(this)
-
 
     var definiteArticle: String = "the"
     var indefiniteArticle: String = "a"
@@ -204,19 +205,8 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             val modifiers = f.getModifiers
             val isNotFinal = (modifiers & Modifier.FINAL) == 0
             if (isNotFinal) {
-                println(s"serializing object $this field $f")
                 f.setAccessible(true)
-
-                /*
-                if(f.getType.isAssignableFrom(classOf[ZextObject])){
-                    println(s"serializing zextobject field ${f}")
-                    val z = f.get(this).asInstanceOf[ZextObject]
-                    oos.writeObject(z.objectID)
-                }
-                else {
-                    */
-                    oos.writeObject(f.get(this))
-                //}
+                oos.writeObject(f.get(this))
             }
         }
     }
@@ -231,52 +221,31 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             if (isNotFinal) {
                 f.setAccessible(true)
                 val obj = ois.readObject()
-
-                /*
-                if (f.getType.isAssignableFrom(classOf[ZextObject])) {
-                    println(s"deserializing zextobject field ${f}")
-                    val objectID = ois.readObject().asInstanceOf[Int]
-                    val z = ZextObject.allObjects(objectID)
-                    f.set(this, z)
-                }
-                else {
-                    */
-                    println(s"deserializing object $this field $f, value $obj")
-                    f.set(this, obj)
-                //}
-
-
+                f.set(this, obj)
             }
         }
     }
 
-    /*
-    def writeObject (oos : java.io.ObjectOutputStream) : Unit = {
-        oos.writeObject(objectID)
-    }
-
-    def readObject(ois: java.io.ObjectInputStream): Unit = {
-        val index = ois.readObject().asInstanceOf[Int]
-
-    }
-    */
-
-
     def writeReplace() : java.lang.Object = {
-        ZextObjectSerializationProxy(objectID)
+
+        if(!dynamic){
+            ZextObjectSerializationProxy(objectID)
+        }
+        else {
+            this
+        }
     }
-
-
-
 }
-
-
 
 object Thing {
     extension(d: StringExpression)  {
         inline def unary_~(using c : Container) : Thing = {
-            SimpleThing(Macros.variableName, d)
+            SimpleThing(FixName(Macros.variableName), d)
         }
+    }
+
+    def FixName(s: String): String = {
+        s.replace('_', ' ')
     }
 
     enum NounAmount {
@@ -294,9 +263,6 @@ abstract class Thing(using c : Container) extends ZextObject{
     parentContainer = c
     c.contents += this
 
-    def FixName(s : String): String  ={
-        s.replace('_', ' ')
-    }
 
     /*
     def SetName(s : String): Unit = {

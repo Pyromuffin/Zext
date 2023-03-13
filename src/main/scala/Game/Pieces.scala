@@ -62,8 +62,9 @@ object Pieces {
 
 abstract class Pieces(var quantity : Int)(using c : Container) extends Thing with Cloneable {
 
-  amount(some)
+  override val dynamic = true
 
+  amount(some)
   var unitName = "piece"
 
   def split(amount : Int, destination: Container) : Unit = {

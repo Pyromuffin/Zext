@@ -323,12 +323,13 @@ object Actions {
   object loading extends Action(0, "load") {
     inflict(loading) {
       Saving.LoadWorld()
+      LineBreak()
+      execute(examining, reflexively)
     }
   }
 
 
   object debugging extends Action(0, "debug") {
-
     report(debugging) Say FindVisibleSet().toString()
   }
 
