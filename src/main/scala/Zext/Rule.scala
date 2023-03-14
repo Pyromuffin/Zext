@@ -169,18 +169,6 @@ object Rule {
      def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
         val set = ruleSets(rule)
 
-        /*
-        if( !target.forall( _.isVisible(currentLocation))) {
-            Say(s"You can't see ${target.get.definite}")
-            return false
-        }
-
-        if( !target2.forall( _.isVisible(currentLocation))) {
-            Say(s"You can't see ${target2.get.definite}")
-            return false
-        }
-        */
-
         def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule], all : Boolean = false) : Boolean = {
 
             if(target.isDefined) SetNoun(target.get)
@@ -337,6 +325,7 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     allActions.addOne(this)
 
+    var implicitTargetSelector : ZextObject => Boolean = null
     var disambiguationHint : ZextObject => Boolean = null
 
     /*

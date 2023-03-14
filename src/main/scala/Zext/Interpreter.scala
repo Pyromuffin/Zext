@@ -365,7 +365,7 @@ object Parser extends RegexParsers{
     val allParser =  allParsers.reduce( _ ||| _ )
     val space = "\\s+".r
     val anySpace = "\\s*".r
-    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "from", "about")
+    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "from", "about", "with")
     val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
 
     val command = anySpace ~> allParser ~ opt(space ~> allParser) ~ (opt(space ~> prepositionParser) ~> opt(space ~> allParser)) ^^ { (a) =>
@@ -377,7 +377,6 @@ object Parser extends RegexParsers{
 
     command
   }
-
 
   def Disambiguate(parsables : Seq[ParsableType], hint : ZextObject => Boolean) : ParsableType = {
 
@@ -432,6 +431,69 @@ object Parser extends RegexParsers{
     parsables(choiceIndex - 1)
   }
 
+
+  def BuildZeroTargetCommand(action: Action) : Option[Command] = {
+    Some(Command(action, None, None))
+  }
+
+
+  def BuildOneTargetCommand(action: Action, firsts : Option[Seq[ParsableType]]) : Option[Command] = {
+
+    if(firsts.isEmpty && action.implicitTargetSelector != null){
+      val visibleSet = FindVisibleSet()
+      val candidates = visibleSet.filter(action.implicitTargetSelector)
+      if(candidates.nonEmpty){
+        val first = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+        return Some(Command(action, Some(first), None))
+      } else {
+        Say(s"${action.verbs(0)} with what?")
+        // no implicit candidates
+        return None
+      }
+    } else if (firsts.isEmpty){
+      Say(s"${action.verbs(0)} with what?")
+      // no first noun and no implicit selector
+      return None
+    }
+
+
+    val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    Some(Command(action, Some(first), None))
+  }
+
+
+  def BuildTwoTargetCommand(action: Action, firsts : Option[Seq[ParsableType]], seconds : Option[Seq[ParsableType]]) : Option[Command] =  {
+    if(firsts.isEmpty)
+      return None
+
+    val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    // for tests against noun in the target selector hint
+    SetNoun(first)
+
+    if(seconds.isEmpty && action.implicitTargetSelector != null){
+      val visibleSet = FindVisibleSet()
+      val candidates = visibleSet.filter(action.implicitTargetSelector)
+      if(candidates.nonEmpty){
+        val second = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+        return Some(Command(action, Some(first), Some(second)))
+      } else {
+        // no implicit candidates
+        Say(s"${action.verbs(0)} with what?")
+        return None
+      }
+    } else if( seconds.isEmpty){
+      // no second target and no implicit selector
+      Say(s"${action.verbs(0)} with what?")
+      return  None
+    }
+
+    val second = Disambiguate(seconds.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    Some(Command(action, Some(first), Some(second)))
+  }
+
+
+
+
   def BuildCommand(input : String, parser : CommandParserType) : Option[Command]=  {
 
     if(commandAliases.contains(input)){
@@ -445,48 +507,18 @@ object Parser extends RegexParsers{
     }
 
     val triple = result.get
-    var targets = 0
-    if(triple._2.isDefined) targets += 1
-    if(triple._3.isDefined) targets += 1
-
     val zeroth = Disambiguate(triple._1, null)
-
     if(zeroth.part != PartOfSpeech.verb)
       return None
 
     val action = zeroth.asInstanceOf[Action]
-    if(action.targets != targets)
-      return None
 
-    // this kinda sucks
-    if(triple._2.isDefined && triple._3.isDefined) {
-
-      val first = Disambiguate(triple._2.get, action.disambiguationHint)
-      val second = Disambiguate(triple._3.get, action.disambiguationHint)
-
-      if(first.part == PartOfSpeech.verb || second.part == PartOfSpeech.verb)
-        return None
-
-
-      Some(Command(action, Some(first.asInstanceOf[ZextObject]), Some(second.asInstanceOf[ZextObject])))
+    action.targets match {
+      case 0 => BuildZeroTargetCommand(action)
+      case 1 => BuildOneTargetCommand(action, triple._2)
+      case 2 => BuildTwoTargetCommand(action, triple._2, triple._3)
+      case _ => None
     }
-    else if(triple._2.isDefined) {
-      val first = Disambiguate(triple._2.get, action.disambiguationHint)
-
-      if (first.part == PartOfSpeech.verb)
-        return None
-
-      Some(Command(action, Some(first.asInstanceOf[ZextObject]), None))
-    }
-    else {
-
-      Some(Command(action, None, None))
-    }
-  }
-
-
-  object potato extends Serializable {
-    var dirt = 5
   }
 
 

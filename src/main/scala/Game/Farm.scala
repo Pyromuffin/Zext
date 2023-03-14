@@ -71,6 +71,8 @@ object FarmHouse extends Room {
     val name = "drawer"
     val description = "debris collector"
 
+    val lucre = new Lucre(100)
+
     Understand(pencil, "prisoner"){
       pencil.parentContainer == this
     }
@@ -78,6 +80,8 @@ object FarmHouse extends Room {
     pencil has flavor(Randomly("wood. Delicious, delicious wood", "a beaver delicacy", "sitting at your desk in kindergarten", "deep thoughts", "eraser flakes"))
     pencil has scent(Randomly( "You fill your nostrils with pencil. It hurts but also smells like wood.", "Cedar, like you expected. But also, the enchanting smell of sandalwood, lingering from the desk drawer.", "You poked your sinuses with a pencil. Smells like pain."))
 
+
+    report(taking, lucre, this had lucre) Say "This might come in handy."
     report(taking, pencil, this had pencil) Say "The prisoner is free of their shackles"
     instead(putting, pencil, this.asSecondNoun) Say "the pencil squeals \"No! I will never go back!\""
     report(putting, this.asSecondNoun) Say s"the drawer eases open to accept $noun"
@@ -98,8 +102,6 @@ object FarmHouse extends Room {
 
   val bed = ~"The place where the real magic happens. Soft sheets, the smell of you, safety. Make sure you're here by 2 am or who *knows* what might happen to you." is fixed aka "love nest" aka "pile of sheets"
   val door = ~"This is a thing you really wish you could open and close, but you can't"
-
-  val houseLucre = Lucre(100)
 
   object coffee_machine extends Device with Container {
     val name = "coffee maker"
@@ -139,7 +141,7 @@ object FarmHouse extends Room {
     }
 
     inflict(tamping) {
-      Say(s"$noun doesn't give a heck. It's tamp-er proof.")
+      Say(s"$noun $be tamper-proof.")
     }
 
     instead(taking, coffee_machine) Say "Wow that's a lot heavier than it should be. Oh, right, you glued it down after that special night with the Wizard. With a grunt, you narrowly avoid dropping it on your foot as you put it back down."
@@ -221,7 +223,11 @@ enum LiquidType {
 
 trait LiquidHolder {
   var liquidAmount : Int
+  val liquidCapacity : Int
   var liquidType : LiquidType
+
+  def remainingCapacity = if unlimited then 0 else liquidCapacity - liquidAmount
+  def unlimited = liquidAmount == -1
 }
 
 object Porch extends Room {
@@ -232,6 +238,17 @@ object Porch extends Room {
   val name = "Porch"
   val description = s"Ah, yes, the great outdoors. $farm lies before you. You feel the wood planks beneath your feet. Your chicken coop lies to the west. There's a pond btw"
   val parsnip = ~"A single perfect parsnip, ripe and ready just for you" worth 30
+
+  val pond = new Thing with LiquidHolder{
+    var liquidAmount = -1
+    val liquidCapacity = -1
+    var liquidType = LiquidType.water
+    val name = "pond"
+    val description = "A heavily modified Joja Cola dispenser. This is a fresh source of liquid for all your farming needs."
+    this is scenery
+    this is fixed
+  }
+
 
   val maw = new Box {
 
@@ -310,8 +327,18 @@ object Porch extends Room {
   }
 
 
-  object watering_can extends Thing {
+  val teacup = new Thing with LiquidHolder{
     var liquidAmount = 0
+    val liquidCapacity = 1
+    var liquidType = LiquidType.water
+    val name = "teacup"
+    val description = "Short and stout."
+  }
+
+
+  object watering_can extends Thing with LiquidHolder {
+    var liquidAmount = 0
+    val liquidCapacity = 5
     var liquidType = LiquidType.water
     val name = "watering can"
     val description = "you never felt like upgrading your copper watering can. it is jealous of the other tools."
@@ -330,18 +357,67 @@ object Porch extends Room {
   }
 
 
-  object filling extends Action(1, "fill", "submerge", "refill", "dunk"){
+  object filling extends Action(2, "fill", "submerge", "dunk"){
 
-    inflict(filling, watering_can) {
-      Say("You submerge the watering can in the pond, filling it with potential")
-      watering_can.liquidAmount = 5
+    implicitTargetSelector = z => z != noun && z.isType[LiquidHolder]
+
+    // instead(filling, player lacks noun) Say s"You might want to pick up $noun first"
+
+    inflict(filling, of[LiquidHolder], ofSecond[LiquidHolder]) {
+      val first = noun[LiquidHolder]
+      val second = secondNoun[LiquidHolder]
+
+      if(first == second){
+        Say(s"Nice try, $noun is already full of itself.")
+        stop
+      }
+
+      if(first.remainingCapacity == 0){
+        Say(s"$noun is already full.")
+        stop
+      }
+
+      if(second.liquidAmount == 0){
+        Say(s"You try to fill $noun from $secondNoun, but $secondNoun is empty.")
+        stop
+      }
+
+      val fillAmount = if second.unlimited then first.remainingCapacity else math.min(first.remainingCapacity, second.liquidAmount)
+      first.liquidAmount += fillAmount
+
+      if(!second.unlimited){
+        second.liquidAmount -= fillAmount
+      }
     }
+
+    report(filling, of[LiquidHolder], ofSecond[LiquidHolder]) Say s"You fill $noun with $secondNoun"
+
   }
 
 
-  object emptying extends Action(1, "empty", "dump", "drain", "spill")
+  object emptying extends Action(1, "empty", "dump", "drain", "spill"){
 
-  instead(emptying, player lacks watering_can) Say Randomly("You practice a watering can emptying motion so you don't get out of practice.", "You may not have a can, but you can still have emptiness")
+
+    check(emptying, of[LiquidHolder]){
+      val lh = noun[LiquidHolder]
+      if(lh.unlimited){
+        Say(s"$noun appears to be bottomless.")
+        stop
+      }
+      if(lh.liquidAmount == 0){
+        Say(s"$noun is already empty")
+        stop
+      }
+    }
+
+    inflict(emptying, of[LiquidHolder]){
+      noun[LiquidHolder].liquidAmount = 0
+    }
+
+    report(emptying, of[LiquidHolder]) Say s"You spill the contents of $noun everywhere"
+  }
+
+  //instead(emptying, player lacks watering_can) Say Randomly("You practice a watering can emptying motion so you don't get out of practice.", "You may not have a can, but you can still have emptiness")
 
   inflict(emptying, watering_can) {
     if (watering_can.liquidAmount > 0) {
@@ -355,6 +431,7 @@ object Porch extends Room {
    }
 
     object watering extends Action(1, "water", "spray", "hydrate", "douse", "irrigate"){
+
     instead(watering, player lacks watering_can) Say Randomly("You try but your tank is empty.", "Stage fright strikes again!", "Performance anxiety overcomes you when you look at the person on the other side of the screen")
 
     inflict(watering, of[Vegetable]) {
@@ -426,7 +503,6 @@ object ChickenCoop extends Room {
   before(taking, void_mayo) {
     if (void_mayo.parentContainer == player) {
       Say("You fondle the void mayo in your pocket")
-      false  //what does this even do in before??
     }
     else if (void_mayo.parentContainer == mayo_machine) {
       Say(Randomly("You reverently take the fresh void mayo out of the machine. It contains universes within, in a convenient colloidal suspension", "You lovingly extricate the void mayo from its berth."))
@@ -441,7 +517,7 @@ object ChickenCoop extends Room {
 
 
   instead(examining, mayo_machine) {
-    if (mayo_machine.open == false) {
+    if (!mayo_machine.open) {
       Say("You look hopefully at the mayo machine. You left some void egg in there last night.")
       true
     }
