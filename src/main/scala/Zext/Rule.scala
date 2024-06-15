@@ -76,13 +76,13 @@ object Rule {
 
     // ultra terse syntax
     class InsteadConsequence(r: Action, conditions: Condition*) {
-        def Say(s: StringExpression): ActionRule = {
+        infix def Say(s: StringExpression): ActionRule = {
             instead(r, conditions *)(Interpreter.Say(s))
         }
     }
 
     class ReportConsequence(r: Action, conditions: Condition*) {
-        def Say(s: StringExpression): ActionRule = {
+        infix def Say(s: StringExpression): ActionRule = {
             report(r, conditions *)(Interpreter.Say(s))
         }
     }

@@ -1,6 +1,5 @@
 package Zext
 
-import scala.annotation.experimental
 import scala.quoted.*
 
 
@@ -37,7 +36,6 @@ object Macros{
     ${ packageToucherImpl('something) }
   }
 
-  @experimental
   def packageToucherImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[List[Any]] = {
     import quotes.reflect.*
     // assume something is a top level object
@@ -119,7 +117,6 @@ object Macros{
     ${GetPackageObjectImpl('something)}
   }
 
-  @experimental
   def GetPackageObjectImpl[T](something : Expr[T])(using Quotes, Type[T]): Expr[Any] = {
     import quotes.reflect.*
     val _type = TypeRepr.of[T].typeSymbol

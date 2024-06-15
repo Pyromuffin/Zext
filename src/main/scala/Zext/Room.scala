@@ -10,8 +10,9 @@ import scala.collection.mutable
 
 enum Direction extends ZextObject {
   case north, east, south, west
+  val names = Array("north", "east", "south", "west")
 
-  override val name: String = ""
+  override val name: String = names(ordinal)
   override val description: StringExpression = ""
   proper = true
 }
@@ -21,16 +22,12 @@ enum Direction extends ZextObject {
 
 object Direction{
 
-  /*
-  north.name = "north"
   north.aliases += "n"
-  south.name = "south"
   south.aliases += "s"
-  east.name = "east"
   east.aliases += "e"
-  west.name = "west"
   west.aliases += "w"
-  */
+
+  World.currentWorld.globals.addAll(Seq(north, east, south, west))
 
   def opposing(direction: Direction) = {
     var ret : Direction = north

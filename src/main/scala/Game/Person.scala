@@ -162,7 +162,6 @@ object PersonHolder extends Room {
 
     val num = util.Random.nextInt(phrasematch.length)
     Say(s"$num "+phrasematch(num))
-    true
   }
 
   object MayorLewis extends Person {

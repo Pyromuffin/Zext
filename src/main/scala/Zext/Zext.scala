@@ -41,7 +41,7 @@ object exports{
     export Inflector.*
     export Zext.Thing.*
     export Zext.Thing.NounAmount.*
-    export Device.*
+    export Zext.Device.*
 }
 
 
@@ -76,10 +76,10 @@ trait Container {
        ListNamesNicely(contents.toSeq)
     }
 
-    def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
-    def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
-    def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
-    def lacked(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment, true)
+    infix def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
+    infix def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
+    infix def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
+    infix def lacked(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment, true)
 }
 
 
@@ -126,7 +126,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var compositeObject: ZextObject = null
 
 
-    def transferTo(container: Container): Unit = {
+    infix def transferTo(container: Container): Unit = {
         parentContainer.contents.remove(parentContainer.contents.indexOf(this))
         parentContainer = container
         container.contents.addOne(this)
@@ -190,7 +190,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
     }
 
-    def composes(zextObject: ZextObject): this.type = {
+    infix def composes(zextObject: ZextObject): this.type = {
         this transferTo nowhere
         compositeObject = zextObject
         zextObject.parts.addOne(this)
@@ -283,12 +283,12 @@ abstract class Thing(using c : Container) extends ZextObject{
     }
     */
 
-    def is(prop: Property) : this.type = {
+    infix def is(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def are(prop: Property) : this.type = {
+    infix def are(prop: Property) : this.type = {
         properties += prop
         this
     }
@@ -301,17 +301,17 @@ abstract class Thing(using c : Container) extends ZextObject{
     }
     */
 
-    def has(prop: Property) : this.type = {
+    infix def has(prop: Property) : this.type = {
         properties += prop
         this
     }
 
-    def aka(s : String) : this.type  = {
+    infix def aka(s : String) : this.type  = {
         aliases.addOne(s)
         this
     }
 
-    def amount(nounAmount: NounAmount):  this.type ={
+    infix def amount(nounAmount: NounAmount):  this.type ={
         if nounAmount == NounAmount.plural then pluralized = true
         if (nounAmount == NounAmount.some) {
             pluralized = true
@@ -320,7 +320,7 @@ abstract class Thing(using c : Container) extends ZextObject{
         this
     }
 
-    def worth(value : Int) : this.type = {
+    infix def worth(value : Int) : this.type = {
         valueInLucre = value
         this
     }
