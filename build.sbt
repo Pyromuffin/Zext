@@ -4,7 +4,15 @@ version := "0.1.0"
 scalaVersion := "3.2.2"
 isSnapshot := true
 
-val org = "org.pyromuffin"
+resolvers += "Zobjectifier packages" at "https://maven.pkg.github.com/pyromuffin/zobjectifier"
+
+
+githubTokenSource := TokenSource.Or(
+    TokenSource.Environment("GITHUB_TOKEN"), // Injected during a github workflow for publishing
+    TokenSource.GitConfig("github.token") // local token set in ~/.gitconfig
+)
+
+val org = "com.pyromuffin"
 
 lazy val zext = (project in file("."))
   .settings(
@@ -13,11 +21,15 @@ lazy val zext = (project in file("."))
     version := "0.1.0",
     organization := org,
     autoCompilerPlugins := true,
-    addCompilerPlugin("org.pyromuffin" %% "zobjectifier" % "1.0.4"),
+    addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.0.6"),
 
     libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.3.0",
     libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.14.0",
-  )
+    githubOwner := "pyromuffin",
+    githubRepository := "zext",
+
+
+)
 
 Compile / scalacOptions ++= Seq("-Xplugin-require:Zobjectifier")
 
