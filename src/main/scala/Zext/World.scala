@@ -1,8 +1,5 @@
 package Zext
 
-
-import Game.JunimoGame.*
-
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
 import Zext.Actions.*
@@ -17,54 +14,34 @@ object reflexively extends ZextObject {
   val description = ""
 }
 
-
-
 object nowhere extends Room {
   val name = "nowhere"
   val description = ""
   proper = true
 
-
-  var potatos = 100
-
-  object murdering_can extends Thing {
-    override val name = "murdering can"
-    override val description = "not very nice"
-  }
-
 }
 
 
-class Player extends ZextObject with Container {
+abstract class Player extends ZextObject with Container {
 
-  val name = "player"
   properties += scenery
-
-  // describe clothes?
-  val description = s"You are $farmer, heir of Grandpa, steward of $farm. Your readiness is currently $rigidity." + GetRigidity()
-
   automaticallyListContents = false
   open = false
   transparent = false
-
-  // parentContainer = nowhere
-  // nowhere.contents += this
-
-  var playerName = "Farmer"
 
   def Move(room: Room): Unit = {
     transferTo(room)
   }
 
-  this.aliases.addOne("self").addOne("me").addOne(playerName).addOne(s"$farmer")
+  this.aliases.addOne("self").addOne("me")
 }
 
 class WorldState{
 
   val globals = ArrayBuffer[ZextObject]()
   val rooms = ArrayBuffer[Room]()
-  //var allObjects : ArrayBuffer[ZextObject] = null
-  var player = new Player
+  var player : Player = null
+
   var time = 0
 }
 
@@ -76,6 +53,12 @@ object World  {
   def currentLocation = player.parentContainer.asInstanceOf[Room]
 
 
+  def RevealSecrets(path: String, className : String): Unit = {
+    val c = Class.forName(s"$path.$className")
+    val f = c.getMethod("Reveal")
+    f.invoke(null)
+  }
+
   def TouchPackage(path: String): Unit = {
 
     val cl = ClassLoader.getSystemClassLoader
@@ -85,30 +68,43 @@ object World  {
     val classNames = files.filter(f => f.getName.endsWith("$SecretHolder.class")).map(f => f.getName.stripSuffix(".class"))
 
     classNames.foreach { cn =>
-
-      val c = Class.forName(s"$path.$cn")
-      val f = c.getMethod("Reveal")
-      f.invoke(null)
+      RevealSecrets(path, cn)
     }
   }
 
   object StartingGame extends Action(0) // for hooking.
   object EndingDay extends Action(0)
 
-  def Init(): Unit = {
+  val secretNames = Array(
+  "Actions$SecretHolder",
+  "Inflector$SecretHolder",
+  "Interpreter$SecretHolder",
+  "Macros$SecretHolder",
+  "Person$SecretHolder",
+  "Room$SecretHolder",
+  "Rule$SecretHolder",
+  "Saving$SecretHolder",
+  "World$SecretHolder",
+  "Zext$SecretHolder")
 
-    TouchPackage("Zext")
-    TouchPackage("Game")
 
-    // currentWorld.player.Move(Game.FarmHouse)
-    player.parentContainer = Game.FarmHouse
-    Game.FarmHouse.contents.addOne(player)
+  def Init(gamesPlayer : Player, gamePackageName : String): Unit = {
 
-   // currentWorld.globals.addOne(Game.FarmHouse.butt)
-   // currentWorld.globals.addOne(Game.Porch.parsnip)
+    // i think it will be hard or impossible to switch players, but maybe that's ok.
+    currentWorld.player = gamesPlayer
 
-    //val p = Game.Porch.parsnip.asInstanceOf[Thing]
-    //p.properties.addOne(wet)
+    for(name <- secretNames){
+      RevealSecrets("Zext", name)
+    }
+
+    TouchPackage(gamePackageName)
+
+    val startingRoom = currentWorld.rooms.find(_.isInstanceOf[StartingRoom]).get
+    startingRoom.visited = true
+    gamesPlayer.parentContainer = startingRoom
+    startingRoom.contents.addOne(gamesPlayer)
+
+
 
     ExecuteAction(StartingGame)
 
@@ -140,8 +136,5 @@ object World  {
     else _secondNoun.asInstanceOf[T]
   }
 
-  object is {
-    override def toString: String = noun.be
-  }
 
 }

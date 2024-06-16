@@ -6,12 +6,9 @@ import scala.collection.mutable.ArrayBuffer
 
 object Saving {
 
-
-
   // we want to save the contents of every item in every room.
   // we also want to save the properties on each item.
   // maybe some global variables like turn number, and player location.
-
 
   def SaveWorld() = {
     println(s"saving world")
@@ -25,8 +22,6 @@ object Saving {
     for(obj <- ZextObject.allObjects){
       obj.SerializeMembers(objectOutputStream)
     }
-
-
 
     /*
     for(z <- ZextObject.allObjects) {

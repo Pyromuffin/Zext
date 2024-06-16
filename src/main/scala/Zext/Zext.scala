@@ -76,6 +76,7 @@ trait Container {
        ListNamesNicely(contents.toSeq)
     }
 
+    // i think these containment conditions are not ?? dynamic. The haver is fixed, so if that changes then this wont work properly.
     infix def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
     infix def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
     infix def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
@@ -152,6 +153,11 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             return "are"
         "is"
     }
+
+    infix def is(rhs : String): String = {
+        toString + " " + be + " " + rhs
+    }
+
 
 
     def ?(property: Property): Boolean = {

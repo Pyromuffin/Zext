@@ -522,11 +522,10 @@ object Parser extends RegexParsers{
   }
 
 
-  def main(args: Array[String]): Unit = {
-    World.Init()
+  def StartInterpreter(player : Player, gamePackageName : String): Unit = {
+    World.Init(player, gamePackageName)
 
     execute(examining, reflexively)
-    currentLocation.OnEnter()
 
     while(!exit){
       val commandParser = BuildParser2()

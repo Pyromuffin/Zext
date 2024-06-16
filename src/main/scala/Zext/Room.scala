@@ -40,6 +40,7 @@ object Direction{
   }
 }
 
+trait StartingRoom
 
 abstract class Room extends ZextObject with Container {
 
@@ -49,10 +50,6 @@ abstract class Room extends ZextObject with Container {
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
   def asDestination = Condition.fromObject(this)
-
-  def OnEnter(): Unit = {
-    visited = true
-  }
 
   def Connect(direction: Direction, destination : Room) = {
     this.connections(direction) = destination

@@ -9,8 +9,6 @@ import Zext.ZextObject.*
 import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
-import Game.JunimoGame.{GetEquipmentDescription, encumbrance}
-import Game.Person
 
 
 import scala.collection.mutable.ArrayBuffer
@@ -28,7 +26,6 @@ object Actions {
   def UnderstandAlias(strs: Seq[String], action: Action, zextObject1: ZextObject, zextObject2: ZextObject) : Unit = {
     commandAliases.addAll(strs.map( _ -> Command(action, Option(zextObject1), Option(zextObject2))))
   }
-
 
 
   object being extends Action(1)
@@ -59,8 +56,6 @@ object Actions {
     UnderstandAlias("n", going, Direction.north)
     UnderstandAlias("south", going, Direction.south)
     UnderstandAlias("s", going, Direction.south)
-
-
 
     /// inflict[Direction](going) { d => goingDir = d; execute(going, currentLocation.connections.getOrElse(d, nowhere)) }
 
@@ -122,26 +117,6 @@ object Actions {
   }
 
 
-  case class flavor(desc: StringExpression) extends Property
-
-  object tasting extends Action( 1,"eat", "taste", "lick", "nom", "mouth", "nibble") {
-
-    player.properties += flavor("the inside of your mouth")
-
-    instead(tasting, reflexively) {
-      Say("Slurp!")
-      execute(tasting, player)
-    }
-
-    report(tasting, prop[flavor]) {
-      Say(s"$noun tastes like ${noun[flavor].desc}")
-    }
-
-    report(tasting) {
-      Say(s"$noun is strangely flavorless")
-    }
-
-  }
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
@@ -157,7 +132,7 @@ object Actions {
     // for the most part, you could just insert the contents of "check" rules at the top of inflict rules, but this has more granularity i suppose.
     check(taking){
       if !noun.isAccessible(currentLocation) then
-        Say(s"$noun $is inaccessible") // maybe say why?
+        Say(noun is "inaccessible") // maybe say why?
         stop
     }
 
@@ -170,19 +145,12 @@ object Actions {
     }
 
     instead(taking, fixed) {
-      Say(s"$noun $is shoracle")
+      Say(noun is "shoracle")
     }
 
     report(taking) {
       Say(s"You slip $noun into your backpack.")
     }
-
-    /*
-    after(taking){
-      Say(s"$encumbrance slots left and then you DIE.")
-      true
-    }
-    */
 
     inflict(taking) {
       noun.transferTo(player)
@@ -199,16 +167,13 @@ object Actions {
 
   object examining extends Action(1,"examine", "x", "look", "l") {
 
-
     instead(examining, reflexively) {
       execute(examining, currentLocation)
     }
 
-
     inflict(examining) {
       Say({noun.description})
     }
-
 
     inflict(examining, of[Room]) {
       Title(currentLocation.name)
@@ -254,12 +219,6 @@ object Actions {
 
       Say(response)
     }
-
-
-    after(examining, player) {
-      Say(GetEquipmentDescription())
-    }
-
   }
 
   object closing extends Action(1, "close", "shut") {
@@ -300,7 +259,7 @@ object Actions {
 
   object exiting extends Action(0,"exit") {
     inflict(exiting) {
-      Say(s"Goodbye ${player.playerName}")
+      Say(s"Goodbye ${player.name}")
       exit = true
     }
   }
