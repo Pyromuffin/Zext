@@ -239,6 +239,16 @@ object Parser extends RegexParsers{
     visibleSet
   }
 
+  def GetWords(z : ZextObject) : Seq[String] = {
+    var names = Seq(z.name).concat(z.aliases)
+    if(z.pluralized){
+      names = names.concat(names.map(Inflector.singularize))
+    }
+    
+    
+    names
+  }
+
   def BuildUnderstandables(): Unit = {
 
     understandables.clear()
@@ -253,7 +263,7 @@ object Parser extends RegexParsers{
     val visibleSet = FindVisibleSet()
 
     visibleSet.foreach { z =>
-      Understand(z, Seq(z.name).concat(z.aliases) *)
+      Understand(z, GetWords(z)*)
     }
   }
 

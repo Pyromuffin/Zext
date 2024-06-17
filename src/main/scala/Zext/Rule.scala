@@ -172,7 +172,7 @@ object Rule {
         def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule], all : Boolean = false) : Boolean = {
 
             if(target.isDefined) SetNoun(target.get)
-            if(target2.isDefined) SetSecondNoun(target2.get)
+            if(target2.isDefined) SetSecondNoun(target2.get) else SetSecondNoun(null)
 
             val possibleRules = rules.filter(_.possible)
             val sorted = SoryByPrecedence(possibleRules)
@@ -210,47 +210,73 @@ abstract class Rule {
 }
 
 
-
 enum QueryPrecedence:
     case Generic, Class, SecondClass, Property, Containment, Object, SecondObject, Location
 
 
-class Condition( condition : => Boolean, var queryType: QueryPrecedence, var previously : Boolean = false ) {
+class Condition(condition: => Boolean, var queryType: QueryPrecedence, var previously: Boolean = false) {
     def evaluate = condition
-
     var specificity = 1
-
     def precedence = queryType.ordinal
+    def unary_! : Condition = {
+        new Condition(!condition, queryType, previously)
+    }
 }
 
-object Condition{
+object Condition {
     // inform's precedence is something like
     // location > object > property > class > generic
 
 
-    def prop[T](using tt : TypeTest[Property, T]) : Condition = new Condition(noun.properties.exists(canBecome[Property,T]), QueryPrecedence.Property)
+    def prop[T](using tt: TypeTest[Property, T]): Condition = new Condition(noun.properties.exists(canBecome[Property, T]), QueryPrecedence.Property)
 
-    implicit def fromBoolean(b : => Boolean) : Condition = new Condition(b, QueryPrecedence.Generic)
-    implicit def fromObject(z : => ZextObject) : Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
-    implicit def fromObjectArray(az : => Seq[ZextObject]) : Condition = new Condition( az.contains(noun), QueryPrecedence.Object)
-    implicit def fromProperty(p : => Property) : Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
-    implicit def fromLocation(r : => Room) : Condition = new Condition(r == currentLocation, QueryPrecedence.Location)
+    implicit def fromBoolean(b: => Boolean): Condition = new Condition(b, QueryPrecedence.Generic)
+    implicit def fromObject(z: => ZextObject): Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
+    implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
+    implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
+    implicit def fromLocation(r: => Room): Condition = new Condition(r == currentLocation, QueryPrecedence.Location)
+    implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = new Condition(t._1.objectID == noun.objectID && t._2.objectID == secondNoun.objectID, QueryPrecedence.SecondObject)
+
     inline def of[T](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.Class)
     }
+
     inline def ofSecond[T](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.SecondClass)
     }
 
-    inline def of[T](queryType : QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+    inline def of[T](queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
         val condition = new Condition(
             {
-                val target = if(queryType == QueryPrecedence.Class) noun else secondNoun
+                val target = if (queryType == QueryPrecedence.Class) noun else secondNoun
                 val success = canBecome[ZextObject, T](target)
                 success
             }
             , queryType)
         condition.specificity = depth[T]
+        condition
+    }
+
+    inline def is[T](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+        val condition = new Condition(
+            {
+                val success = canBecome[ZextObject, T](target)
+                success
+            }
+            , queryType)
+        condition.specificity = depth[T]
+        condition
+    }
+
+    inline def was[T](target: => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+        val condition = new Condition(
+            {
+                val success = canBecome[ZextObject, T](target)
+                success
+            }
+            , queryType)
+        condition.specificity = depth[T]
+        condition.previously = true
         condition
     }
 
@@ -260,12 +286,9 @@ object Condition{
         case _ => None
 
     def canBecome[X, Y](x: X)(using tt: TypeTest[X, Y]): Boolean = {
-        become[X,Y](x).isDefined
+        become[X, Y](x).isDefined
     }
 }
-
-
-
 
 
 class ContinueException extends ControlThrowable
@@ -278,9 +301,6 @@ def result(res : Boolean) : Unit = {
 }
 
 class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
-
-
-
     def specificity = {
         conditions.map( _.specificity ).sum
     }
@@ -302,7 +322,6 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
                 throw e
             }
         }
-
     }
 
     def exec : Boolean = {

@@ -2,7 +2,6 @@ package Game
 
 import Zext.*
 import Zext.Actions.{dropping, putting}
-import Zext.Actions.putting.Zontainer
 import Zext.Rule.*
 import Zext.Thing.NounAmount.*
 import Zext.ZextObject.*
@@ -17,7 +16,7 @@ import javax.print.attribute.standard.Destination
 
 object Pieces {
 
-  inflict(putting, of[Pieces], ofSecond[Zontainer]) {
+  inflict(putting, of[Pieces], ofSecond[Container]) {
 
     val pieces = noun[Pieces]
     val name = pieces.name

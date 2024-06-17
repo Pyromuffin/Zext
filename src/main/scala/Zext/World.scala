@@ -85,7 +85,10 @@ object World  {
   "Rule$SecretHolder",
   "Saving$SecretHolder",
   "World$SecretHolder",
-  "Zext$SecretHolder")
+  "Container$SecretHolder",
+  "Zext$SecretHolder",
+  )
+
 
 
   def Init(gamesPlayer : Player, gamePackageName : String): Unit = {

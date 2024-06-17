@@ -182,7 +182,7 @@ object Actions {
 
     after(examining, of[Room]) {
       val r = noun[Room]
-      val nonscenery = r.contents.filterNot(_ ? scenery).filterNot( _.isType[Person]).toSeq
+      val nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
       val people = r.contents.filter(_.isType[Person]).toSeq
 
       val nonsceneryString = ListNamesNicely(nonscenery)
@@ -257,6 +257,7 @@ object Actions {
     }
   }
 
+
   object exiting extends Action(0,"exit") {
     inflict(exiting) {
       Say(s"Goodbye ${player.name}")
@@ -294,19 +295,14 @@ object Actions {
 
   object putting extends Action(2,"put", "insert", "place") {
 
-    type Zontainer = Container & ZextObject
+    instead(putting, player lacks noun) Say s"You need to pick up $noun before putting it somewhere."
+    instead(putting, player lacks noun, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
+    instead(putting, !ofSecond[Container]) Say s"I don't think $secondNoun can hold $noun"
 
-
-
-    check(putting, ofSecond[Zontainer]){
+    check(putting, ofSecond[Container]){
 
       if(noun == secondNoun){
         Say(s"Stepping into the fourth dimension, you put $noun into itself.")
-        stop
-      }
-
-      if(noun.parentContainer != player){
-        Say(s"You need to pick up $noun before putting it somewhere.")
         stop
       }
 
@@ -321,11 +317,13 @@ object Actions {
       }
     }
 
-    inflict(putting, ofSecond[Zontainer]) {
+    inflict(putting, ofSecond[Container]) {
         noun transferTo secondNoun[Container]
     }
 
-    report(putting, ofSecond[Zontainer]) Say s"You put $noun into $secondNoun"
+    report(putting, ofSecond[Container]) Say s"You put $noun into $secondNoun"
+
+
 
   }
 }

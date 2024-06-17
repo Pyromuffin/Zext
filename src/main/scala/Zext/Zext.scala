@@ -12,7 +12,7 @@ import java.lang.reflect.{Constructor, Modifier}
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
-import Zext.Actions.does
+import Zext.Actions.*
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
 
@@ -65,23 +65,7 @@ def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
 }
 
 
-trait Container {
-    given c : Container = this
-    var contents : ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
-    var open = true
-    var transparent = true
-    var automaticallyListContents = true
 
-    def ContentsString : Option[String] = {
-       ListNamesNicely(contents.toSeq)
-    }
-
-    // i think these containment conditions are not ?? dynamic. The haver is fixed, so if that changes then this wont work properly.
-    infix def has(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment)
-    infix def had(zextObject : => ZextObject) = Condition( zextObject.parentContainer == this, QueryPrecedence.Containment, true)
-    infix def lacks(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment)
-    infix def lacked(zextObject : => ZextObject) = Condition( zextObject.parentContainer != this, QueryPrecedence.Containment, true)
-}
 
 
 object ZextObject{
@@ -160,9 +144,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
 
 
-    def ?(property: Property): Boolean = {
-        properties.contains(property)
-    }
 
 
     def isComposite = compositeObject != null
@@ -269,25 +250,13 @@ abstract class Thing(using c : Container) extends ZextObject{
     parentContainer = c
     c.contents += this
 
-
-    /*
-    def SetName(s : String): Unit = {
-        val fixed = FixName(s)
-        name = fixed
-
-        /*
-        if(noun.pluralized){
-            words = words.concat(words.map(Inflector.singularize))
-        }
-        */
+    def isAutomaticallyPlural = {
+        Inflector.pluralize(name) == name
     }
 
-
-    def desc(desc : StringExpression) : this.type = {
-        description = desc
-        this
+    if(isAutomaticallyPlural){
+        pluralized = true
     }
-    */
 
     infix def is(prop: Property) : this.type = {
         properties += prop
@@ -299,30 +268,24 @@ abstract class Thing(using c : Container) extends ZextObject{
         this
     }
 
-
-    /*
-    def named(name : String) : this.type = {
-        SetName(name)
-        this
-    }
-    */
-
-    infix def has(prop: Property) : this.type = {
-        properties += prop
-        this
-    }
-
     infix def aka(s : String) : this.type  = {
         aliases.addOne(s)
         this
     }
 
     infix def amount(nounAmount: NounAmount):  this.type ={
-        if nounAmount == NounAmount.plural then pluralized = true
-        if (nounAmount == NounAmount.some) {
+        if (nounAmount == NounAmount.plural) {
             pluralized = true
+        }
+
+        if (nounAmount == NounAmount.singular) {
+            pluralized = false
+        }
+
+        if (nounAmount == NounAmount.some) {
             indefiniteArticle = "some"
         }
+
         this
     }
 
@@ -383,13 +346,5 @@ abstract class Device(using Container) extends Thing {
     var offDesc: StringExpression = null
     var onDesc: StringExpression = null
     val description = s"${if (on) onDesc else offDesc}"
-}
-
-
-abstract class Supporter(using Container) extends Thing with Container
-
-abstract class Box(open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
-    transparent = open_and_transparent
-    open = open_and_transparent
 }
 

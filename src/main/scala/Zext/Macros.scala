@@ -2,7 +2,6 @@ package Zext
 
 import scala.quoted.*
 
-
 inline def assert(inline expr: Boolean): Unit =
   ${ assertImpl('expr) }
 
@@ -11,15 +10,34 @@ if !$expr then
   throw AssertionError(s"failed assertion: ${${ showExpr(expr) }}")
 }
 
+inline def ShowTree(inline expr: Unit): String =
+  ${ showExpr('expr) }
+
 def showExpr[T](expr: Expr[T])(using Quotes): Expr[String] =
-  val code: String = expr.show
+  import quotes.reflect.*
+
+  val term = expr.asTerm
+  val code: String = term.toString
   Expr(code)
 
 
-inline def GetClass(inline expr: Boolean): Unit =
-  ${ assertImpl('expr) }
-
 object Macros{
+
+
+
+  inline def stuff(container : Container)(inline code : => Unit) : Container = {
+    ${stuffImpl('container, 'code)}
+  }
+
+  def stuffImpl[T](container: Expr[Container], code : Expr[T])(using Quotes, Type[T]) : Expr[Container] = {
+    '{
+      new SimpleBox("my name", "cool world")(using $container) {
+        given cool : Container = this
+        $code
+      }
+    }
+  }
+
 
   inline def fullClassName[T]: String =
     ${ fullClassNameImpl[T] }
@@ -172,6 +190,17 @@ object Macros{
   def variableNameImpl(using Quotes): Expr[String] = {
     import quotes.reflect.*
     val callee = Symbol.spliceOwner.owner
+    Expr(callee.name)
+  }
+
+
+  inline def superVariableName : String = {
+    ${ superVariableNameImpl }
+  }
+
+  def superVariableNameImpl(using Quotes): Expr[String] = {
+    import quotes.reflect.*
+    val callee = Symbol.spliceOwner.owner.owner
     Expr(callee.name)
   }
 

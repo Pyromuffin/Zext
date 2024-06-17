@@ -1,6 +1,4 @@
 
-name := "Zext"
-version := "0.1.0"
 scalaVersion := "3.2.2"
 isSnapshot := true
 
@@ -18,7 +16,7 @@ lazy val zext = (project in file("."))
   .settings(
     name := "Zext",
 
-    version := "0.1.0",
+    version := "0.1.1",
     organization := org,
     autoCompilerPlugins := true,
     addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.0.6"),

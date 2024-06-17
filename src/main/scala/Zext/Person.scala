@@ -5,7 +5,7 @@ import Zext.exports.*
 
 
 
-abstract class Person(using Container) extends Thing with Container {
+abstract class Person(using Container) extends ZextObject with Container {
 
   proper = true
 
