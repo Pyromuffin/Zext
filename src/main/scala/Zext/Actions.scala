@@ -30,19 +30,17 @@ object Actions {
 
   object entering extends Action(1) {
 
-    inflict(entering, of[Room]) {
-      player.Move(noun[Room])
+
+    inflict(entering, of[Room]){
+      noun[Room].visited = true
     }
 
-    after(entering, of[Room]){
-      noun[Room].visited = true
+    report(entering, of[Room]){
       LineBreak()
-      result(execute(examining, currentLocation))
+      result(execute(examining, noun))
     }
 
   }
-
-  // for hooking
   object leaving extends Action(1)
 
   object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
@@ -58,16 +56,28 @@ object Actions {
     UnderstandAlias("south", going, Direction.south)
     UnderstandAlias("s", going, Direction.south)
 
-    /// inflict[Direction](going) { d => goingDir = d; execute(going, currentLocation.connections.getOrElse(d, nowhere)) }
 
-    // you can still circumvent going direction based movements by going directly to a location... eh i'll fix it later
-    // desired behavior:
-    // override the "i went x " text, which should be the act of reporting going
-    // once we have moved to the other room, and reported, we want to automatically examine the room.
+    /*
+      we want
+        check going
+        check leaving
+        report going
+        report leaving
+        inflict going
+        inflict leaving
+     */
 
     check(going, of[Direction]){
       val d = noun[Direction]
       val connected = currentLocation.connections.contains(d)
+
+      // this is so dumb but maybe it will work?
+      val leavingBefore = RunRule(Some(currentLocation), None, ruleSets(leaving).beforeRules, true)
+      val leavingInstead = RunRule(Some(currentLocation), None, ruleSets(leaving).insteadRules)
+      val leavingCheck = RunRule(Some(currentLocation), None, ruleSets(leaving).checkRules, true)
+
+      val all = leavingBefore && leavingInstead && leavingCheck
+      if(!all) stop
 
       if (!connected) {
         Say(s"You can't go $d")
@@ -78,16 +88,23 @@ object Actions {
     report(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
+
       Say(s"You went $d to $room.")
     }
 
-    after(going, of[Direction]) {
+    inflict(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
 
-      // we dont have a noun stack, so executing chained rules blows up .
-      if !execute(leaving, currentLocation) then stop
-      result(execute(entering, room))
+      RunRule(Some(currentLocation), None, ruleSets(leaving).reportRules)
+      RunRule(Some(currentLocation), None, ruleSets(leaving).executeRules, true)
+      blackboard = currentLocation
+      player.Move(room)
+    }
+
+    after(going, of[Direction]){
+      RunRule(Some(blackboard.asInstanceOf[Room]), None, ruleSets(leaving).afterRules, true)
+      result(execute(entering, currentLocation))
     }
 
   }
@@ -100,7 +117,7 @@ object Actions {
     }
 
     inflict(dropping, reflexively) {
-     
+
       Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))

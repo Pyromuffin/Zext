@@ -2,6 +2,7 @@ package Test
 
 import Zext.*
 import Zext.exports.*
+import Zext.Actions.*
 
 val player = new Player:
   override val name = "SLEEMO"
@@ -37,16 +38,30 @@ object Dirt extends Room with StartingRoom {
     time = time + 1
   }
 
-  report(being) Say Cycle("ouch", "my bones", s"the current time is $time")
+  //report(being) Say Cycle("ouch", "my bones", s"the current time is $time")
+
+
   report(going, south, here) Say "You tunnel to the south."
+  report(going, north, here) Say "You mosey to the north."
 
-  report(Actions.leaving, here) Say "The tunnel collapses behind you."
-
-  inflict(Actions.leaving, here) {
+  report(leaving, here) Say "The tunnel collapses behind you."
+  inflict(leaving, here) {
     currentLocation.Disconnect(south)
+    currentLocation.Disconnect(north)
   }
 
 
+
+
+
+}
+
+object WormPile extends Room {
+
+  override val name: String = "Worm Pile"
+  override val description: StringExpression = "I'm not sure what you expected."
+
+  Connect(south, Dirt)
 }
 
 
@@ -56,17 +71,15 @@ object FairyFountain extends Room {
   override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with great power."
   val fairy_armadillo = ~"Nigiri with feet"
 
+  instead(leaving, here) Say "The big guy wants your attention"
+
+  
   Connect(north, Dirt)
 }
 
 
 object Test extends App{
 
-  println("Hello world.")
-
-
   Zext.Parser.StartInterpreter(player, "Test")
-
-
 
 }

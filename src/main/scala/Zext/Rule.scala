@@ -16,6 +16,12 @@ import scala.util.control.{Breaks, ControlThrowable}
 
 object Rule {
 
+    val nounStack = mutable.Stack[(ZextObject, ZextObject)]()
+    nounStack.push((null,null))
+
+    val blackboardStack = mutable.Stack[Any]()
+    var blackboard : Any = null
+
     class ActionRuleSet {
         val beforeRules = ArrayBuffer[ActionRule]()
         val afterRules = ArrayBuffer[ActionRule]()
@@ -96,7 +102,7 @@ object Rule {
     }
 
 
-    def SoryByPrecedence(possible: ArrayBuffer[ActionRule]): Seq[ActionRule] = {
+    def SortByPrecedence(possible: ArrayBuffer[ActionRule]): Seq[ActionRule] = {
         // the inform rules are something like this:
         // it seems like this is highest priority to lowest
 
@@ -141,34 +147,55 @@ object Rule {
     }
 
 
+    def RunRule(target: Option[ZextObject], target2: Option[ZextObject], rules: ArrayBuffer[ActionRule], all: Boolean = false): Boolean = {
+        nounStack.push((noun, secondNoun))
+
+        if (target.isDefined) SetNoun(target.get)
+        if (target2.isDefined) SetSecondNoun(target2.get) else SetSecondNoun(null)
+
+        val possibleRules = rules.filter(_.possible)
+        val sorted = SortByPrecedence(possibleRules)
+
+
+        val result = if (all) {
+            sorted.forall(_.exec)
+        } else {
+            sorted.headOption.forall(_.exec)
+        }
+
+        val previousNouns = nounStack.pop()
+        SetNoun(previousNouns._1)
+        SetSecondNoun(previousNouns._2)
+
+        result
+    }
 
      def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
         val set = ruleSets(rule)
 
-        def RunRule(target: Option[ZextObject], target2 : Option[ZextObject], rules : ArrayBuffer[ActionRule], all : Boolean = false) : Boolean = {
-
-            if(target.isDefined) SetNoun(target.get)
-            if(target2.isDefined) SetSecondNoun(target2.get) else SetSecondNoun(null)
-
-            val possibleRules = rules.filter(_.possible)
-            val sorted = SoryByPrecedence(possibleRules)
-
-            if(all){
-                sorted.forall(_.exec)
-            } else {
-                sorted.headOption.forall(_.exec)
-            }
-        }
+         /*
+            Before: by default, make no decision. If stopped, no further rulebooks are run.
+            (some internal visibility/accessibility sanity checks run here)
+            Instead: by default, stop the action. If stopped, no further rulebooks are run.
+            Check: by default, make no decision. If stopped, no further rulebooks are run.
+            Carry Out: by default, make no decision. If stopped, other rulebooks continue.
+            After: by default, stop the action. If stopped, no further rulebooks are run.
+            Report: by default, make no decision.
+          */
 
 
-        if(!RunRule(target, target2, set.beforeRules, true)) return false
-        if(!RunRule(target, target2, set.insteadRules)) return false
-        if(!RunRule(target, target2, set.checkRules, true)) return false
-        if(!RunRule(target, target2, set.reportRules)) return false
-        if(!RunRule(target, target2, set.executeRules, true)) return false
-        if(!RunRule(target, target2, set.afterRules, true)) return false
+         blackboardStack.push(blackboard)
 
-        true
+         if(!RunRule(target, target2, set.beforeRules, true)) return false
+         if(!RunRule(target, target2, set.insteadRules)) return false
+         if(!RunRule(target, target2, set.checkRules, true)) return false
+         if(!RunRule(target, target2, set.reportRules)) return false
+         if(!RunRule(target, target2, set.executeRules, true)) return false
+         if(!RunRule(target, target2, set.afterRules, true)) return false
+
+         blackboard = blackboardStack.pop()
+
+         true
     }
 
     def execute(rule: Action, target: ZextObject): Boolean = {
