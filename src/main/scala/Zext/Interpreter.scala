@@ -545,7 +545,6 @@ object Parser extends RegexParsers{
       val command = BuildCommand(input, commandParser)
       if(command.nonEmpty){
         val c = command.get
-        EvaluatePreviouslyConditions(c.action, c.noun, c.secondNoun)
         ExecuteAction(c.action, c.noun, c.secondNoun)
         execute(being, currentLocation)
       } else {

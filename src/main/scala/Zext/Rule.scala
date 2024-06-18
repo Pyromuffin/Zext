@@ -138,32 +138,8 @@ object Rule {
         val flat = sortedPrecedenceSets.sortBy( kv => kv._1 ).reverse.flatten(kv => kv._2)
 
         flat
-        //val maxPrecedence = possible.map(_.precedence).max
-        //val maxPrecedenceRules = possible.filter(_.precedence == maxPrecedence)
-        //val rule = maxPrecedenceRules.maxBy(_.specificity)
-        //Option(rule)
     }
 
-
-
-    val previouslySucceeded = mutable.HashSet[Condition]()
-
-    def EvaluatePreviouslyConditions(action: Action, target: Option[ZextObject] = None, target2: Option[ZextObject]): Unit = {
-        previouslySucceeded.clear()
-
-        if(target.isDefined) SetNoun(target.get)
-        if(target2.isDefined) SetSecondNoun(target2.get)
-
-        // forbid using 'noun' in conditions when previously
-
-        val set = ruleSets(action)
-        set.beforeRules.foreach( _.storePreviousPossibilities() )
-        set.insteadRules.foreach( _.storePreviousPossibilities() )
-        set.checkRules.foreach( _.storePreviousPossibilities() )
-        set.executeRules.foreach( _.storePreviousPossibilities() )
-        set.reportRules.foreach( _.storePreviousPossibilities() )
-        set.afterRules.foreach( _.storePreviousPossibilities() )
-    }
 
 
      def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
@@ -188,8 +164,8 @@ object Rule {
         if(!RunRule(target, target2, set.beforeRules, true)) return false
         if(!RunRule(target, target2, set.insteadRules)) return false
         if(!RunRule(target, target2, set.checkRules, true)) return false
-        if(!RunRule(target, target2, set.executeRules)) return false
         if(!RunRule(target, target2, set.reportRules)) return false
+        if(!RunRule(target, target2, set.executeRules, true)) return false
         if(!RunRule(target, target2, set.afterRules, true)) return false
 
         true
@@ -214,12 +190,12 @@ enum QueryPrecedence:
     case Generic, Class, SecondClass, Property, Containment, Object, SecondObject, Location
 
 
-class Condition(condition: => Boolean, var queryType: QueryPrecedence, var previously: Boolean = false) {
+class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
     def evaluate = condition
     var specificity = 1
     def precedence = queryType.ordinal
     def unary_! : Condition = {
-        new Condition(!condition, queryType, previously)
+        new Condition(!condition, queryType)
     }
 }
 
@@ -268,19 +244,6 @@ object Condition {
         condition
     }
 
-    inline def was[T](target: => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
-        val condition = new Condition(
-            {
-                val success = canBecome[ZextObject, T](target)
-                success
-            }
-            , queryType)
-        condition.specificity = depth[T]
-        condition.previously = true
-        condition
-    }
-
-
     def become[X, Y](x: X)(using tt: TypeTest[X, Y]): Option[Y] = x match
         case tt(x) => Some(x)
         case _ => None
@@ -309,13 +272,10 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
         conditions.map(_.precedence).foldLeft(0)( _ max _ )
     }
 
-    def storePreviousPossibilities(): Unit = {
-        conditions.filter(_.previously).filter(_.evaluate).foreach(previouslySucceeded.add)
-    }
 
     def possible : Boolean = {
         try{
-            conditions.filterNot(_.previously).forall( _.evaluate ) && conditions.filter(_.previously).forall( previouslySucceeded(_) )
+            conditions.forall( _.evaluate )
         } catch {
             case e => {
                 System.err.println("Error from condition at: .(" + definitionPosition + ")")

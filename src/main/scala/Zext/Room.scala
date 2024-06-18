@@ -56,4 +56,19 @@ abstract class Room extends ZextObject with Container {
     destination.connections(opposing(direction)) = this
   }
 
+  def ConnectOneWay(direction: Direction, destination: Room) = {
+    this.connections(direction) = destination
+  }
+
+  def DisconnectOneWay(direction: Direction) = {
+    this.connections.remove(direction)
+  }
+
+  def Disconnect(direction: Direction) = {
+    val dest = this.connections(direction)
+    this.connections.remove(direction)
+    dest.connections.remove(opposing(direction))
+  }
+
+
 }

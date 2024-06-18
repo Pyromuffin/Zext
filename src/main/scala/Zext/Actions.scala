@@ -10,7 +10,6 @@ import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
 
-
 import scala.collection.mutable.ArrayBuffer
 
 object Actions {
@@ -27,22 +26,24 @@ object Actions {
     commandAliases.addAll(strs.map( _ -> Command(action, Option(zextObject1), Option(zextObject2))))
   }
 
-
   object being extends Action(1)
 
   object entering extends Action(1) {
 
     inflict(entering, of[Room]) {
       player.Move(noun[Room])
-      LineBreak()
-      result(execute(examining, currentLocation))
     }
 
     after(entering, of[Room]){
       noun[Room].visited = true
+      LineBreak()
+      result(execute(examining, currentLocation))
     }
 
   }
+
+  // for hooking
+  object leaving extends Action(1)
 
   object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
 
@@ -64,11 +65,11 @@ object Actions {
     // override the "i went x " text, which should be the act of reporting going
     // once we have moved to the other room, and reported, we want to automatically examine the room.
 
-    inflict(going, of[Direction]) {
+    check(going, of[Direction]){
       val d = noun[Direction]
       val connected = currentLocation.connections.contains(d)
 
-      if(!connected){
+      if (!connected) {
         Say(s"You can't go $d")
         stop
       }
@@ -83,8 +84,12 @@ object Actions {
     after(going, of[Direction]) {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
+
+      // we dont have a noun stack, so executing chained rules blows up .
+      if !execute(leaving, currentLocation) then stop
       result(execute(entering, room))
     }
+
   }
 
   object dropping extends Action(1,"drop", "abandon") {
@@ -138,7 +143,9 @@ object Actions {
 
     instead(taking, reflexively) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
-    instead(taking, noun.isComposite) Say s"You're going to have a difficult time removing $noun from ${noun.compositeObject}"
+    instead(taking, noun.isComposite) {
+      Say(s"You're going to have a difficult time removing $noun from ${noun.compositeObject}")
+    }
 
     instead(taking, player has noun) {
       Say(s"You rummage around the items in your backpack, looking for $noun")
@@ -171,13 +178,13 @@ object Actions {
       execute(examining, currentLocation)
     }
 
-    inflict(examining) {
+    report(examining) {
       Say({noun.description})
     }
 
-    inflict(examining, of[Room]) {
+    report(examining, of[Room]) {
       Title(currentLocation.name)
-      Say(currentLocation.description)
+      Say({noun.description})
     }
 
     after(examining, of[Room]) {

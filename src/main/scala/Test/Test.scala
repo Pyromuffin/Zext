@@ -8,11 +8,6 @@ val player = new Player:
   override val description = "Your bipes bip fast."
 
 
-def thing(name : String)(using c : Container) = {
-  c
-}
-
-
 
 object Dirt extends Room with StartingRoom {
 
@@ -36,9 +31,34 @@ object Dirt extends Room with StartingRoom {
   val sashes = ~"Second place winner in the number of sashes competition" is scenery is not_yours
 
 
+  var time = 0
+
+  inflict(being) {
+    time = time + 1
+  }
+
+  report(being) Say Cycle("ouch", "my bones", s"the current time is $time")
+  report(going, south, here) Say "You tunnel to the south."
+
+  report(Actions.leaving, here) Say "The tunnel collapses behind you."
+
+  inflict(Actions.leaving, here) {
+    currentLocation.Disconnect(south)
+  }
 
 
 }
+
+
+object FairyFountain extends Room {
+
+  override val name: String = "Fairy Fountain"
+  override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with great power."
+  val fairy_armadillo = ~"Nigiri with feet"
+
+  Connect(north, Dirt)
+}
+
 
 object Test extends App{
 
