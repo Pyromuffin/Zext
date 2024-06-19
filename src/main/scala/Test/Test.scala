@@ -4,6 +4,7 @@ import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
 
+
 val player = new Player:
   override val name = "SLEEMO"
   override val description = "Your bipes bip fast."
@@ -19,8 +20,7 @@ object Dirt extends Room with StartingRoom {
   val mud = ~"dirt juice" amount some
   val walls = ~"they're everywhere" are fixed
 
-  val bucket = box("A rough pail") {
-    val corn = ~"cobbic" amount some
+  val bucket = box("pebble purgatory") {
     val sand = ~"paperless sandpaper" amount some
   }
   
@@ -38,16 +38,23 @@ object Dirt extends Room with StartingRoom {
     time = time + 1
   }
 
-  //report(being) Say Cycle("ouch", "my bones", s"the current time is $time")
+   report(being) Say Randomly("ouch", "my bones", s"the current time is $time")
+
+  after(being) {
+    Say(Cycle("Red", "Green", "Blue"))
+    Say(Randomly("ouch", "my bones", s"the current time is $time"))
+  }
 
 
   report(going, south, here) Say "You tunnel to the south."
   report(going, north, here) Say "You mosey to the north."
 
   report(leaving, here) Say "The tunnel collapses behind you."
+  // after leaving doesn't work because once you left you're not here anymore!
+  // after rules are weird
   inflict(leaving, here) {
-    currentLocation.Disconnect(south)
-    currentLocation.Disconnect(north)
+    Disconnect(south)
+    Disconnect(north)
   }
 
 
@@ -73,7 +80,7 @@ object FairyFountain extends Room {
 
   instead(leaving, here) Say "The big guy wants your attention"
 
-  
+
   Connect(north, Dirt)
 }
 

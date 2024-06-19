@@ -58,13 +58,17 @@ object Actions {
 
 
     /*
-      we want
         check going
+        before leaving
+        instead leaving
         check leaving
         report going
         report leaving
         inflict going
         inflict leaving
+        after going
+        run entering completely
+        after leaving
      */
 
     check(going, of[Direction]){

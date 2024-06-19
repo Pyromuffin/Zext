@@ -42,6 +42,7 @@ object exports{
     export Zext.Thing.*
     export Zext.Thing.NounAmount.*
     export Zext.Device.*
+    export Zext.StringExpression.*
 }
 
 

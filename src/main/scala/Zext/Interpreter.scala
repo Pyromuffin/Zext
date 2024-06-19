@@ -7,6 +7,7 @@ import Zext.Interpreter.*
 import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
 import Zext.Saving.*
+import Zext.StringExpression.str
 import Zext.World.*
 
 import java.io.{FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
@@ -32,9 +33,53 @@ implicit class TernaryExtension(that : Boolean) {
 
 
 object StringExpression{
-  implicit def fromString(str : => String): StringExpression = {
+
+  private val state = mutable.HashMap[String, Int]()
+
+  implicit def str(str : => String): StringExpression = {
     new StringExpression(str)
   }
+
+  private case class ProgressivelyHolder(pos : String, strs: StringExpression*) extends StringExpression(null) {
+
+    override def toString: String = {
+      var state = StringExpression.state.getOrElse(pos, 0)
+      val ret = strs(state).toString
+      state = scala.math.min(state + 1, strs.length - 1)
+      StringExpression.state(pos) = state
+      ret
+    }
+  }
+
+  private case class CycleHolder(pos : String, strs: StringExpression*) extends StringExpression(null) {
+
+    override def toString: String = {
+      var state = StringExpression.state.getOrElse(pos, 0)
+      val ret = strs(state).toString
+      state = (state + 1) % strs.length
+      StringExpression.state(pos) = state
+
+      ret
+    }
+  }
+
+  inline def Cycle(strs: StringExpression*): StringExpression = {
+    CycleHolder(Macros.CodePosition(), strs *)
+  }
+
+  inline def Progressively(strs: StringExpression*) : StringExpression = {
+    ProgressivelyHolder(Macros.CodePosition(), strs *)
+  }
+
+
+  def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
+
+  def Randomly(strs: StringExpression*): StringExpression = s"${
+      val which = util.Random.nextInt(strs.length)
+      strs(which)
+    }"
+
+
 }
 
 class StringExpression(lazyStr : => String) extends Serializable{
@@ -44,41 +89,6 @@ class StringExpression(lazyStr : => String) extends Serializable{
 }
 
 
-case class Progressively(strs: StringExpression*) extends StringExpression(null) {
-  var progress = 0
-
-  override def toString: String = {
-    val ret = strs(progress).toString
-    progress = scala.math.min(progress + 1, strs.length - 1)
-    ret
-  }
-}
-
-
-case class Cycle(strs: StringExpression*) extends StringExpression(null) {
-  var cycle = 0
-
-  override def toString: String = {
-    val ret = strs(cycle).toString
-    cycle = (cycle + 1) % strs.length
-    ret
-  }
-}
-
-def Shuffled(strs: StringExpression*): StringExpression = {
-  val shuffled = scala.util.Random.shuffle(strs)
-  Cycle(shuffled *)
-}
-
-
-def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
-
-def Randomly(strs: StringExpression*): StringExpression = {
-  s"${
-    val which = util.Random.nextInt(strs.length)
-    strs(which)
-  }"
-}
 
 
 object Interpreter{

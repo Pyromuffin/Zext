@@ -158,7 +158,7 @@ object Macros{
     val pos = Option(Position.ofMacroExpansion)
     if(pos.isDefined){
       val p = pos.get
-      Expr(p.sourceFile.name + ":" + (p.startLine + 1))
+      Expr(p.sourceFile.name + ":" + (p.startLine + 1) + ":" + p.startColumn)
     } else {
       Expr("unknown source position")
     }
