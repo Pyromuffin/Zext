@@ -5,7 +5,7 @@ import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.QueryPrecedence.Location
 import Zext.Rule.{after, execute, inflict}
-import Zext.World.{currentLocation, noun}
+import Zext.World.currentLocation
 
 import scala.collection.mutable
 

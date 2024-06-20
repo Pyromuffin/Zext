@@ -9,6 +9,7 @@ import Zext.Condition.*
 import Zext.Inflector.pluralize
 import Zext.Interpreter.*
 import Zext.World.*
+import Zext.RuleContext.*
 
 import javax.print.attribute.standard.Destination
 

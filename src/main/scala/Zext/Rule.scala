@@ -5,6 +5,7 @@ import Zext.Interpreter.*
 import Zext.Macros.{CodePosition, depth}
 import Zext.Parser.*
 import Zext.Rule.*
+import Zext.RuleContext.*
 import Zext.RuleControl.{Continue, Replace, Stop}
 import Zext.World.*
 
@@ -15,10 +16,42 @@ import scala.quoted.*
 import scala.reflect.{ClassTag, TypeTest}
 import scala.util.control.{Breaks, ControlThrowable}
 
-object Rule {
+object RuleContext {
 
-    val nounStack = mutable.Stack[(ZextObject, ZextObject)]()
-    nounStack.push((null,null))
+    private[Zext] var _noun: ZextObject = null
+    private[Zext] var _secondNoun: ZextObject = null
+    private[Zext] var _first: Boolean = false
+    private[Zext] var _silent: Boolean = false
+
+    private[Zext] def SetContext(ctx : RuleContext) : Unit = {
+        _noun = ctx.z1.orNull
+        _secondNoun = ctx.z2.orNull
+        _silent = ctx.silent
+    }
+
+    def noun: ZextObject = _noun
+
+    def noun[T](using TypeTest[Property, T]): T = {
+        val maybe = _noun.get[T]
+        if (maybe.isDefined) maybe.get
+        else _noun.asInstanceOf[T]
+    }
+
+    def secondNoun: ZextObject = _secondNoun
+
+    def secondNoun[T](using TypeTest[Property, T]): T = {
+        val maybe = _secondNoun.get[T]
+        if (maybe.isDefined) maybe.get
+        else _secondNoun.asInstanceOf[T]
+    }
+
+    def first : Boolean =  _first
+    def silent : Boolean = _silent
+}
+
+case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean)
+
+object Rule {
 
     val blackboardStack = mutable.Stack[Any]()
     var blackboard : Any = null
@@ -31,7 +64,7 @@ object Rule {
         val insteadRules = ArrayBuffer[ActionRule]()
         val reportRules = ArrayBuffer[ActionRule]()
 
-        def GetSet() = {
+        def GetAllRules() = {
             Array(beforeRules, insteadRules, checkRules, reportRules, executeRules, afterRules)
         }
     }
@@ -162,24 +195,22 @@ object Rule {
         true
     }
 
-    def RunRule(target: Option[ZextObject], target2: Option[ZextObject], rules: ArrayBuffer[ActionRule]): Boolean = {
-        nounStack.push((noun, secondNoun))
+    def RunRule(context : RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        if (target.isDefined) SetNoun(target.get)
-        if (target2.isDefined) SetSecondNoun(target2.get) else SetSecondNoun(null)
+        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent)
+        SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
         val sorted = SortByPrecedence(possibleRules)
         val result = ExecuteRules(sorted)
 
-        val previousNouns = nounStack.pop()
-        SetNoun(previousNouns._1)
-        SetSecondNoun(previousNouns._2)
+        SetContext(previousContext)
+
 
         result
     }
 
-     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None): Boolean = {
+     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false): Boolean = {
         val set = ruleSets(rule)
 
          /*
@@ -194,11 +225,12 @@ object Rule {
             Report: by default, make no decision.
           */
 
+         val context = RuleContext(target, target2, silent)
 
          blackboardStack.push(blackboard)
 
-         for(rules <- set.GetSet()) {
-             if (!RunRule(target, target2, rules)) {
+         for(rules <- set.GetAllRules()) {
+             if (!RunRule(context, rules)) {
                  blackboard = blackboardStack.pop()
                  return false // cry about it.
              }
@@ -209,12 +241,8 @@ object Rule {
          true
     }
 
-    def execute(rule: Action, target: ZextObject): Boolean = {
-        ExecuteAction(rule, Some(target))
-    }
-
-    def execute(rule: Action, target: ZextObject, target2: ZextObject): Boolean = {
-        ExecuteAction(rule, Some(target), Some(target2))
+    def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false): Boolean = {
+        ExecuteAction(rule, Some(target), Option(target2), silent)
     }
 }
 
@@ -308,6 +336,8 @@ def result(res : Boolean) : Unit = {
 }
 
 class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
+    var first = true
+
     def specificity = {
         conditions.map( _.specificity ).sum
     }
@@ -329,6 +359,10 @@ class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
     }
 
     def exec : RuleControl = {
+        val previous = _first
+        _first = this.first
+        this.first = false
+
         val ret = try{
             body
         } catch {
@@ -337,6 +371,7 @@ class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
             case ex : ReplaceException => RuleControl.Replace
         }
 
+        _first = previous
         ret
     }
 }
@@ -354,5 +389,6 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
+
 }
 

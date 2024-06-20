@@ -115,29 +115,7 @@ object World  {
 
   }
 
-  private var _noun : ZextObject = null
-  private var _secondNoun : ZextObject = null
-
-  def SetNoun(z: ZextObject) : Unit = {
-    _noun = z
-  }
-  def SetSecondNoun(z: ZextObject) : Unit = {
-    _secondNoun = z
-  }
-
-  def noun : ZextObject = _noun
-  def noun[T](using TypeTest[Property, T]) : T = {
-    val maybe = _noun.get[T]
-    if(maybe.isDefined) maybe.get
-    else _noun.asInstanceOf[T]
-  }
-
-  def secondNoun: ZextObject = _secondNoun
-  def secondNoun[T](using TypeTest[Property, T]): T = {
-    val maybe = _secondNoun.get[T]
-    if (maybe.isDefined) maybe.get
-    else _secondNoun.asInstanceOf[T]
-  }
+  
 
 
 }

@@ -7,6 +7,7 @@ import Zext.QueryPrecedence.*
 import Zext.Rule.*
 import Zext.World.*
 import Zext.Thing.NounAmount
+import Zext.RuleContext.*
 
 import java.lang.reflect.{Constructor, Modifier}
 import scala.collection.mutable.ArrayBuffer
@@ -26,9 +27,6 @@ object holdable extends Property
 object fixed extends Property
 object scenery extends Property
 object wet extends Property
-case class initialDescription(desc : StringExpression) extends Property
-
-
 
 object exports{
     export Interpreter.*
@@ -38,11 +36,11 @@ object exports{
     export Direction.*
     export ZextObject.*
     export Actions.*
-    export Inflector.*
     export Zext.Thing.*
     export Zext.Thing.NounAmount.*
     export Zext.Device.*
     export Zext.StringExpression.*
+    export Zext.RuleContext.*
 }
 
 
@@ -142,10 +140,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     infix def is(rhs : String): String = {
         toString + " " + be + " " + rhs
     }
-
-
-
-
 
     def isComposite = compositeObject != null
 
@@ -260,6 +254,11 @@ abstract class Thing(using c : Container) extends ZextObject{
     }
 
     infix def is(prop: Property) : this.type = {
+        properties += prop
+        this
+    }
+
+    infix def and(prop: Property): this.type = {
         properties += prop
         this
     }

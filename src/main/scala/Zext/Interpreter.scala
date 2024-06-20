@@ -6,11 +6,13 @@ import Zext.Condition.canBecome
 import Zext.Interpreter.*
 import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
+import Zext.RuleContext.{_noun, silent}
 import Zext.Saving.*
 import Zext.StringExpression.str
 import Zext.World.*
 
 import java.io.{FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
+import scala.annotation.targetName
 import scala.io.StdIn.readLine
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -75,6 +77,7 @@ object StringExpression{
     new StringExpression(s"$s")
   }
 
+
   implicit def fromStateful(str : StatefulString): StringExpression = {
     str.asInstanceOf[StringExpression]
   }
@@ -109,6 +112,10 @@ object StringExpression{
     ProgressivelyHolder(Macros.CodePosition(), strs *)
   }
 
+  inline def once(str: StringExpression) : StatefulString = {
+    progressively(str, "")
+  }
+
   def infrequently(s : StringExpression, one_in: Int) : StringExpression = str {
     if scala.util.Random.nextInt(one_in) == 0 then s else ""
   }
@@ -120,6 +127,9 @@ object StringExpression{
 }
 
 class StringExpression(lazyStr : => String) extends Serializable{
+
+  @targetName("plus")
+  def +(rhs: String) = StringExpression(this.toString + rhs)
 
   override def toString: String = {
     lazyStr
@@ -186,6 +196,8 @@ object Interpreter{
   }
 
   def Say(str: StringExpression): Unit = {
+
+    if(silent) return
 
     val strImmediate = str.toString
     if(strImmediate == "") return // maybe an error
@@ -526,7 +538,7 @@ object Parser extends RegexParsers{
 
     val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
     // for tests against noun in the target selector hint
-    SetNoun(first)
+    _noun = first
 
     if(seconds.isEmpty && action.implicitTargetSelector != null){
       val visibleSet = FindVisibleSet()

@@ -6,6 +6,7 @@ import Zext.Rule.*
 import Zext.World.*
 import Zext.ZextObject.*
 import Zext.StringExpression.*
+import Zext.RuleContext.*
 
 import scala.collection.mutable
 import scala.reflect.TypeTest
@@ -29,6 +30,18 @@ object Actions {
   }
 
   object being extends Action(1)
+
+
+  /*
+    considerations for room movement:
+      i think we want the behavior to be something like
+      1) check if leaving, going, and entering is possible, if not, dont do any of those things.
+      2) do going, leaving, entering in that order
+
+
+
+   */
+
 
   object entering extends Action(1) {
 
@@ -78,13 +91,10 @@ object Actions {
       val connected = currentLocation.connections.contains(d)
 
       // this is so dumb but maybe it will work?
-      val leavingBefore = RunRule(Some(currentLocation), None, ruleSets(leaving).beforeRules)
-      val leavingInstead = RunRule(Some(currentLocation), None, ruleSets(leaving).insteadRules)
-      val leavingCheck = RunRule(Some(currentLocation), None, ruleSets(leaving).checkRules)
-
-
-      val allLeaving = leavingBefore && leavingInstead && leavingCheck
-      if(!allLeaving) stop
+      val leaveCtx = RuleContext(Some(currentLocation), None, false)
+      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
+      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
+      if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
 
       if (!connected) {
         Say(s"You can't go $d")
@@ -92,13 +102,10 @@ object Actions {
       }
       val destination = currentLocation.connections(d)
 
-      val enteringBefore = RunRule(Some(destination), None, ruleSets(entering).beforeRules)
-      val enteringInstead = RunRule(Some(destination), None, ruleSets(entering).insteadRules)
-      val enteringCheck = RunRule(Some(destination), None, ruleSets(entering).checkRules)
-
-      val allEntering = enteringBefore && enteringInstead && enteringCheck
-      if(!allEntering) stop
-
+      val enterCtx = RuleContext(Some(destination), None, false)
+      if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
+      if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
+      if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
 
     }
 
@@ -113,20 +120,22 @@ object Actions {
       val d = noun[Direction]
       val room = currentLocation.connections(d)
 
-      RunRule(Some(currentLocation), None, ruleSets(leaving).reportRules)
-      RunRule(Some(currentLocation), None, ruleSets(leaving).executeRules)
+      val leaveCtx = RuleContext(Some(currentLocation), None, false)
+      RunRule(leaveCtx, ruleSets(leaving).reportRules)
+      RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
       blackboard = currentLocation
       player.Move(room)
 
-      RunRule(Some(currentLocation), None, ruleSets(entering).reportRules)
-      RunRule(Some(currentLocation), None, ruleSets(entering).executeRules)
+      val enterCtx = RuleContext(Some(currentLocation), None, false)
+      RunRule(enterCtx, ruleSets(entering).reportRules)
+      RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(Some(previousRoom), None, ruleSets(leaving).afterRules)
-      RunRule(Some(currentLocation), None, ruleSets(entering).afterRules)
+      RunRule(RuleContext(Some(previousRoom), None, false), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(Some(currentLocation), None, false), ruleSets(entering).afterRules)
     }
 
   }
@@ -169,11 +178,6 @@ object Actions {
       z.parentContainer != player
     }
 
-
-    // i don't really know how i feel about check rules, but inform has them so why not
-    // they are checked after "before" and "instead" rules, so you can put generic conditions here.
-    // if you want to override these generic conditions... i'm not sure how we should do that yet.
-    // for the most part, you could just insert the contents of "check" rules at the top of inflict rules, but this has more granularity i suppose.
     check(taking){
       if !noun.isAccessible(currentLocation) then
         Say(noun is "inaccessible") // maybe say why?
@@ -340,6 +344,18 @@ object Actions {
   }
 
   object putting extends Action(2,"put", "insert", "place") {
+
+    before(putting, player lacks noun){
+      if( execute(taking, noun, silent = true) ){
+        Say(s"(First taking $noun)")
+      }
+    }
+
+    before(putting, !secondNoun[Container].open) {
+      if (execute(opening, secondNoun, silent = true)) {
+        Say(s"(First opening $secondNoun)")
+      }
+    }
 
     instead(putting, player lacks noun) Say s"You need to pick up $noun before putting it somewhere."
     instead(putting, player lacks noun, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.

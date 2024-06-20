@@ -14,7 +14,8 @@ val player = new Player:
 object Dirt extends Room with StartingRoom {
 
   override val name: String = "dirt"
-  override val description: StringExpression = "You are buried in soil."
+  override val description: StringExpression = once("the floorboards creak underfoot.") + "You are buried in soil."
+
 
   val pebble = ~"the size of a small boulder"
   val mud = ~"dirt juice" amount some
@@ -23,18 +24,21 @@ object Dirt extends Room with StartingRoom {
   val bucket = box("pebble purgatory") {
     val sand = ~"paperless sandpaper" amount some
   }
-  
+
+  instead(opening, bucket) Say "It's sealed with bucket glue"
+
   val hook = supporter("hungry tines") 
 
   object not_yours extends Property
-  val scarves = ~"An array of zebra patterned tactical scarves" is scenery is not_yours
-  val mantles = ~"How did they get all these fireplaces in here???" is scenery is not_yours
-  val sashes = ~"Second place winner in the number of sashes competition" is scenery is not_yours
+  val scarves = ~"An array of zebra patterned tactical scarves" is scenery and not_yours
+  val mantles = ~"How did they get all these fireplaces in here???" is scenery and not_yours
+  val sashes = ~"Second place winner in the number of sashes competition" is scenery and not_yours
 
 
   var time = 0
 
   inflict(being) {
+    if(first) Say("Time is ticking")
     time = time + 1
   }
 
@@ -82,8 +86,6 @@ object WormPile extends Room {
   override val name: String = "Worm Pile"
   override val description: StringExpression = "I'm not sure what you expected."
 
-  //instead(entering, this) Say "Its too full to fit into!"
-
   Connect(south, Dirt)
 }
 
@@ -91,12 +93,11 @@ object WormPile extends Room {
 object FairyFountain extends Room {
 
   override val name: String = "Fairy Fountain"
-  override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with great power."
+  override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with immense power."
   val fairy_armadillo = ~"Nigiri with feet"
 
 
   instead(leaving, here) Say "The big guy wants your attention here"
-  instead(leaving, this) Say "The big guy wants your attention"
 
 
   Connect(north, Dirt)
