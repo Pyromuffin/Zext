@@ -3,7 +3,8 @@ package Zext
 import Zext.Actions.*
 import Zext.Direction.opposing
 import Zext.Interpreter.Say
-import Zext.Rule.{after, inflict, execute}
+import Zext.QueryPrecedence.Location
+import Zext.Rule.{after, execute, inflict}
 import Zext.World.{currentLocation, noun}
 
 import scala.collection.mutable
@@ -46,10 +47,9 @@ abstract class Room extends ZextObject with Container {
 
   World.currentWorld.rooms.append(this)
 
-  val here = this
+  val here = Condition(this == currentLocation, Location )
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
-  def asDestination = Condition.fromObject(this)
 
   def Connect(direction: Direction, destination : Room) = {
     this.connections(direction) = destination

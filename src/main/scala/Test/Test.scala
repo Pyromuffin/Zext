@@ -38,25 +38,39 @@ object Dirt extends Room with StartingRoom {
     time = time + 1
   }
 
-   report(being) Say Randomly("ouch", "my bones", s"the current time is $time")
-
-  after(being) {
-    Say(Cycle("Red", "Green", "Blue"))
-    Say(Randomly("ouch", "my bones", s"the current time is $time"))
-  }
-
-
   report(going, south, here) Say "You tunnel to the south."
   report(going, north, here) Say "You mosey to the north."
 
   report(leaving, here) Say "The tunnel collapses behind you."
-  // after leaving doesn't work because once you left you're not here anymore!
-  // after rules are weird
   inflict(leaving, here) {
     Disconnect(south)
     Disconnect(north)
   }
 
+
+  val clothes_rack = new Supporter("Clothes Rack") {
+
+
+    this is fixed
+    this aka "rack"
+
+    automaticallyListContents = false
+
+
+    val shirt = ~"Solidified dye in the shape of a tank top"
+
+    override val description = str {
+      if (contents.contains(shirt))
+        "A shirt is pinned to a line strewn between two very serious pots."
+      else
+        "The line hangs limply"
+    }
+
+
+    report(taking, shirt, this has shirt) {
+      Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
+    }
+  }
 
 
 
@@ -68,6 +82,8 @@ object WormPile extends Room {
   override val name: String = "Worm Pile"
   override val description: StringExpression = "I'm not sure what you expected."
 
+  //instead(entering, this) Say "Its too full to fit into!"
+
   Connect(south, Dirt)
 }
 
@@ -78,7 +94,9 @@ object FairyFountain extends Room {
   override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with great power."
   val fairy_armadillo = ~"Nigiri with feet"
 
-  instead(leaving, here) Say "The big guy wants your attention"
+
+  instead(leaving, here) Say "The big guy wants your attention here"
+  instead(leaving, this) Say "The big guy wants your attention"
 
 
   Connect(north, Dirt)

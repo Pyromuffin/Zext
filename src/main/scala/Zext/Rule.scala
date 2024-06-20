@@ -5,6 +5,7 @@ import Zext.Interpreter.*
 import Zext.Macros.{CodePosition, depth}
 import Zext.Parser.*
 import Zext.Rule.*
+import Zext.RuleControl.{Continue, Replace, Stop}
 import Zext.World.*
 
 import scala.collection.mutable
@@ -29,13 +30,17 @@ object Rule {
         val executeRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
         val reportRules = ArrayBuffer[ActionRule]()
+
+        def GetSet() = {
+            Array(beforeRules, insteadRules, checkRules, reportRules, executeRules, afterRules)
+        }
     }
 
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
 
 
     inline def check(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; true}, conditions *)
+        val rule = new ActionRule({body; Continue}, conditions *)
         rule.definitionPosition = CodePosition()
         ruleSets(r).checkRules += rule
         rule
@@ -43,41 +48,39 @@ object Rule {
 
 
     inline def before(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; true}, conditions*)
+        val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).beforeRules += rule
         rule
     }
 
     inline def instead(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; false}, conditions*)
+        val rule = new ActionRule({body; Stop}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).insteadRules += rule
         rule
     }
 
     inline def inflict(r: Action, conditions: Condition*)(body: => Unit) : ActionRule = {
-        val rule = new ActionRule({body; true}, conditions*)
+        val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).executeRules += rule
         rule
     }
 
     inline def report(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule( {body; true}, conditions* )
+        val rule = new ActionRule( {body; Replace}, conditions* )
         rule.definitionPosition = CodePosition()
         ruleSets(r).reportRules += rule
         rule
     }
 
-
     inline def after(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; true}, conditions*)
+        val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
         rule
     }
-
 
 
     // ultra terse syntax
@@ -147,7 +150,19 @@ object Rule {
     }
 
 
-    def RunRule(target: Option[ZextObject], target2: Option[ZextObject], rules: ArrayBuffer[ActionRule], all: Boolean = false): Boolean = {
+    def ExecuteRules(sortedRules : Seq[ActionRule]) : Boolean = {
+        for (rule <- sortedRules) {
+            val result = rule.exec
+            result match {
+                case Continue =>
+                case Stop => return false
+                case Replace => return true
+            }
+        }
+        true
+    }
+
+    def RunRule(target: Option[ZextObject], target2: Option[ZextObject], rules: ArrayBuffer[ActionRule]): Boolean = {
         nounStack.push((noun, secondNoun))
 
         if (target.isDefined) SetNoun(target.get)
@@ -155,13 +170,7 @@ object Rule {
 
         val possibleRules = rules.filter(_.possible)
         val sorted = SortByPrecedence(possibleRules)
-
-
-        val result = if (all) {
-            sorted.forall(_.exec)
-        } else {
-            sorted.headOption.forall(_.exec)
-        }
+        val result = ExecuteRules(sorted)
 
         val previousNouns = nounStack.pop()
         SetNoun(previousNouns._1)
@@ -174,6 +183,8 @@ object Rule {
         val set = ruleSets(rule)
 
          /*
+            these are the rules for inform's rule execution, we are not following them, but it's useful to know anyway.
+
             Before: by default, make no decision. If stopped, no further rulebooks are run.
             (some internal visibility/accessibility sanity checks run here)
             Instead: by default, stop the action. If stopped, no further rulebooks are run.
@@ -186,12 +197,12 @@ object Rule {
 
          blackboardStack.push(blackboard)
 
-         if(!RunRule(target, target2, set.beforeRules, true)) return false
-         if(!RunRule(target, target2, set.insteadRules)) return false
-         if(!RunRule(target, target2, set.checkRules, true)) return false
-         if(!RunRule(target, target2, set.reportRules)) return false
-         if(!RunRule(target, target2, set.executeRules, true)) return false
-         if(!RunRule(target, target2, set.afterRules, true)) return false
+         for(rules <- set.GetSet()) {
+             if (!RunRule(target, target2, rules)) {
+                 blackboard = blackboardStack.pop()
+                 return false // cry about it.
+             }
+         }
 
          blackboard = blackboardStack.pop()
 
@@ -237,7 +248,7 @@ object Condition {
     implicit def fromObject(z: => ZextObject): Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
-    implicit def fromLocation(r: => Room): Condition = new Condition(r == currentLocation, QueryPrecedence.Location)
+    implicit def fromLocation(r: => Room): Condition = new Condition(r.objectID == noun.objectID, QueryPrecedence.Location)
     implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = new Condition(t._1.objectID == noun.objectID && t._2.objectID == secondNoun.objectID, QueryPrecedence.SecondObject)
 
     inline def of[T](using TypeTest[ZextObject, T]): Condition = {
@@ -280,17 +291,23 @@ object Condition {
     }
 }
 
-
+class ReplaceException extends ControlThrowable
 class ContinueException extends ControlThrowable
 class StopException extends ControlThrowable
 def continue: Unit = throw new ContinueException
 def stop: Unit = throw new StopException
+def replace: Unit = throw new ReplaceException
+
+enum RuleControl {
+    case Stop, Continue, Replace
+}
+
 
 def result(res : Boolean) : Unit = {
     if(res) continue else stop
 }
 
-class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
+class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
     def specificity = {
         conditions.map( _.specificity ).sum
     }
@@ -311,12 +328,13 @@ class ActionRule(body : => Boolean, conditions : Condition*) extends Rule{
         }
     }
 
-    def exec : Boolean = {
+    def exec : RuleControl = {
         val ret = try{
             body
         } catch {
-            case ex : ContinueException => true
-            case ex : StopException => false
+            case ex : ContinueException => RuleControl.Continue
+            case ex : StopException => RuleControl.Stop
+            case ex : ReplaceException => RuleControl.Replace
         }
 
         ret
@@ -333,13 +351,6 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     var implicitTargetSelector : ZextObject => Boolean = null
     var disambiguationHint : ZextObject => Boolean = null
-
-    /*
-    Understand(this, verbs*)
-    if(targets == 1){
-        UnderstandAlias(verbs, this, reflexively,null)
-    }
-    */
 
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)

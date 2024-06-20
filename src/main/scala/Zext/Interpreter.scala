@@ -34,60 +34,97 @@ implicit class TernaryExtension(that : Boolean) {
 
 object StringExpression{
 
+  /**
+   * stateful strings use a source code position macro to track which state they should access
+   * so if multiple stateful strings are created at the same source code position (eg, procedurally in a loop)
+   * then they will share the same state unless you provide an extra key using the withKey method
+   */
+  trait StatefulString(val key : String) {
+
+    this : StringExpression =>
+
+    var extraKey = ""
+
+    /** Sets an extra key for procedurally created stateful strings  */
+    def withKey(str : String) : this.type = {
+      extraKey = str
+      this
+    }
+
+    def GetState() : Int = {
+      StringExpression.state.getOrElse(key + extraKey, 0)
+    }
+
+    def UpdateState(state : Int): Unit = {
+      StringExpression.state(key + extraKey) = state
+    }
+
+    def ResetState(): Unit = {
+      UpdateState(0)
+    }
+  }
+
+
   private val state = mutable.HashMap[String, Int]()
 
-  implicit def str(str : => String): StringExpression = {
+  implicit def fromString(str : => String): StringExpression = {
     new StringExpression(str)
   }
 
-  private case class ProgressivelyHolder(pos : String, strs: StringExpression*) extends StringExpression(null) {
+  def str (s : => StringExpression) : StringExpression = {
+    new StringExpression(s"$s")
+  }
+
+  implicit def fromStateful(str : StatefulString): StringExpression = {
+    str.asInstanceOf[StringExpression]
+  }
+
+  private case class ProgressivelyHolder(pos : String, strs: StringExpression*) extends StringExpression(null) with StatefulString(pos) {
 
     override def toString: String = {
-      var state = StringExpression.state.getOrElse(pos, 0)
+      var state = GetState()
       val ret = strs(state).toString
       state = scala.math.min(state + 1, strs.length - 1)
-      StringExpression.state(pos) = state
+      UpdateState(state)
       ret
     }
   }
 
-  private case class CycleHolder(pos : String, strs: StringExpression*) extends StringExpression(null) {
+  private case class CycleHolder(pos : String, strs: StringExpression*) extends StringExpression(null) with StatefulString(pos) {
 
     override def toString: String = {
-      var state = StringExpression.state.getOrElse(pos, 0)
+      var state =  GetState()
       val ret = strs(state).toString
       state = (state + 1) % strs.length
-      StringExpression.state(pos) = state
-
+      UpdateState(state)
       ret
     }
   }
 
-  inline def Cycle(strs: StringExpression*): StringExpression = {
+  inline def cycle(strs: StringExpression*): StatefulString = {
     CycleHolder(Macros.CodePosition(), strs *)
   }
 
-  inline def Progressively(strs: StringExpression*) : StringExpression = {
+  inline def progressively(strs: StringExpression*) : StatefulString = {
     ProgressivelyHolder(Macros.CodePosition(), strs *)
   }
 
+  def infrequently(s : StringExpression, one_in: Int) : StringExpression = str {
+    if scala.util.Random.nextInt(one_in) == 0 then s else ""
+  }
 
-  def Randomly(one_in: Int): Boolean = util.Random.nextInt(one_in) == 0
-
-  def Randomly(strs: StringExpression*): StringExpression = s"${
+  def randomly(strs: StringExpression*): StringExpression = str {
       val which = util.Random.nextInt(strs.length)
       strs(which)
-    }"
-
-
+    }
 }
 
 class StringExpression(lazyStr : => String) extends Serializable{
+
   override def toString: String = {
     lazyStr
   }
 }
-
 
 
 
@@ -149,8 +186,9 @@ object Interpreter{
   }
 
   def Say(str: StringExpression): Unit = {
+
     val strImmediate = str.toString
-    if(strImmediate == "") println("Empty string!!!")
+    if(strImmediate == "") return // maybe an error
 
     println( Capitalize(strImmediate) )
   }

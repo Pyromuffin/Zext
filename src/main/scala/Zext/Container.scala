@@ -42,19 +42,20 @@ object Supporter {
 
 
 // tables, hooks, etc always open and cannot be closed.
-abstract class Supporter(using Container) extends Thing with Container {
+abstract class Supporter(val name: String)(using Container) extends Thing with Container {
   automaticallyListContents = false
   open = true
   transparent = true
 }
 
-abstract class Box(open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
+abstract class Box(val name: String, open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
   transparent = open_and_transparent
   open = open_and_transparent
 }
 
-case class SimpleBox(name : String, description: StringExpression)(using c : Container) extends Box
-case class SimpleSupporter(name: String, description: StringExpression)(using c: Container) extends Supporter
+case class SimpleBox(override val name : String, description: StringExpression)(using c : Container) extends Box(name)
+
+case class SimpleSupporter(override val name: String, description: StringExpression)(using c: Container) extends Supporter(name)
 
 inline def box(desc: StringExpression)(code: Container ?=> Unit)(using boxContainer: Container) = {
   val name = Macros.superVariableName

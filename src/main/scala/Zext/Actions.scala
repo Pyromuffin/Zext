@@ -5,12 +5,14 @@ import Zext.Parser.*
 import Zext.Rule.*
 import Zext.World.*
 import Zext.ZextObject.*
+import Zext.StringExpression.*
 
 import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
 
 import scala.collection.mutable.ArrayBuffer
+
 
 object Actions {
 
@@ -76,17 +78,28 @@ object Actions {
       val connected = currentLocation.connections.contains(d)
 
       // this is so dumb but maybe it will work?
-      val leavingBefore = RunRule(Some(currentLocation), None, ruleSets(leaving).beforeRules, true)
+      val leavingBefore = RunRule(Some(currentLocation), None, ruleSets(leaving).beforeRules)
       val leavingInstead = RunRule(Some(currentLocation), None, ruleSets(leaving).insteadRules)
-      val leavingCheck = RunRule(Some(currentLocation), None, ruleSets(leaving).checkRules, true)
+      val leavingCheck = RunRule(Some(currentLocation), None, ruleSets(leaving).checkRules)
 
-      val all = leavingBefore && leavingInstead && leavingCheck
-      if(!all) stop
+
+      val allLeaving = leavingBefore && leavingInstead && leavingCheck
+      if(!allLeaving) stop
 
       if (!connected) {
         Say(s"You can't go $d")
         stop
       }
+      val destination = currentLocation.connections(d)
+
+      val enteringBefore = RunRule(Some(destination), None, ruleSets(entering).beforeRules)
+      val enteringInstead = RunRule(Some(destination), None, ruleSets(entering).insteadRules)
+      val enteringCheck = RunRule(Some(destination), None, ruleSets(entering).checkRules)
+
+      val allEntering = enteringBefore && enteringInstead && enteringCheck
+      if(!allEntering) stop
+
+
     }
 
     report(going, of[Direction]) {
@@ -101,14 +114,19 @@ object Actions {
       val room = currentLocation.connections(d)
 
       RunRule(Some(currentLocation), None, ruleSets(leaving).reportRules)
-      RunRule(Some(currentLocation), None, ruleSets(leaving).executeRules, true)
+      RunRule(Some(currentLocation), None, ruleSets(leaving).executeRules)
+
       blackboard = currentLocation
       player.Move(room)
+
+      RunRule(Some(currentLocation), None, ruleSets(entering).reportRules)
+      RunRule(Some(currentLocation), None, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
-      RunRule(Some(blackboard.asInstanceOf[Room]), None, ruleSets(leaving).afterRules, true)
-      result(execute(entering, currentLocation))
+      val previousRoom = blackboard.asInstanceOf[Room]
+      RunRule(Some(previousRoom), None, ruleSets(leaving).afterRules)
+      RunRule(Some(currentLocation), None, ruleSets(entering).afterRules)
     }
 
   }
@@ -122,7 +140,7 @@ object Actions {
 
     inflict(dropping, reflexively) {
 
-      Say(Randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
+      Say(randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
@@ -138,7 +156,7 @@ object Actions {
         noun.transferTo(currentLocation)
     }
 
-    report(dropping) Say Randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
+    report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
 
   }
 
