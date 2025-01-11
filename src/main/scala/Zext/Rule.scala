@@ -53,7 +53,6 @@ case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: B
 
 object Rule {
 
-    val blackboardStack = mutable.Stack[Any]()
     var blackboard : Any = null
 
     class ActionRuleSet {
@@ -215,6 +214,8 @@ object Rule {
 
          /*
             these are the rules for inform's rule execution, we are not following them, but it's useful to know anyway.
+            one thing about before, instead, and after rules is that in inform, they're global. They are all checked every command.
+            I believe this allows them to apply to sets of rules, or reason about rule logic in a powerful way. We don't do anything like that at the moment, but maybe!
 
             Before: by default, make no decision. If stopped, no further rulebooks are run.
             (some internal visibility/accessibility sanity checks run here)
@@ -227,17 +228,16 @@ object Rule {
 
          val context = RuleContext(target, target2, silent)
 
-         blackboardStack.push(blackboard)
+         val previousBlackboard = blackboard
 
          for(rules <- set.GetAllRules()) {
              if (!RunRule(context, rules)) {
-                 blackboard = blackboardStack.pop()
+                 blackboard = previousBlackboard
                  return false // cry about it.
              }
          }
 
-         blackboard = blackboardStack.pop()
-
+         blackboard = previousBlackboard
          true
     }
 
