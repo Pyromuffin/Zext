@@ -24,7 +24,7 @@ lazy val zext = (project in file("."))
   .settings(
     name := "Zext",
 
-    version := "0.1.6",
+    version := "0.1.7",
     organization := org,
     autoCompilerPlugins := true,
     addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.0.6"),

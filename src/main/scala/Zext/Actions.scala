@@ -273,18 +273,36 @@ object Actions {
       if(!c.automaticallyListContents)
         continue
 
-      var response = ""
-      if c.open then response +=s"$noun is open" else response += s"$noun is closed"
-
-      if (c.open  || c.transparent) {
-        response += ", "
-        if(c.contents.isEmpty)
-          response += "nothing is inside"
-        else
-          response += s"inside you can see ${c.ContentsString.get}"
+      val roomDescribed = c.contents.filter { z =>
+        val roomDesc = z.get[RoomDescription]
+        roomDesc.isDefined && !roomDesc.get.disturbed
       }
 
-      Say(response)
+      val nondescribed = c.contents.diff(roomDescribed)
+
+      if (roomDescribed.nonEmpty) {
+        if c.open then Say(s"$noun is open") else Say(s"$noun is closed")
+        if (c.open || c.transparent) {
+          for (rd <- roomDescribed) {
+            Say(rd.get[RoomDescription].get.desc)
+          }
+          if(nondescribed.nonEmpty){
+            Say(s"Inside $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
+          }
+        }
+      } else  {
+        var response = ""
+        if c.open then response += s"$noun is open" else response += s"$noun is closed"
+        if (c.open || c.transparent) {
+          response += ", "
+          if (c.contents.isEmpty)
+            response += "nothing is inside"
+          else
+            response += s"inside you can see ${c.ContentsString.get}"
+        }
+
+        Say(response)
+      }
     }
   }
 
@@ -317,10 +335,31 @@ object Actions {
     }
 
     report(opening, of[Container]) {
-      if !noun[Container].transparent && noun[Container].contents.nonEmpty then
-        Say(s"You open $noun, inside you can see ${noun[Container].ContentsString.get}")
+      val c = noun[Container]
+
+      if (!c.transparent && c.contents.nonEmpty) {
+        val roomDescribed = c.contents.filter { z =>
+          val roomDesc = z.get[RoomDescription]
+          roomDesc.isDefined && !roomDesc.get.disturbed
+        }
+
+        val nondescribed = c.contents.diff(roomDescribed)
+        if (roomDescribed.nonEmpty) {
+          Say(s"You open $noun")
+          for (rd <- roomDescribed) {
+            Say(rd.get[RoomDescription].get.desc)
+          }
+          if (nondescribed.nonEmpty) {
+            Say(s"Inside $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
+          }
+        } else {
+          Say(s"You open $noun, inside you can see ${c.ContentsString.get}")
+        }
+      }
       else
+      {
         Say(s"You open $noun")
+      }
     }
   }
 
