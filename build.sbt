@@ -10,13 +10,21 @@ githubTokenSource := TokenSource.Or(
     TokenSource.GitConfig("github.token") // local token set in ~/.gitconfig
 )
 
+credentials += Credentials(
+    "GitHub Package Registry",
+    "maven.pkg.github.com",
+    "_",
+    sys.env("GITHUB_TOKEN")
+)
+
+
 val org = "com.pyromuffin"
 
 lazy val zext = (project in file("."))
   .settings(
     name := "Zext",
 
-    version := "0.1.4",
+    version := "0.1.6",
     organization := org,
     autoCompilerPlugins := true,
     addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.0.6"),

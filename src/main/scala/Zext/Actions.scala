@@ -205,6 +205,11 @@ object Actions {
     inflict(taking) {
       noun.transferTo(player)
     }
+
+    after(taking, prop[RoomDescription]) {
+      noun[RoomDescription].disturbed = true
+    }
+
   }
 
   extension[T] (o : Option[T]) {
@@ -232,8 +237,20 @@ object Actions {
 
     after(examining, of[Room]) {
       val r = noun[Room]
-      val nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
+      var nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
       val people = r.contents.filter(_.isType[Person]).toSeq
+
+
+      val roomDescribed = nonscenery.filter{ z =>
+        val roomDesc = z.get[RoomDescription]
+        roomDesc.isDefined && !roomDesc.get.disturbed
+      }
+
+      nonscenery = nonscenery.diff(roomDescribed)
+
+      for(rd <- roomDescribed) {
+        Say(rd.get[RoomDescription].get.desc)
+      }
 
       val nonsceneryString = ListNamesNicely(nonscenery)
       nonsceneryString does { s =>

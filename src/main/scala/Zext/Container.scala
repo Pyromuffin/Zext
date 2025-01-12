@@ -58,28 +58,28 @@ case class SimpleBox(override val name : String, description: StringExpression)(
 case class SimpleSupporter(override val name: String, description: StringExpression)(using c: Container) extends Supporter(name)
 
 inline def box(desc: StringExpression)(code: Container ?=> Unit)(using boxContainer: Container) = {
-  val name = Macros.superVariableName
+  val name = FixName(Macros.superVariableName)
   val box = SimpleBox(name, desc)(using boxContainer)
   code(using box)
   box
 }
 
 inline def box(desc: StringExpression)(using boxContainer: Container) = {
-  val name = Macros.superVariableName
+  val name = FixName(Macros.superVariableName)
   val box = SimpleBox(name, desc)(using boxContainer)
   box
 }
 
 
 inline def supporter(desc: StringExpression)(code: Container ?=> Unit)(using supporterContainer: Container) = {
-  val name = Macros.superVariableName
+  val name = FixName(Macros.superVariableName)
   val supporter = SimpleSupporter(name, desc)(using supporterContainer)
   code(using supporter)
   supporter
 }
 
 inline def supporter(desc: StringExpression)(using supporterContainer: Container) = {
-  val name = Macros.superVariableName
+  val name = FixName(Macros.superVariableName)
   val supporter = SimpleSupporter(name, desc)(using supporterContainer)
   supporter
 }

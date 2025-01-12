@@ -35,6 +35,10 @@ object Dirt extends Room with StartingRoom {
   val sashes = ~"Second place winner in the number of sashes competition" is scenery and not_yours
 
 
+  val crumble_block = ~"It disintegrated." and RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
+  
+
+
   var time = 0
 
   inflict(being) {

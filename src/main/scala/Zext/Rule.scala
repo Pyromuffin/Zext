@@ -351,7 +351,11 @@ class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
         try{
             conditions.forall( _.evaluate )
         } catch {
-            case e => {
+            case cast : ClassCastException => {
+                // if we're trying to cast to something it's not, then that means it's not possible.
+                false
+            }
+            case e: Throwable => {
                 System.err.println("Error from condition at: .(" + definitionPosition + ")")
                 throw e
             }

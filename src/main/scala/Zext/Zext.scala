@@ -107,7 +107,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     //@todo eventually fix zextobject/thing confusion
     var parentContainer: Container = null
     val parts = ArrayBuffer[ZextObject]()
-    var compositeObject: ZextObject = null
+    var compositeObject: ZextObject = null // turn composite into a property
 
 
     infix def transferTo(container: Container): Unit = {
@@ -235,6 +235,9 @@ object Thing {
     }
 }
 
+case class RoomDescription(desc: StringExpression) extends Property {
+    var disturbed = false
+}
 
 case class SimpleThing(name : String, description: StringExpression)(using c : Container) extends Thing
 
