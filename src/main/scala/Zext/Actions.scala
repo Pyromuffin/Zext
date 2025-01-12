@@ -206,7 +206,7 @@ object Actions {
       noun.transferTo(player)
     }
 
-    after(taking, prop[RoomDescription]) {
+    after(taking, of[RoomDescription]) {
       noun[RoomDescription].disturbed = true
     }
 

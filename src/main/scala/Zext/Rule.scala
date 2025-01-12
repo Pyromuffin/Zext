@@ -253,7 +253,7 @@ abstract class Rule {
 
 
 enum QueryPrecedence:
-    case Generic, Class, SecondClass, Property, Containment, Object, SecondObject, Location
+    case Generic, Class, SecondClass, Property, SecondProperty, Containment, Object, SecondObject, Location
 
 
 class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
@@ -269,9 +269,6 @@ object Condition {
     // inform's precedence is something like
     // location > object > property > class > generic
 
-
-    def prop[T](using tt: TypeTest[Property, T]): Condition = new Condition(noun.properties.exists(canBecome[Property, T]), QueryPrecedence.Property)
-
     implicit def fromBoolean(b: => Boolean): Condition = new Condition(b, QueryPrecedence.Generic)
     implicit def fromObject(z: => ZextObject): Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
@@ -279,15 +276,23 @@ object Condition {
     implicit def fromLocation(r: => Room): Condition = new Condition(r.objectID == noun.objectID, QueryPrecedence.Location)
     implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = new Condition(t._1.objectID == noun.objectID && t._2.objectID == secondNoun.objectID, QueryPrecedence.SecondObject)
 
-    inline def of[T](using TypeTest[ZextObject, T]): Condition = {
+    inline def of[T <: Property](using tt: TypeTest[Property, T], dummy : DummyImplicit): Condition = {
+        new Condition(noun.properties.exists(canBecome[Property, T]), QueryPrecedence.Property)
+    }
+
+    inline def ofSecond[T <: Property](using tt: TypeTest[Property, T], dummy : DummyImplicit): Condition = {
+        new Condition(secondNoun.properties.exists(canBecome[Property, T]), QueryPrecedence.SecondProperty)
+    }
+
+    inline def of[T <: ZextObject | Container](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.Class)
     }
 
-    inline def ofSecond[T](using TypeTest[ZextObject, T]): Condition = {
+    inline def ofSecond[T <: ZextObject | Container](using TypeTest[ZextObject, T]): Condition = {
         of[T](QueryPrecedence.SecondClass)
     }
 
-    inline def of[T](queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+    inline def of[T <: ZextObject | Container](queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
         val condition = new Condition(
             {
                 val target = if (queryType == QueryPrecedence.Class) noun else secondNoun
