@@ -4,6 +4,7 @@ import Zext.Actions.{UnderstandAlias, allActions, examining}
 import Zext.Interpreter.*
 import Zext.Macros.{CodePosition, depth}
 import Zext.Parser.*
+import Zext.QueryPrecedence.Location
 import Zext.Rule.*
 import Zext.RuleContext.*
 import Zext.RuleControl.{Continue, Replace, Stop}
@@ -297,33 +298,39 @@ class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
 
 }
 
+
 object Condition {
     // inform's precedence is something like
     // location > object > property > class > generic
 
     implicit def fromBoolean(b: => Boolean): Condition = new Condition(b, QueryPrecedence.Generic)
-    implicit def fromObject(z: => ZextObject): Condition = new Condition(z.objectID == noun.objectID, QueryPrecedence.Object)
+    implicit def fromObject(z: => ZextObject): Condition = new Condition(z == noun, QueryPrecedence.Object)
+    def fromSecondObject(z: => ZextObject): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
-    implicit def fromLocation(r: => Room): Condition = new Condition(r.objectID == noun.objectID, QueryPrecedence.Location)
+    implicit def fromLocation(r: => Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
+    implicit def fromRegion(r: => RoomRegion): Condition = new Condition(r.rooms.contains(currentLocation), QueryPrecedence.Location)
     implicit def fromClassHolder(ch: => ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
     implicit def fromPropHolder(ph: => ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
 
 
-    implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = {
+
+    implicit def fromTuple(t: => (ZextObject | ZextObjectProxy[_], ZextObject | ZextObjectProxy[_])): Condition = {
 
         val firstPredicate : Condition = t._1 match {
-            case anythingFirst : ZextObject if anythingFirst.objectID == anything.objectID => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
+            case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case _ => fromObject(t._1)
+            case zextObjectProxy: ZextObjectProxy[_] => fromObject(zextObjectProxy.resolve)
+            case zextObject: ZextObject => fromObject(zextObject)
         }
 
         val secondPredicate: Condition = t._2 match {
-            case anythingFirst : ZextObject if anythingFirst.objectID == anything.objectID => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
+            case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case _ => {val c = fromObject(t._2); c.queryType = QueryPrecedence.SecondObject; c}
+            case zextObjectProxy: ZextObjectProxy[_] => fromSecondObject(zextObjectProxy.resolve)
+            case zextObject: ZextObject => fromSecondObject(zextObject)
         }
 
         firstPredicate && secondPredicate

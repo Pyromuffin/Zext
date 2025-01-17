@@ -313,6 +313,9 @@ object Parser extends RegexParsers{
     4) the current room or an adjacent room (? maybe ?),
     5) a global object
     6) a part of a visible object
+    7) a backdrop in the current room
+    8) a backdrop in the current region
+    9) a backdrop that is in the everywhere region
     */
 
     val visibleSet = new ArrayBuffer[ZextObject]()
@@ -320,6 +323,15 @@ object Parser extends RegexParsers{
     visibleSet.addAll( FindAllTransitivelyVisible(currentLocation) )
     visibleSet.addAll( player.contents ) // this doesn't transitively give you the contents of the player or the globals.
     visibleSet.addAll( World.currentWorld.globals )
+    visibleSet.addAll( currentLocation.backdrops.flatMap(_.contents) )
+
+    for(region <- World.currentWorld.regions){
+      if(region.rooms.contains(currentLocation)){
+        visibleSet.addAll(region.backdrops.flatMap(_.contents))
+      }
+    }
+
+    visibleSet.addAll(everywhere.backdrops.flatMap(_.contents))
 
     visibleSet
   }
@@ -334,6 +346,22 @@ object Parser extends RegexParsers{
     names
   }
 
+  object findingVisibleSet extends Action(0) {
+    var visibleSet = ArrayBuffer[ZextObject]()
+
+    inflict(findingVisibleSet) {
+      visibleSet = FindVisibleSet()
+    }
+
+
+    def makeVisible(zextObject: ZextObject) = {
+      if (!visibleSet.contains(zextObject)) {
+        visibleSet.addOne(zextObject)
+      }
+    }
+  }
+
+
   def BuildUnderstandables(): Unit = {
 
     understandables.clear()
@@ -345,32 +373,11 @@ object Parser extends RegexParsers{
       }
     }
 
-    val visibleSet = FindVisibleSet()
+    execute(findingVisibleSet, reflexively)
 
-    visibleSet.foreach { z =>
+    findingVisibleSet.visibleSet.foreach { z =>
       Understand(z, GetWords(z)*)
     }
-  }
-
-
-  def VerbParser(action: Action) : Parser[Action] = {
-    val words = action.verbs.toList
-    val parsers = words.map {
-      _.r ^^ { s => action }
-    }
-    val parser = parsers.reduce( _ | _ )
-    parser
-  }
-
-  def NounParser(noun: ZextObject) : Parser[ZextObject] = {
-    var words = Seq(noun.name).concat(noun.aliases.toSeq)
- 
-
-    val parsers = words.map {
-      _.toString.r ^^ { s => noun }
-    }
-    val parser = parsers.reduce( _ | _ )
-    parser
   }
 
 
@@ -454,7 +461,6 @@ object Parser extends RegexParsers{
   def BuildParser2() : CommandParserType = {
 
     BuildUnderstandables()
-
 
     val allParsers : Seq[Parser[Seq[ParsableType]]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
     val space = "\\s+".r

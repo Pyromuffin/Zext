@@ -123,6 +123,7 @@ class WorldState{
 
   val globals = ArrayBuffer[ZextObject]()
   val rooms = ArrayBuffer[Room]()
+  val regions = ArrayBuffer[RoomRegion]()
   var player : PlayerClass = null
 
   var time = 0

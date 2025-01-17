@@ -5,9 +5,10 @@ import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.QueryPrecedence.Location
 import Zext.Rule.{after, execute, inflict}
-import Zext.World.currentLocation
+import Zext.World.{currentLocation, currentWorld}
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 enum Direction extends ZextObject {
   case north, east, south, west, up, down
@@ -52,6 +53,11 @@ abstract class Room extends ZextObject with Container {
   val here = Condition(this == currentLocation, Location )
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
+  val backdrops = mutable.HashSet[Backdrop]()
+
+  def addBackdrop(backdrop: Backdrop) : Unit = {
+    backdrops.add(backdrop)
+  }
 
   def Connect(direction: Direction, destination : Room) = {
     this.connections(direction) = destination
@@ -71,6 +77,31 @@ abstract class Room extends ZextObject with Container {
     this.connections.remove(direction)
     dest.connections.remove(opposing(direction))
   }
+}
 
 
+object everywhere extends RoomRegion
+
+
+class Backdrop extends ZextObject with Container {
+  override val name = this.getClass.getSimpleName
+  override val description = ""
+}
+
+class RoomRegion extends ZextObject {
+
+  override val name = this.getClass.getSimpleName
+  override val description = ""
+
+  World.currentWorld.regions.append(this)
+
+  val rooms = mutable.HashSet[Room]()
+  val backdrops = mutable.HashSet[Backdrop]()
+
+  def addBackdrop(backdrop: Backdrop) : Unit = {
+    backdrops.add(backdrop)
+  }
+
+  def addRoom(room : Room) : Unit = rooms.add(room)
+  def addRooms(r : Room*) : Unit = rooms.addAll(r)
 }

@@ -3,10 +3,13 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
+import Zext.Parser.findingVisibleSet
 
 val guy = new PlayerClass:
   override val name = "SLEEMO"
   override val description = "Your bipes bip fast."
+  var insured = false
+
   val stick = ~"sticky"
 
 object count {
@@ -23,7 +26,7 @@ object unlocking extends Action(1, "unlock")
   report(unlocking) Say s"You unlock $noun"
 }
 
-object Dirt extends Room with StartingRoom {
+object Dirt extends Room {
 
   override val name: StringExpression = "dirt"
   override val description: StringExpression = once("the floorboards creak underfoot.") + "You are buried in soil."
@@ -117,25 +120,71 @@ object Dirt extends Room with StartingRoom {
 
 object hanging extends Action(2, "hang") {
   implicitSubjectSelector = _ == player
+
+  report(hanging) Say s"$noun hangs from $secondNoun"
+
 }
 
 
-object CrowsNest extends Room with StartingRoom {
+object crowsBackdrop extends Backdrop {
+  val crows = ~"Several crows are circling above you."
+}
+
+object Circus extends RoomRegion {
+
+  addRooms(BigTop, CrowsNest)
+
+  val circusBackdrop = new Backdrop {
+    val tent = ~"A spiral candystripe towering overhead" aka "roof"
+  }
+
+  addBackdrop(circusBackdrop)
+}
+
+object BigTop extends Room with StartingRoom {
+
+
+  override val name: StringExpression = "The Big Top"
+  override val description: StringExpression =  "You are in a giant stadium, covered by a bright tent. It seems to be sagging in the middle"
+
+  val sagging = ~"Upon further inspection you see the sagging is caused by a small trapeze." is scenery is fixed aka "sag"
+
+  val ladder = ~"It leads to the crow's nest" is fixed
+
+  Connect(up, CrowsNest)
+}
+
+
+object CrowsNest extends Room {
   override val name: StringExpression = "The Crow's Nest"
   override val description: StringExpression = "A circular platform at the top of the ladder from which you can reach the trapeze"
 
-  val trapeze = ~"It looks like a barber pole, only it's orange and purple" is fixed
+  val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
+    "It looks like a barber pole, only it's orange and purple" is fixed
+
+  report(examining, trapeze, !trapeze.isAccessible(currentLocation)) Say "A handlebar that seems to be hanging from something in the sky"
+
+  instead(hanging, player -> trapeze, !guy.insured) Say "You are not insured for that"
+
+  addBackdrop(crowsBackdrop)
+
+  after(findingVisibleSet, Circus){
+    findingVisibleSet.makeVisible(trapeze)
+  }
 
 
-  instead(hanging, anything -> trapeze) Say "You are not insured for that"
 
 }
+
+
 
 
 object WormPile extends Room {
 
   override val name: StringExpression = "Worm Pile"
   override val description: StringExpression = "I'm not sure what you expected."
+
+  val pile_of_worms = ~"writhing all around you."
 
   Connect(south, Dirt)
 }
