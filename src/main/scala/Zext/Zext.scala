@@ -86,7 +86,7 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 @SerialVersionUID(100L)
-abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable {
+abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable {
 
     val dynamic = false
 
@@ -95,8 +95,8 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     var definiteArticle: String = "the"
     var indefiniteArticle: String = "a"
-    val name: String
-    var aliases = ArrayBuffer[String]()
+    val name: StringExpression
+    var aliases = ArrayBuffer[StringExpression]()
     val description: StringExpression
     var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
     var pluralized = false
@@ -109,6 +109,13 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     val parts = ArrayBuffer[ZextObject]()
     var compositeObject: ZextObject = null // turn composite into a property
 
+
+    override def equals(obj: Any) = {
+        obj match {
+            case zextObjectProxy: ZextObjectProxy[_] => objectID == zextObjectProxy.objectID
+            case zextObject: ZextObject => objectID == zextObject.objectID
+        }
+    }
 
     infix def transferTo(container: Container): Unit = {
         parentContainer.contents.remove(parentContainer.contents.indexOf(this))
@@ -163,9 +170,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     override def toString: String = definite
 
-    def asSecondNoun: Condition = {
-        Condition(secondNoun.objectID == this.objectID, QueryPrecedence.SecondObject)
-    }
 
     def get[T](using TypeTest[Property, T]): Option[T] = {
         // if a zextobject has more than one property of the same "type" then it will give ?? one
@@ -177,6 +181,17 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         compositeObject = zextObject
         zextObject.parts.addOne(this)
         this
+    }
+
+    infix def inside(container : Container): this.type = {
+        this transferTo container
+        this
+    }
+
+    def apply[T](using TypeTest[Property, T]): T = {
+        val maybe = this.get[T]
+        if (maybe.isDefined) maybe.get
+        else this.asInstanceOf[T]
     }
 
     def isType[T](using TypeTest[ZextObject, T]) = canBecome[ZextObject, T](this)
@@ -224,6 +239,10 @@ object Thing {
         inline def unary_~(using c : Container) : Thing = {
             SimpleThing(FixName(Macros.variableName), d)
         }
+
+        inline def initially(desc: StringExpression)(using c: Container): Thing = {
+            SimpleThing(FixName(Macros.variableName), desc) and RoomDescription(d)
+        }
     }
 
     def FixName(s: String): String = {
@@ -239,7 +258,7 @@ case class RoomDescription(desc: StringExpression) extends Property {
     var disturbed = false
 }
 
-case class SimpleThing(name : String, description: StringExpression)(using c : Container) extends Thing
+case class SimpleThing(name : StringExpression, description: StringExpression)(using c : Container) extends Thing
 
 abstract class Thing(using c : Container) extends ZextObject{
 
@@ -249,7 +268,7 @@ abstract class Thing(using c : Container) extends ZextObject{
     c.contents += this
 
     def isAutomaticallyPlural = {
-        Inflector.pluralize(name) == name
+        Inflector.pluralize(name.toString) == name.toString
     }
 
     if(isAutomaticallyPlural){

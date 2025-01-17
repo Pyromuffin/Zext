@@ -4,30 +4,55 @@ import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
 
-
-val player = new Player:
+val guy = new PlayerClass:
   override val name = "SLEEMO"
   override val description = "Your bipes bip fast."
+  val stick = ~"sticky"
+
+object count {
+
+  var calls = 0
+}
 
 
+object unlocking extends Action(1, "unlock")
+{
+  inflict(unlocking, of[Container]) {
+    noun[Container].openable = true
+  }
+  report(unlocking) Say s"You unlock $noun"
+}
 
 object Dirt extends Room with StartingRoom {
 
-  override val name: String = "dirt"
+  override val name: StringExpression = "dirt"
   override val description: StringExpression = once("the floorboards creak underfoot.") + "You are buried in soil."
 
+
+  val lockbox = simpleBox("A transparent lockbox with a small round keyhole") {
+    val treasure = ~"lucre"
+  }
+  lockbox.openable = false
+  lockbox.transparent = true
 
   val pebble = ~"the size of a small boulder"
   val mud = ~"dirt juice" amount some
   val walls = ~"they're everywhere" are fixed
 
-  val bucket = box("pebble purgatory") {
+  val bucket = simpleBox("pebble purgatory") {
     val sand = ~"paperless sandpaper" amount some
+    val pants = ~"rag ensemble" and RoomDescription("A pair of pants is tangled with bucket particles") amount some // add custom amountifiers like a pair
   }
 
-  instead(opening, bucket) Say "It's sealed with bucket glue"
+  //val zebra = z"Striped, suited to camouflage $time times in this environment"
 
-  val hook = supporter("hungry tines") 
+  val chemicals = ~"10 mol\\. guydrofluouric \\?type\\? \\\\acid\\\\"
+
+
+  report(opening, bucket) Say "Your pry open the bucket lid"
+  // instead(opening, bucket) Say "It's sealed with bucket glue"
+
+  val hook = simpleSupporter("hungry tines")
 
   object not_yours extends Property
   val scarves = ~"An array of zebra patterned tactical scarves" is scenery and not_yours
@@ -35,9 +60,9 @@ object Dirt extends Room with StartingRoom {
   val sashes = ~"Second place winner in the number of sashes competition" is scenery and not_yours
 
 
-  val crumble_block = ~"It disintegrated." and RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
-  
+  instead(taking, not_yours) Say "that would be uncouth"
 
+  val crumble_block = ~"It disintegrated." and RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
 
   var time = 0
 
@@ -45,6 +70,9 @@ object Dirt extends Room with StartingRoom {
     if(first) Say("Time is ticking")
     time = time + 1
   }
+
+  report(being) Add s"The time is $time"
+
 
   report(going, south, here) Say "You tunnel to the south."
   report(going, north, here) Say "You mosey to the north."
@@ -75,6 +103,7 @@ object Dirt extends Room with StartingRoom {
     }
 
 
+
     report(taking, shirt, this has shirt) {
       Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
     }
@@ -85,9 +114,27 @@ object Dirt extends Room with StartingRoom {
 
 }
 
+
+object hanging extends Action(2, "hang") {
+  implicitSubjectSelector = _ == player
+}
+
+
+object CrowsNest extends Room with StartingRoom {
+  override val name: StringExpression = "The Crow's Nest"
+  override val description: StringExpression = "A circular platform at the top of the ladder from which you can reach the trapeze"
+
+  val trapeze = ~"It looks like a barber pole, only it's orange and purple" is fixed
+
+
+  instead(hanging, anything -> trapeze) Say "You are not insured for that"
+
+}
+
+
 object WormPile extends Room {
 
-  override val name: String = "Worm Pile"
+  override val name: StringExpression = "Worm Pile"
   override val description: StringExpression = "I'm not sure what you expected."
 
   Connect(south, Dirt)
@@ -96,7 +143,7 @@ object WormPile extends Room {
 
 object FairyFountain extends Room {
 
-  override val name: String = "Fairy Fountain"
+  override val name: StringExpression = "Fairy Fountain"
   override val description: StringExpression = "Piped-in harp music indicates the presence of a creature with immense power."
   val fairy_armadillo = ~"Nigiri with feet"
 
@@ -110,6 +157,6 @@ object FairyFountain extends Room {
 
 object Test extends App{
 
-  Zext.Parser.StartInterpreter(player, "Test")
+  Zext.Parser.StartInterpreter(guy, "Test")
 
 }

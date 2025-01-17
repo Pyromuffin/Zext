@@ -18,6 +18,8 @@ trait Container {
   given c: Container = this
 
   var contents: ArrayBuffer[ZextObject] = ArrayBuffer[ZextObject]()
+  var preposition = "inside"
+  var openable = true
   var open = true
   var transparent = true
   var automaticallyListContents = true
@@ -35,66 +37,54 @@ trait Container {
 
 
 object Supporter {
-  instead(closing, of[Supporter]) Say s"There's no way to close $noun"
-  report(putting, ofSecond[Supporter]) Say s"You put $noun on to $secondNoun"
-  report(taking, is[Supporter](noun.parentContainer, Containment)) Say s"You take $noun off of ${noun.parentContainer}"
+  report(putting, anything -> ofDebug[Supporter]("report putting anything -> supporter")) Say s"You put $noun on to $secondNoun"
+  report(taking, isZextObjectOf[Supporter](noun.parentContainer, Containment)) Say s"You take $noun off of ${noun.parentContainer}"
 }
 
 
 // tables, hooks, etc always open and cannot be closed.
-abstract class Supporter(val name: String)(using Container) extends Thing with Container {
-  automaticallyListContents = false
+abstract class Supporter(val name: StringExpression)(using Container) extends Thing with Container {
   open = true
   transparent = true
+  openable = false
+  preposition = "on"
 }
 
-abstract class Box(val name: String, open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
+abstract class Box(val name: StringExpression, open_and_transparent : Boolean = false) (using Container) extends Thing with Container {
   transparent = open_and_transparent
   open = open_and_transparent
 }
 
-case class SimpleBox(override val name : String, description: StringExpression)(using c : Container) extends Box(name)
+case class SimpleBox(override val name : StringExpression, description: StringExpression)(using c : Container) extends Box(name)
 
-case class SimpleSupporter(override val name: String, description: StringExpression)(using c: Container) extends Supporter(name)
+case class SimpleSupporter(override val name: StringExpression, description: StringExpression)(using c: Container) extends Supporter(name)
 
-inline def box(desc: StringExpression)(code: Container ?=> Unit)(using boxContainer: Container) = {
+inline def simpleBox(desc: StringExpression)(code: Container ?=> Unit)(using boxContainer: Container) = {
   val name = FixName(Macros.superVariableName)
   val box = SimpleBox(name, desc)(using boxContainer)
   code(using box)
   box
 }
 
-inline def box(desc: StringExpression)(using boxContainer: Container) = {
+inline def simpleBox(desc: StringExpression)(using boxContainer: Container) = {
   val name = FixName(Macros.superVariableName)
   val box = SimpleBox(name, desc)(using boxContainer)
   box
 }
 
 
-inline def supporter(desc: StringExpression)(code: Container ?=> Unit)(using supporterContainer: Container) = {
+inline def simpleSupporter(desc: StringExpression)(code: Container ?=> Unit)(using supporterContainer: Container) = {
   val name = FixName(Macros.superVariableName)
   val supporter = SimpleSupporter(name, desc)(using supporterContainer)
   code(using supporter)
   supporter
 }
 
-inline def supporter(desc: StringExpression)(using supporterContainer: Container) = {
+inline def simpleSupporter(desc: StringExpression)(using supporterContainer: Container) = {
   val name = FixName(Macros.superVariableName)
   val supporter = SimpleSupporter(name, desc)(using supporterContainer)
   supporter
 }
 
 
-// not sure i like these string context extensions
-/*
-extension (sc: StringContext) {
-  inline def box(args: Any*)(using c: Container): Box = {
-    SimpleBox(FixName(Macros.variableName), sc.s())
-  }
-
-  inline def supporter(args: Any*)(using c: Container): Supporter = {
-    SimpleSupporter(FixName(Macros.variableName), sc.toString)
-  }
-}
-*/
 

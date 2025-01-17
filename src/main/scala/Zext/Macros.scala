@@ -21,8 +21,19 @@ def showExpr[T](expr: Expr[T])(using Quotes): Expr[String] =
   Expr(code)
 
 
+
+
+
 object Macros{
 
+
+  def tpeNmeMacro[A: Type](using Quotes) = {
+
+    val name = Type.show[A]
+    Expr(name)
+  }
+
+  inline def typeName[A]: String = ${ tpeNmeMacro[A] }
 
 
   inline def stuff(container : Container)(inline code : => Unit) : Container = {
@@ -233,7 +244,13 @@ def depthImpl[T](using quotes: Quotes, tpe: Type[T]): Expr[Int] = {
 
   val tpe = TypeRepr.of[T]
 
+  val containerSym = TypeRepr.of[Container].typeSymbol
   val zextSym = TypeRepr.of[ZextObject].typeSymbol
+
+  if(tpe.baseClasses(0) == containerSym){
+    return Expr(1)
+  }
+
   val bases = tpe.baseClasses.filterNot( c => c.flags.is(Flags.Trait) )
   var depth = 0
 

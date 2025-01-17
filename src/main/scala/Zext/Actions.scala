@@ -70,6 +70,10 @@ object Actions {
     UnderstandAlias("n", going, Direction.north)
     UnderstandAlias("south", going, Direction.south)
     UnderstandAlias("s", going, Direction.south)
+    UnderstandAlias("up", going, Direction.up)
+    UnderstandAlias("u", going, Direction.up)
+    UnderstandAlias("down", going, Direction.down)
+    UnderstandAlias("d", going, Direction.down)
 
 
     /*
@@ -147,7 +151,7 @@ object Actions {
       z.parentContainer == player
     }
 
-    inflict(dropping, reflexively) {
+    instead(dropping, reflexively) {
 
       Say(randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
@@ -220,6 +224,7 @@ object Actions {
   }
 
 
+
   object examining extends Action(1,"examine", "x", "look", "l") {
 
     instead(examining, reflexively) {
@@ -230,12 +235,12 @@ object Actions {
       Say({noun.description})
     }
 
-    report(examining, of[Room]) {
+    report(examining, ofDebug[Room]("report room examining")) {
       Title(currentLocation.name)
       Say({noun.description})
     }
 
-    after(examining, of[Room]) {
+    after(examining, ofDebug[Room]("after room examining")) {
       val r = noun[Room]
       var nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
       val people = r.contents.filter(_.isType[Person]).toSeq
@@ -266,7 +271,7 @@ object Actions {
       stop
     }
 
-    after(examining, of[Container]) {
+    after(examining, ofDebug[Container]("after examining container")) {
 
       val c = noun[Container]
 
@@ -281,25 +286,37 @@ object Actions {
       val nondescribed = c.contents.diff(roomDescribed)
 
       if (roomDescribed.nonEmpty) {
-        if c.open then Say(s"$noun is open") else Say(s"$noun is closed")
+        if c.openable || !c.open then
+            if c.open then Say(s"$noun is open") else Say(s"$noun is closed")
+
         if (c.open || c.transparent) {
           for (rd <- roomDescribed) {
             Say(rd.get[RoomDescription].get.desc)
           }
           if(nondescribed.nonEmpty){
-            Say(s"Inside $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
+            Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
           }
         }
       } else  {
         var response = ""
-        if c.open then response += s"$noun is open" else response += s"$noun is closed"
+        if c.openable || !c.open then
+          if c.open then response += s"$noun is open" else response += s"$noun is closed"
+
         if (c.open || c.transparent) {
-          response += ", "
-          if (c.contents.isEmpty)
-            response += "nothing is inside"
-          else
-            response += s"inside you can see ${c.ContentsString.get}"
-        }
+            if (c.openable || !c.open) {
+              response += ", "
+              if (c.contents.isEmpty)
+                response += s"nothing is ${c.preposition}"
+              else
+                response += s"${c.preposition} you can see ${c.ContentsString.get}"
+            }
+            else {
+              if (c.contents.isEmpty)
+                response += s"nothing is ${c.preposition} $noun"
+              else
+                response += s"${c.preposition} $noun you can see ${c.ContentsString.get}"
+            }
+          }
 
         Say(response)
       }
@@ -309,6 +326,10 @@ object Actions {
   object closing extends Action(1, "close", "shut") {
 
     check(closing, of[Container]){
+      if !noun[Container].openable then
+        Say(s"$noun can't be closed.")
+        stop
+
       if !noun[Container].open then
         Say(s"$noun is already closed")
         stop
@@ -325,6 +346,11 @@ object Actions {
   object opening extends Action(1, "open"){
 
     check(opening, of[Container]){
+
+      if !noun[Container].openable then
+        Say(s"$noun can't be opened.")
+        stop
+
       if noun[Container].open then
         Say(s"$noun is already open")
         stop
@@ -334,10 +360,15 @@ object Actions {
         noun[Container].open = true
     }
 
+
     report(opening, of[Container]) {
+      Say(s"You open $noun")
+    }
+
+    after(opening, of[Container]) {
       val c = noun[Container]
 
-      if (!c.transparent && c.contents.nonEmpty) {
+      if (c.contents.nonEmpty) {
         val roomDescribed = c.contents.filter { z =>
           val roomDesc = z.get[RoomDescription]
           roomDesc.isDefined && !roomDesc.get.disturbed
@@ -345,20 +376,16 @@ object Actions {
 
         val nondescribed = c.contents.diff(roomDescribed)
         if (roomDescribed.nonEmpty) {
-          Say(s"You open $noun")
+
           for (rd <- roomDescribed) {
             Say(rd.get[RoomDescription].get.desc)
           }
           if (nondescribed.nonEmpty) {
-            Say(s"Inside $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
+            Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
           }
         } else {
-          Say(s"You open $noun, inside you can see ${c.ContentsString.get}")
+          Say(s"${c.preposition} $noun you can see ${c.ContentsString.get}")
         }
-      }
-      else
-      {
-        Say(s"You open $noun")
       }
     }
   }
@@ -399,9 +426,19 @@ object Actions {
     report(debugging) Say FindVisibleSet().toString()
   }
 
+
+  implicit final class BackArrow[A](private val self:  A) extends AnyVal {
+    @inline def <~ [B](y: B): (B, A) = (y, self)
+  }
+
   object putting extends Action(2,"put", "insert", "place") {
 
-    before(putting, player lacks noun){
+    before(putting, secondNoun has noun) {
+      Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")
+      stop
+    }
+
+    before(putting, player lacks noun, secondNoun lacks noun){
       if( execute(taking, noun, silent = true) ){
         Say(s"(First taking $noun)")
       }
@@ -415,9 +452,9 @@ object Actions {
 
     instead(putting, player lacks noun) Say s"You need to pick up $noun before putting it somewhere."
     instead(putting, player lacks noun, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
-    instead(putting, !ofSecond[Container]) Say s"I don't think $secondNoun can hold $noun"
+    instead(putting, anything -> !of[Container] ) Say s"I don't think $secondNoun can hold $noun"
 
-    check(putting, ofSecond[Container]){
+    check(putting, anything -> ofDebug[Container]("anything -> container")){
 
       if(noun == secondNoun){
         Say(s"Stepping into the fourth dimension, you put $noun into itself.")
@@ -435,11 +472,11 @@ object Actions {
       }
     }
 
-    inflict(putting, ofSecond[Container]) {
+    inflict(putting, anything -> of[Container]) {
         noun transferTo secondNoun[Container]
     }
 
-    report(putting, ofSecond[Container]) Say s"You put $noun into $secondNoun"
+    report(putting, anything -> of[Container]) Say s"You put $noun into $secondNoun"
 
 
 

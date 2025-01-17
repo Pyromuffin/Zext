@@ -7,6 +7,7 @@ import Zext.Parser.*
 import Zext.Rule.*
 import Zext.RuleContext.*
 import Zext.RuleControl.{Continue, Replace, Stop}
+import Zext.StringExpression.str
 import Zext.World.*
 
 import scala.collection.mutable
@@ -15,6 +16,34 @@ import scala.language.implicitConversions
 import scala.quoted.*
 import scala.reflect.{ClassTag, TypeTest}
 import scala.util.control.{Breaks, ControlThrowable}
+
+
+object ZextObjectProxy {
+    implicit def toZext[T <: ZextObject](z : ZextObjectProxy[T]): T = z.resolve
+}
+
+abstract class ZextObjectProxy[T <: ZextObject]  {
+    override def toString = resolve.toString
+    def resolve : T
+
+    override def equals(obj: Any) = {
+         obj match {
+             case zextObjectProxy: ZextObjectProxy[_] => resolve.objectID == zextObjectProxy.objectID
+             case zextObject: ZextObject => resolve.objectID == zextObject.objectID
+        }
+    }
+
+    infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Containment)
+    infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Containment)
+}
+
+object noun extends ZextObjectProxy[ZextObject] {
+    override def resolve = RuleContext._noun
+}
+
+object secondNoun extends ZextObjectProxy[ZextObject] {
+    override def resolve = RuleContext._secondNoun
+}
 
 object RuleContext {
 
@@ -29,22 +58,6 @@ object RuleContext {
         _silent = ctx.silent
     }
 
-    def noun: ZextObject = _noun
-
-    def noun[T](using TypeTest[Property, T]): T = {
-        val maybe = _noun.get[T]
-        if (maybe.isDefined) maybe.get
-        else _noun.asInstanceOf[T]
-    }
-
-    def secondNoun: ZextObject = _secondNoun
-
-    def secondNoun[T](using TypeTest[Property, T]): T = {
-        val maybe = _secondNoun.get[T]
-        if (maybe.isDefined) maybe.get
-        else _secondNoun.asInstanceOf[T]
-    }
-
     def first : Boolean =  _first
     def silent : Boolean = _silent
 }
@@ -56,12 +69,13 @@ object Rule {
     var blackboard : Any = null
 
     class ActionRuleSet {
+        // this is the order they're executed in
         val beforeRules = ArrayBuffer[ActionRule]()
-        val afterRules = ArrayBuffer[ActionRule]()
-        val checkRules = ArrayBuffer[ActionRule]()
-        val executeRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
+        val checkRules = ArrayBuffer[ActionRule]()
         val reportRules = ArrayBuffer[ActionRule]()
+        val executeRules = ArrayBuffer[ActionRule]()
+        val afterRules = ArrayBuffer[ActionRule]()
 
         def GetAllRules() = {
             Array(beforeRules, insteadRules, checkRules, reportRules, executeRules, afterRules)
@@ -117,14 +131,21 @@ object Rule {
 
     // ultra terse syntax
     class InsteadConsequence(r: Action, conditions: Condition*) {
-        infix def Say(s: StringExpression): ActionRule = {
+        infix inline def Say(s: StringExpression): ActionRule = {
             instead(r, conditions *)(Interpreter.Say(s))
         }
     }
 
     class ReportConsequence(r: Action, conditions: Condition*) {
-        infix def Say(s: StringExpression): ActionRule = {
+        infix inline def Say(s: StringExpression): ActionRule = {
             report(r, conditions *)(Interpreter.Say(s))
+        }
+
+        infix inline def Add(s: StringExpression): ActionRule = {
+            report(r, conditions *){
+                Interpreter.Say(s)
+                continue
+            }
         }
     }
 
@@ -261,8 +282,19 @@ class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
     var specificity = 1
     def precedence = queryType.ordinal
     def unary_! : Condition = {
-        new Condition(!condition, queryType)
+        val c = new Condition(!condition, queryType)
+        c.specificity = specificity
+        c
     }
+
+    def &&(other: Condition): Condition = {
+        // combine predicates
+        val precedence = if(this.queryType.ordinal > other.queryType.ordinal) this.queryType else other.queryType
+        val c = new Condition(this.evaluate && other.evaluate, precedence)
+        c.specificity = this.specificity + other.specificity
+        c
+    }
+
 }
 
 object Condition {
@@ -274,37 +306,57 @@ object Condition {
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
     implicit def fromLocation(r: => Room): Condition = new Condition(r.objectID == noun.objectID, QueryPrecedence.Location)
-    implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = new Condition(t._1.objectID == noun.objectID && t._2.objectID == secondNoun.objectID, QueryPrecedence.SecondObject)
+    implicit def fromClassHolder(ch: => ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
+    implicit def fromPropHolder(ph: => ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
 
-    inline def of[T <: Property](using tt: TypeTest[Property, T], dummy : DummyImplicit): Condition = {
-        new Condition(noun.properties.exists(canBecome[Property, T]), QueryPrecedence.Property)
+
+    implicit def fromTuple(t: => (ZextObject, ZextObject)): Condition = {
+
+        val firstPredicate : Condition = t._1 match {
+            case anythingFirst : ZextObject if anythingFirst.objectID == anything.objectID => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
+            case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
+            case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
+            case _ => fromObject(t._1)
+        }
+
+        val secondPredicate: Condition = t._2 match {
+            case anythingFirst : ZextObject if anythingFirst.objectID == anything.objectID => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
+            case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
+            case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
+            case _ => {val c = fromObject(t._2); c.queryType = QueryPrecedence.SecondObject; c}
+        }
+
+        firstPredicate && secondPredicate
     }
 
-    inline def ofSecond[T <: Property](using tt: TypeTest[Property, T], dummy : DummyImplicit): Condition = {
-        new Condition(secondNoun.properties.exists(canBecome[Property, T]), QueryPrecedence.SecondProperty)
+
+    // these have to be macros to get the proper depth for T
+     inline def of[T <: ZextObject | Container](using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
+         val depth = Macros.depth[T]
+         val typeName = Macros.typeName[T]
+         new ZextObjectClassHolder(tt, depth, typeName)
     }
 
-    inline def of[T <: ZextObject | Container](using TypeTest[ZextObject, T]): Condition = {
-        of[T](QueryPrecedence.Class)
+    inline def of[T <: Property](using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
+        val typeName = Macros.typeName[T]
+        new ZextObjectPropHolder(tt, 1, typeName)
     }
 
-    inline def ofSecond[T <: ZextObject | Container](using TypeTest[ZextObject, T]): Condition = {
-        of[T](QueryPrecedence.SecondClass)
+    inline def ofDebug[T <: ZextObject | Container](name : String)(using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
+        val depth = Macros.depth[T] // depth of container is -1, which is maybe not expected
+        val typeName = Macros.typeName[T]
+        println(s"making of $typeName with name $name with depth $depth")
+        new ZextObjectClassHolder(tt, depth, name)
     }
 
-    inline def of[T <: ZextObject | Container](queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
-        val condition = new Condition(
-            {
-                val target = if (queryType == QueryPrecedence.Class) noun else secondNoun
-                val success = canBecome[ZextObject, T](target)
-                success
-            }
-            , queryType)
-        condition.specificity = depth[T]
-        condition
+    inline def ofDebug[T <: Property](name : String)(using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
+        val typeName = Macros.typeName[T]
+        println(s"making of $typeName with name $name with depth $depth")
+        new ZextObjectPropHolder(tt, 1, name)
     }
 
-    inline def is[T](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+    // this is for querying whether a specific object has a type
+    def isZextObjectOf[T](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
         val condition = new Condition(
             {
                 val success = canBecome[ZextObject, T](target)
@@ -394,6 +446,7 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
     allActions.addOne(this)
 
     var implicitTargetSelector : ZextObject => Boolean = null
+    var implicitSubjectSelector : ZextObject => Boolean = null
     var disambiguationHint : ZextObject => Boolean = null
 
     ruleSets(this) = new ActionRuleSet

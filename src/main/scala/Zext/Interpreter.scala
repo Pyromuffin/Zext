@@ -152,29 +152,50 @@ object Interpreter{
     }
   }
 
-  def Capitalize(str : String): String = {
+  def MakeTextNice(str : String): String = {
 
     val endingPunctuation = Seq('.', '?', '!')
 
     val sentences = ArrayBuffer[String]()
-    var lastPunctuationIndex = 0
-    for(c <- str.zipWithIndex){
-      if(endingPunctuation.contains(c._1) && c._2 != str.length) {
-        var index = c._2
-        if(index + 1 < str.length && str(index + 1) == '\"'){
-          index += 1
-        }
-        sentences += str.substring(lastPunctuationIndex, index + 1).stripPrefix(" ").stripSuffix(" ").capitalize
-        lastPunctuationIndex = index + 1
+    val escapeCharacterPositions = ArrayBuffer[Int]()
+    var escapeNext = false
+    var unescaped = ""
+    for(c <- str.zipWithIndex) {
+      if(c._1 == '\\' && !escapeNext) {
+        escapeNext = true
+        escapeCharacterPositions.append(c._2 - escapeCharacterPositions.length)
+      }
+      else
+      {
+        escapeNext = false
+        unescaped += c._1
       }
     }
-    sentences += str.substring(lastPunctuationIndex, str.length).stripPrefix(" ").stripSuffix(" ").capitalize
 
+    var lastPunctuationIndex = 0
+    for(c <- unescaped.zipWithIndex){
+      if(endingPunctuation.contains(c._1) && c._2 != unescaped.length && !escapeCharacterPositions.contains(c._2)) {
+        var index = c._2
+        if(index + 1 < unescaped.length && unescaped(index + 1) == '\"'){
+          index += 1
+        }
+        sentences += unescaped.substring(lastPunctuationIndex, index + 1).stripPrefix(" ").stripSuffix(" ").capitalize
+        escapeCharacterPositions.clear()
+        lastPunctuationIndex = index + 1
+
+      }
+    }
+
+
+    // last sentence
+    sentences += unescaped.substring(lastPunctuationIndex, unescaped.length).stripPrefix(" ").stripSuffix(" ").capitalize
 
     var ret = sentences.foldRight("")( _ + " " + _).stripSuffix(" ")
-    if(!endingPunctuation.contains(str.last) && str.last != '\"'){
+    if(!endingPunctuation.contains(unescaped.last) && unescaped.last != '\"'){
       ret += '.'
     }
+
+    ret = ret.stripSuffix(" ")
 
     ret
   }
@@ -202,7 +223,11 @@ object Interpreter{
     val strImmediate = str.toString
     if(strImmediate == "") return // maybe an error
 
-    println( Capitalize(strImmediate) )
+    val output = MakeTextNice(strImmediate)
+    if(testingOutput)
+      testOutput.addOne(output)
+    else
+      println(output)
   }
 
   def Title(str : StringExpression): Unit = {
@@ -300,7 +325,7 @@ object Parser extends RegexParsers{
   }
 
   def GetWords(z : ZextObject) : Seq[String] = {
-    var names = Seq(z.name).concat(z.aliases)
+    var names = Seq(z.name).concat(z.aliases).map(_.toString)
     if(z.pluralized){
       names = names.concat(names.map(Inflector.singularize))
     }
@@ -368,7 +393,6 @@ object Parser extends RegexParsers{
     }
 
     // val bestParsable = bestParsables.head
-
     val parser = str.toLowerCase ^^ {s => bestParsables.map(_.target)}
 
     Some(parser)
@@ -431,12 +455,16 @@ object Parser extends RegexParsers{
 
     BuildUnderstandables()
 
+
     val allParsers : Seq[Parser[Seq[ParsableType]]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
-    val allParser =  allParsers.reduce( _ ||| _ )
     val space = "\\s+".r
     val anySpace = "\\s*".r
     val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "from", "about", "with")
     val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
+    val ignored = Array("a", "the", "some")
+    val ignoredParser = ignored.map(Parser(_)).reduce(_ ||| _)
+
+    val allParser =  opt(ignoredParser ~ space) ~> allParsers.reduce( _ ||| _ )
 
     val command = anySpace ~> allParser ~ opt(space ~> allParser) ~ (opt(space ~> prepositionParser) ~> opt(space ~> allParser)) ^^ { (a) =>
       val action = a._1._1
@@ -526,17 +554,36 @@ object Parser extends RegexParsers{
       return None
     }
 
-
     val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
     Some(Command(action, Some(first), None))
   }
 
 
   def BuildTwoTargetCommand(action: Action, firsts : Option[Seq[ParsableType]], seconds : Option[Seq[ParsableType]]) : Option[Command] =  {
-    if(firsts.isEmpty)
-      return None
 
-    val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    val first : ZextObject =
+      if (firsts.isEmpty && action.implicitSubjectSelector != null) {
+        val visibleSet = FindVisibleSet()
+        val candidates = visibleSet.filter(action.implicitSubjectSelector)
+
+        if (candidates.nonEmpty) {
+          Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+        } else {
+          Say(s"${action.verbs(0)} with what?")
+          // no implicit candidates
+          null
+        }
+
+      } else if (firsts.isEmpty) {
+        Say(s"${action.verbs(0)} with what?")
+        // no first noun and no implicit selector
+        null
+      } else Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+
+    if(first == null){
+      return None
+    }
+    //val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
     // for tests against noun in the target selector hint
     _noun = first
 
@@ -548,12 +595,12 @@ object Parser extends RegexParsers{
         return Some(Command(action, Some(first), Some(second)))
       } else {
         // no implicit candidates
-        Say(s"${action.verbs(0)} with what?")
+        Say(s"${action.verbs(0)} $first with what?")
         return None
       }
     } else if( seconds.isEmpty){
       // no second target and no implicit selector
-      Say(s"${action.verbs(0)} with what?")
+      Say(s"${action.verbs(0)} $first with what?")
       return  None
     }
 
@@ -591,8 +638,40 @@ object Parser extends RegexParsers{
     }
   }
 
+  def InitTests(player: PlayerClass, gamePackageName: String) : Unit = {
+      World.Init(player, gamePackageName)
+      World.testingOutput = true
+  }
 
-  def StartInterpreter(player : Player, gamePackageName : String): Unit = {
+  def RunTest(testName: String, inputStrings : Array[String], expectedOutput : Array[String]) : Boolean = {
+
+    testOutput.clear()
+
+    for(input <- inputStrings) {
+      val commandParser = BuildParser2()
+      val command = BuildCommand(input.toLowerCase, commandParser)
+      if (command.nonEmpty) {
+        val c = command.get
+        ExecuteAction(c.action, c.noun, c.secondNoun)
+        execute(being, currentLocation)
+      } else {
+        Say("[REDACTED]")
+      }
+    }
+
+    for(output <- expectedOutput.zip(World.testOutput)) {
+      if(output._1 != output._2) {
+        println(s"Test output mismatch: Expected: ${output._1} != ${output._2}")
+        return false
+      }
+    }
+
+    println(s"$testName: succeeded")
+    true
+  }
+
+
+  def StartInterpreter(player : PlayerClass, gamePackageName : String): Unit = {
     World.Init(player, gamePackageName)
 
     execute(examining, reflexively)

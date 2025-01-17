@@ -10,15 +10,13 @@ import Zext.World.currentLocation
 import scala.collection.mutable
 
 enum Direction extends ZextObject {
-  case north, east, south, west
-  val names = Array("north", "east", "south", "west")
+  case north, east, south, west, up, down
+  val names = Array("north", "east", "south", "west", "up", "down")
 
-  override val name: String = names(ordinal)
+  override val name: StringExpression = names(ordinal)
   override val description: StringExpression = ""
   proper = true
 }
-
-
 
 
 object Direction{
@@ -27,8 +25,10 @@ object Direction{
   south.aliases += "s"
   east.aliases += "e"
   west.aliases += "w"
+  up.aliases += "u"
+  down.aliases += "d"
 
-  World.currentWorld.globals.addAll(Seq(north, east, south, west))
+  World.currentWorld.globals.addAll(Seq(north, east, south, west, up, down))
 
   def opposing(direction: Direction) = {
     var ret : Direction = north
@@ -36,6 +36,8 @@ object Direction{
     if (direction == west) ret = east;
     if (direction == east) ret = west;
     if (direction == south) ret = north;
+    if (direction == up) ret = down;
+    if (direction == down) ret = up;
 
     ret
   }

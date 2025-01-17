@@ -45,12 +45,12 @@ object Saving {
   }
 
 
-  def FindPlayer(rooms : ArrayBuffer[Room]) : Player = {
+  def FindPlayer(rooms : ArrayBuffer[Room]) : PlayerClass = {
 
     for(r <- rooms){
-      val hasPlayer = r.contents.find( _.getClass == classOf[Player])
+      val hasPlayer = r.contents.find( _.getClass == classOf[PlayerClass])
       if(hasPlayer.nonEmpty)
-        return hasPlayer.get.asInstanceOf[Player]
+        return hasPlayer.get.asInstanceOf[PlayerClass]
     }
 
     throw ClassNotFoundException()

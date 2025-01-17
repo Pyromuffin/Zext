@@ -3,6 +3,7 @@ package Zext
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
 import Zext.Actions.*
+import Zext.Condition.canBecome
 import Zext.Parser.BuildUnderstandables
 import Zext.Rule.*
 
@@ -14,6 +15,88 @@ object reflexively extends ZextObject {
   val description = ""
 }
 
+
+class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ZextObject {
+
+  var not = false
+  val name = "ZextObjectClassHolder"
+  val description = ""
+
+  def unary_! = {
+    not = !not
+    this
+  }
+
+  def createCondition(queryPrecedence: QueryPrecedence) = {
+
+    val condition = new Condition(
+      {
+        val target = if (queryPrecedence == QueryPrecedence.Class) noun else secondNoun
+        var success = test(target)
+        if(not) success = !success
+
+        //println(s"testing if $target is $className with depth $depth : $success")
+        success
+      }
+      , queryPrecedence)
+
+    condition.specificity = depth
+    condition
+  }
+
+  def test(z : ZextObject) : Boolean = {
+    z match {
+      case tt(z) => true
+      case _ => false
+    }
+  }
+}
+
+
+class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ZextObject {
+
+  var not = false
+  val name = "ZextObjectPropertyHolder"
+  val description = ""
+
+  def unary_! = {
+    not = !not
+    this
+  }
+
+  def createCondition(queryPrecedence: QueryPrecedence) = {
+
+    val condition = new Condition(
+      {
+        val target = if (queryPrecedence == QueryPrecedence.Property) noun else secondNoun
+        var success = test(target)
+        if (not) success = !success
+
+        //println(s"testing if $target has property $propName: $success")
+        success
+      }
+      , queryPrecedence)
+
+    condition.specificity = depth
+    condition
+  }
+
+  def test(z: ZextObject): Boolean = {
+    z.properties.exists{ p =>
+      p match {
+        case tt(p) => true
+        case _ => false
+      }
+    }
+  }
+}
+
+object anything extends ZextObject {
+  val name = "anything"
+  val description = ""
+}
+
+
 object nowhere extends Room {
   val name = "nowhere"
   val description = ""
@@ -22,7 +105,7 @@ object nowhere extends Room {
 }
 
 
-abstract class Player extends ZextObject with Container {
+abstract class PlayerClass extends ZextObject with Container {
 
   properties += scenery
   automaticallyListContents = false
@@ -40,16 +123,22 @@ class WorldState{
 
   val globals = ArrayBuffer[ZextObject]()
   val rooms = ArrayBuffer[Room]()
-  var player : Player = null
+  var player : PlayerClass = null
 
   var time = 0
 }
 
+object player extends ZextObjectProxy[PlayerClass] {
+  override def resolve = World.currentWorld.player
+}
 
 object World  {
 
+  var testingOutput = false
+  val testOutput = new ArrayBuffer[String]()
+
   var currentWorld = new WorldState
-  def player = currentWorld.player
+  //def player = currentWorld.player
   def currentLocation = player.parentContainer.asInstanceOf[Room]
 
 
@@ -91,7 +180,7 @@ object World  {
 
 
 
-  def Init(gamesPlayer : Player, gamePackageName : String): Unit = {
+  def Init(gamesPlayer : PlayerClass, gamePackageName : String): Unit = {
 
     // i think it will be hard or impossible to switch players, but maybe that's ok.
     currentWorld.player = gamesPlayer

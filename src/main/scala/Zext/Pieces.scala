@@ -17,7 +17,7 @@ import javax.print.attribute.standard.Destination
 
 object Pieces {
 
-  inflict(putting, of[Pieces], ofSecond[Container]) {
+  inflict(putting, of[Pieces], anything -> of[Container]) {
 
     val pieces = noun[Pieces]
     val name = pieces.name
