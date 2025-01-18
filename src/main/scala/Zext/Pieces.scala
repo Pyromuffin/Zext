@@ -46,7 +46,7 @@ object Pieces {
       stop
     }
 
-    pieces.split(amountToDrop, currentLocation)
+    pieces.split(amountToDrop, playerLocation)
 
     val unitWord = if(amountToDrop == 1) pieces.unitName else pluralize(pieces.unitName) 
     val verb = if(amountToDrop == 1) "spills" else "spill"

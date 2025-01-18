@@ -16,6 +16,7 @@ import Condition.*
 import Zext.Actions.*
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
+import zobjectifier.Macros
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 import scala.reflect.TypeTest
@@ -85,6 +86,121 @@ case class ZextObjectSerializationProxy(index : Int){
     }
 }
 
+
+object determiningAccessibility extends Action(2) {
+
+ inflict(determiningAccessibility) {
+
+     // determining if noun is accessible to secondNoun
+
+     // in the same room, or part of their inventory/contents
+     if (noun.parentContainer == secondNoun.parentContainer || noun.parentContainer == secondNoun || secondNoun.parentContainer == noun || noun == secondNoun) {
+         continue
+     }
+
+     // if noun is composite, check if the composite object is accessible to secondNoun
+     if (noun.isComposite) {
+         result(execute(determiningAccessibility, noun.compositeObject, secondNoun))
+     }
+
+     // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
+     if (noun.parentContainer != null && noun.parentContainer.open && noun.parentContainer.isInstanceOf[ZextObject]) {
+         result(execute(determiningAccessibility, noun.parentContainer.asInstanceOf[ZextObject], secondNoun))
+     }
+
+     // if not, fail
+     stop
+ }
+
+}
+
+object determiningVisibility extends Action(2) {
+
+
+    /*
+    def isTransitivelyVisibleWithin(z : ZextObject, container : ZextObject) : Boolean = {
+        if(z == container)
+            return true
+
+        for(part <- container.parts) {
+            if (isTransitivelyVisibleWithin(z, part))
+                return true
+        }
+
+        container.get[Container] does { c =>
+
+            if (c.open || c.transparent) {
+                for (cc <- c.contents) {
+                    if (isTransitivelyVisibleWithin(z, cc))
+                        return true
+                }
+            }
+        }
+
+        false
+    }
+    */
+
+    // this no longer has a bearing on what are parsable words
+
+    // determining if noun is visible to second noun
+    inflict(determiningVisibility){
+
+        /*
+        conditions for object visibility:
+        1) in the same container
+        2) in the object's inventory
+        3) in a transparent container contained (transitively) within the room
+        4) the current room or an adjacent room (? maybe ?),
+        5) a part of a visible object
+        6) a backdrop in the current room
+        7) a backdrop in the current region
+        8) a backdrop that is in the everywhere region
+
+        */
+
+        //@todo figure out if we want backdrops themsevles to be visible.
+
+        val room = secondNoun.findRoom()
+        val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.backdrops)
+        val backdrops = regionBackdrops.addAll(room.backdrops).addAll(everywhere.backdrops)
+
+        // direct visibility for same container or inventory, or room, or self, or is in the set of backdrops visible backdrops
+        if (noun.parentContainer == secondNoun.parentContainer || noun.parentContainer == secondNoun || secondNoun.parentContainer == noun || noun == secondNoun || backdrops.contains(noun)) {
+            continue
+        }
+
+        // if noun is composite, check if the composite object is visible to secondNoun
+        if (noun.isComposite) {
+            result(execute(determiningVisibility, noun.compositeObject, secondNoun))
+        }
+
+        // if noun is in a container, and that container is open or transparent, check if the parent container is visible to secondNoun
+        if (noun.parentContainer != null && (noun.parentContainer.open || noun.parentContainer.transparent) && noun.parentContainer.isInstanceOf[ZextObject]) {
+            result(execute(determiningVisibility, noun.parentContainer.asInstanceOf[ZextObject], secondNoun))
+        }
+
+        stop
+        /*
+        visibleSet.addAll(FindAllTransitivelyVisible(zextObject.parentContainer))
+        visibleSet.addAll(zextObject.contents) // this doesn't transitively give you the contents of the player or the globals.
+        visibleSet.addAll(World.currentWorld.globals)
+        visibleSet.addAll(playerLocation.backdrops.flatMap(_.contents))
+
+        for (region <- World.currentWorld.regions) {
+            if (region.rooms.contains(playerLocation)) {
+                visibleSet.addAll(region.backdrops.flatMap(_.contents))
+            }
+        }
+
+        visibleSet.addAll(everywhere.backdrops.flatMap(_.contents))
+
+        visibleSet
+        */
+    }
+
+}
+
 @SerialVersionUID(100L)
 abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable {
 
@@ -99,10 +215,21 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var aliases = ArrayBuffer[StringExpression]()
     val description: StringExpression
     var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
-    var pluralized = false
+    var pluralized : Option[Boolean] = None
+    var autoexplode = true
     var proper = false
 
 
+    def findRoom(): Room = {
+        parentContainer match {
+            case r: Room => r
+            case playerClass: PlayerClass => playerLocation
+            case backdrop: Backdrop => nowhere
+            case zextObject: ZextObject => zextObject.findRoom()
+            case null => throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
+            //case _ => nowhere
+        }
+    }
 
     //@todo eventually fix zextobject/thing confusion
     var parentContainer: Container = null
@@ -114,6 +241,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         obj match {
             case zextObjectProxy: ZextObjectProxy[_] => objectID == zextObjectProxy.objectID
             case zextObject: ZextObject => objectID == zextObject.objectID
+            case null => false
         }
     }
 
@@ -139,9 +267,12 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     def be: String = {
-        if (pluralized)
-            return "are"
-        "is"
+        if (pluralized.isDefined && pluralized.get)
+             "are"
+        else if(pluralized.isEmpty && this.isInstanceOf[Thing] && this[Thing].isAutomaticallyPlural)
+             "are"
+        else
+            "is"
     }
 
     infix def is(rhs : String): String = {
@@ -150,23 +281,14 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     def isComposite = compositeObject != null
 
-    def isAccessible(room: Room): Boolean = {
 
-        if (parentContainer == room) {
-            return true
-        }
-
-        if (isComposite) {
-            return compositeObject.isAccessible(room)
-        }
-
-        if (parentContainer != null && parentContainer.open && parentContainer.isInstanceOf[ZextObject]) {
-            return parentContainer.asInstanceOf[ZextObject].isAccessible(room)
-        }
-
-        false
+    def isVisibleTo(other: ZextObject): Boolean = {
+        execute(determiningVisibility, this, other)
     }
 
+    def isAccessibleTo(other: ZextObject): Boolean = {
+        execute(determiningAccessibility, this, other)
+    }
 
     override def toString: String = definite
 
@@ -271,10 +393,6 @@ abstract class Thing(using c : Container) extends ZextObject{
         Inflector.pluralize(name.toString) == name.toString
     }
 
-    if(isAutomaticallyPlural){
-        pluralized = true
-    }
-
     infix def is(prop: Property) : this.type = {
         properties += prop
         this
@@ -297,11 +415,11 @@ abstract class Thing(using c : Container) extends ZextObject{
 
     infix def amount(nounAmount: NounAmount):  this.type ={
         if (nounAmount == NounAmount.plural) {
-            pluralized = true
+            pluralized = Some(true)
         }
 
         if (nounAmount == NounAmount.singular) {
-            pluralized = false
+            pluralized = Some(false)
         }
 
         if (nounAmount == NounAmount.some) {

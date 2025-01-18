@@ -5,7 +5,7 @@ import Zext.Direction.opposing
 import Zext.Interpreter.Say
 import Zext.QueryPrecedence.Location
 import Zext.Rule.{after, execute, inflict}
-import Zext.World.{currentLocation, currentWorld}
+import Zext.World.{playerLocation, currentWorld}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -50,7 +50,10 @@ abstract class Room extends ZextObject with Container {
 
   World.currentWorld.rooms.append(this)
 
-  val here = Condition(this == currentLocation, Location )
+  autoexplode = false
+  pluralized = Some(false)
+
+  val here = Condition(this == playerLocation, Location )
   var visited = false
   val connections = mutable.HashMap[Direction, Room]()
   val backdrops = mutable.HashSet[Backdrop]()
@@ -80,18 +83,24 @@ abstract class Room extends ZextObject with Container {
 }
 
 
-object everywhere extends RoomRegion
+object everywhere extends RoomRegion("everywhere")
 
 
-class Backdrop extends ZextObject with Container {
-  override val name = this.getClass.getSimpleName
+class Backdrop(val name : StringExpression = getClass.getName) extends ZextObject with Container {
+
+  autoexplode = false
+  pluralized = Some(false)
+
   override val description = ""
 }
 
-class RoomRegion extends ZextObject {
-
-  override val name = this.getClass.getSimpleName
+class RoomRegion(val name : StringExpression = getClass.getName) extends ZextObject {
   override val description = ""
+
+  autoexplode = false
+  pluralized = Some(false)
+
+  def here = Condition(rooms.contains(playerLocation), Location)
 
   World.currentWorld.regions.append(this)
 

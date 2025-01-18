@@ -30,6 +30,44 @@ object Actions {
   }
 
   object being extends Action(1)
+  object waiting extends Action(0, "wait", "loiter") {
+    report(waiting) Say "You wait for minute"
+  }
+
+
+  object postprocessingText extends Action(0) {
+    var text : String = null
+
+    inflict(postprocessingText) {
+      text = MakeTextNice(text)
+    }
+
+  }
+
+  object saying extends Action(0) {
+    var text : String = null
+
+    check(saying) {
+      if(location != playerLocation)
+        stop
+    }
+
+    inflict(saying) {
+      if (silent) stop
+
+      if (text == "") stop // maybe an error
+
+      postprocessingText.text = text
+      execute(postprocessingText, noun, secondNoun, silent, location)
+
+      if (testingOutput)
+        testOutput.addOne(postprocessingText.text)
+      else
+        println(postprocessingText.text)
+    }
+
+  }
+
 
 
   /*
@@ -92,10 +130,10 @@ object Actions {
 
     check(going, of[Direction]){
       val d = noun[Direction]
-      val connected = currentLocation.connections.contains(d)
+      val connected = playerLocation.connections.contains(d)
 
       // this is so dumb but maybe it will work?
-      val leaveCtx = RuleContext(Some(currentLocation), None, false)
+      val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
       if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
@@ -104,9 +142,9 @@ object Actions {
         Say(s"You can't go $d")
         stop
       }
-      val destination = currentLocation.connections(d)
+      val destination = playerLocation.connections(d)
 
-      val enterCtx = RuleContext(Some(destination), None, false)
+      val enterCtx = RuleContext(Some(destination), None, false,  playerLocation)
       if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
@@ -115,31 +153,31 @@ object Actions {
 
     report(going, of[Direction]) {
       val d = noun[Direction]
-      val room = currentLocation.connections(d)
+      val room = playerLocation.connections(d)
 
       Say(s"You went $d to $room.")
     }
 
     inflict(going, of[Direction]) {
       val d = noun[Direction]
-      val room = currentLocation.connections(d)
+      val room = playerLocation.connections(d)
 
-      val leaveCtx = RuleContext(Some(currentLocation), None, false)
+      val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
       RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
-      blackboard = currentLocation
+      blackboard = playerLocation
       player.Move(room)
 
-      val enterCtx = RuleContext(Some(currentLocation), None, false)
+      val enterCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
       RunRule(enterCtx, ruleSets(entering).reportRules)
       RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(Some(previousRoom), None, false), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(Some(currentLocation), None, false), ruleSets(entering).afterRules)
+      RunRule(RuleContext(Some(previousRoom), None, false, playerLocation), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(Some(playerLocation), None, false, playerLocation), ruleSets(entering).afterRules)
     }
 
   }
@@ -166,7 +204,7 @@ object Actions {
     }
 
     inflict(dropping) {
-        noun.transferTo(currentLocation)
+        noun.transferTo(playerLocation)
     }
 
     report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
@@ -183,7 +221,7 @@ object Actions {
     }
 
     check(taking){
-      if !noun.isAccessible(currentLocation) then
+      if !noun.isAccessibleTo(playerLocation) then
         Say(noun is "inaccessible") // maybe say why?
         stop
     }
@@ -228,7 +266,7 @@ object Actions {
   object examining extends Action(1,"examine", "x", "look", "l") {
 
     instead(examining, reflexively) {
-      execute(examining, currentLocation)
+      execute(examining, playerLocation)
     }
 
     report(examining) {
@@ -236,7 +274,7 @@ object Actions {
     }
 
     report(examining, ofDebug[Room]("report room examining")) {
-      Title(currentLocation.name)
+      Title(playerLocation.name)
       Say({noun.description})
     }
 
@@ -423,7 +461,17 @@ object Actions {
 
 
   object debugging extends Action(0, "debug") {
-    report(debugging) Say FindVisibleSet().toString()
+
+
+    report(debugging){
+
+      val visibleSet = ZextObject.allObjects.filter(execute(determiningVisibility, _, player))
+      val accessibleSet = ZextObject.allObjects.filter(execute(determiningAccessibility, _, player))
+
+
+      Say("visible set: " + visibleSet.toString)
+      Say("accessible set: " + accessibleSet.toString)
+    }
   }
 
 
@@ -466,7 +514,7 @@ object Actions {
         stop
       }
 
-      if(!secondNoun.isAccessible(currentLocation)) {
+      if(!secondNoun.isAccessibleTo(player)) {
         Say(s"$secondNoun is inaccessible")
         stop
       }

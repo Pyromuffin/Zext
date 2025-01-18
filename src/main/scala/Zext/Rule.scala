@@ -2,7 +2,6 @@ package Zext
 
 import Zext.Actions.{UnderstandAlias, allActions, examining}
 import Zext.Interpreter.*
-import Zext.Macros.{CodePosition, depth}
 import Zext.Parser.*
 import Zext.QueryPrecedence.Location
 import Zext.Rule.*
@@ -17,6 +16,8 @@ import scala.language.implicitConversions
 import scala.quoted.*
 import scala.reflect.{ClassTag, TypeTest}
 import scala.util.control.{Breaks, ControlThrowable}
+import zobjectifier.Macros
+import zobjectifier.Macros.CodePosition
 
 
 object ZextObjectProxy {
@@ -31,6 +32,7 @@ abstract class ZextObjectProxy[T <: ZextObject]  {
          obj match {
              case zextObjectProxy: ZextObjectProxy[_] => resolve.objectID == zextObjectProxy.objectID
              case zextObject: ZextObject => resolve.objectID == zextObject.objectID
+             case null => false
         }
     }
 
@@ -50,20 +52,24 @@ object RuleContext {
 
     private[Zext] var _noun: ZextObject = null
     private[Zext] var _secondNoun: ZextObject = null
+    private[Zext] var _subject: ZextObject = null
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
+    private[Zext] var _location: Room = nowhere
 
     private[Zext] def SetContext(ctx : RuleContext) : Unit = {
         _noun = ctx.z1.orNull
         _secondNoun = ctx.z2.orNull
         _silent = ctx.silent
+        _location = ctx.location
     }
 
     def first : Boolean =  _first
     def silent : Boolean = _silent
+    def location : Room = _location
 }
 
-case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean)
+case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean, location : Room)
 
 object Rule {
 
@@ -71,6 +77,7 @@ object Rule {
 
     class ActionRuleSet {
         // this is the order they're executed in
+        val applyingRules = ArrayBuffer[ActionRule]()
         val beforeRules = ArrayBuffer[ActionRule]()
         val insteadRules = ArrayBuffer[ActionRule]()
         val checkRules = ArrayBuffer[ActionRule]()
@@ -84,6 +91,16 @@ object Rule {
     }
 
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
+
+
+    inline def applying(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+        val rule = new ActionRule({
+            body; Continue
+        }, conditions *)
+        rule.definitionPosition = CodePosition()
+        ruleSets(r).applyingRules += rule
+        rule
+    }
 
 
     inline def check(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
@@ -218,7 +235,7 @@ object Rule {
 
     def RunRule(context : RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent)
+        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent, location)
         SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
@@ -226,12 +243,46 @@ object Rule {
         val result = ExecuteRules(sorted)
 
         SetContext(previousContext)
-
-
         result
     }
 
-     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false): Boolean = {
+    // this is different because applying rules only run if possible, while normal rules only don't run if impossible.
+    def RunApplyingRule(context: RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
+
+        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent, location)
+        SetContext(context)
+
+        val possibleRules = rules.filter(_.possible)
+        val sorted = SortByPrecedence(possibleRules)
+        val result = ExecuteRules(sorted)
+
+        SetContext(previousContext)
+        result && possibleRules.nonEmpty
+    }
+
+
+    def RunApplyingBeforeRules(userCommand : Command): Unit = {
+
+    }
+
+    def RunApplyingRules(userCommand : Command): Unit = {
+        // get all actions with applying rules
+        val applyingActions = Actions.allActions.filter(ruleSets(_).applyingRules.nonEmpty)
+
+        for(action <- applyingActions){
+            val applyingRules = ruleSets(action).applyingRules
+            val allThings = ZextObject.allObjects.filter(_.isInstanceOf[Thing]).map(_.asInstanceOf[Thing])
+
+            for(thing <- allThings){
+                val thingLocation = thing.findRoom()
+                val ruleContext = new RuleContext(Some(thing), None, false, thingLocation)
+                if(RunApplyingRule(ruleContext, applyingRules))
+                    execute(action, thing, location = thingLocation)
+            }
+        }
+    }
+
+     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : Room = playerLocation): Boolean = {
         val set = ruleSets(rule)
 
          /*
@@ -248,7 +299,10 @@ object Rule {
             Report: by default, make no decision.
           */
 
-         val context = RuleContext(target, target2, silent)
+         val t1 = if target.isEmpty then Some(nothing) else target
+         val t2 = if target2.isEmpty then Some(nothing) else target2
+
+         val context = RuleContext(t1, t2, silent, location)
 
          val previousBlackboard = blackboard
 
@@ -263,8 +317,8 @@ object Rule {
          true
     }
 
-    def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false): Boolean = {
-        ExecuteAction(rule, Some(target), Option(target2), silent)
+    def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false, location : Room = playerLocation): Boolean = {
+        ExecuteAction(rule, Option(target), Option(target2), silent, location)
     }
 }
 
@@ -299,6 +353,18 @@ class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
 }
 
 
+abstract class ConditionHelper {
+    def createCondition(queryPrecedence: QueryPrecedence) : Condition
+}
+
+case class Priority(amount : Int) extends ConditionHelper {
+    override def createCondition(queryPrecedence: QueryPrecedence) = {
+        val c = new Condition(true, queryPrecedence)
+        c.specificity = amount
+        c
+    }
+}
+
 object Condition {
     // inform's precedence is something like
     // location > object > property > class > generic
@@ -309,13 +375,15 @@ object Condition {
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
     implicit def fromLocation(r: => Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
-    implicit def fromRegion(r: => RoomRegion): Condition = new Condition(r.rooms.contains(currentLocation), QueryPrecedence.Location)
+    implicit def fromRegion(r: => RoomRegion): Condition = new Condition(r == noun, QueryPrecedence.Location)
     implicit def fromClassHolder(ch: => ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
     implicit def fromPropHolder(ph: => ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
+    implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
 
 
+    type ConditionTypes = ZextObject | ZextObjectProxy[_] | ConditionHelper
 
-    implicit def fromTuple(t: => (ZextObject | ZextObjectProxy[_], ZextObject | ZextObjectProxy[_])): Condition = {
+    implicit def fromTuple(t: => (ConditionTypes, ConditionTypes)): Condition = {
 
         val firstPredicate : Condition = t._1 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
@@ -323,6 +391,7 @@ object Condition {
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
             case zextObjectProxy: ZextObjectProxy[_] => fromObject(zextObjectProxy.resolve)
             case zextObject: ZextObject => fromObject(zextObject)
+            case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
 
         val secondPredicate: Condition = t._2 match {
@@ -331,6 +400,7 @@ object Condition {
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
             case zextObjectProxy: ZextObjectProxy[_] => fromSecondObject(zextObjectProxy.resolve)
             case zextObject: ZextObject => fromSecondObject(zextObject)
+            case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
 
         firstPredicate && secondPredicate
@@ -339,7 +409,7 @@ object Condition {
 
     // these have to be macros to get the proper depth for T
      inline def of[T <: ZextObject | Container](using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
-         val depth = Macros.depth[T]
+         val depth = Macros.depth[T, ZextObject, Container]
          val typeName = Macros.typeName[T]
          new ZextObjectClassHolder(tt, depth, typeName)
     }
@@ -350,15 +420,15 @@ object Condition {
     }
 
     inline def ofDebug[T <: ZextObject | Container](name : String)(using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
-        val depth = Macros.depth[T] // depth of container is -1, which is maybe not expected
+        val depth = Macros.depth[T, ZextObject, Container] // depth of container is -1, which is maybe not expected
         val typeName = Macros.typeName[T]
-        println(s"making of $typeName with name $name with depth $depth")
+        //println(s"making of $typeName with name $name with depth $depth")
         new ZextObjectClassHolder(tt, depth, name)
     }
 
     inline def ofDebug[T <: Property](name : String)(using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
         val typeName = Macros.typeName[T]
-        println(s"making of $typeName with name $name with depth $depth")
+        //println(s"making of $typeName with name $name with depth $depth")
         new ZextObjectPropHolder(tt, 1, name)
     }
 
@@ -370,7 +440,7 @@ object Condition {
                 success
             }
             , queryType)
-        condition.specificity = depth[T]
+        condition.specificity = Macros.depth[T, ZextObject, Container]
         condition
     }
 

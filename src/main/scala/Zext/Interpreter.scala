@@ -6,7 +6,7 @@ import Zext.Condition.canBecome
 import Zext.Interpreter.*
 import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
-import Zext.RuleContext.{_noun, silent}
+import Zext.RuleContext.{_noun, location, silent}
 import Zext.Saving.*
 import Zext.StringExpression.str
 import Zext.World.*
@@ -19,6 +19,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.io.StdIn.readLine
 import scala.language.postfixOps
 import scala.util.parsing.combinator.*
+
+import zobjectifier.Macros
+
 
 // this maybe has to be the last import?
 //import scala.reflect.TypeTest
@@ -216,18 +219,14 @@ object Interpreter{
     parsed.get
   }
 
+  def SystemMessage(str: StringExpression): Unit = {
+    saying.text = str.toString
+    execute(saying, noun, secondNoun, silent, location = playerLocation)
+  }
+
   def Say(str: StringExpression): Unit = {
-
-    if(silent) return
-
-    val strImmediate = str.toString
-    if(strImmediate == "") return // maybe an error
-
-    val output = MakeTextNice(strImmediate)
-    if(testingOutput)
-      testOutput.addOne(output)
-    else
-      println(output)
+    saying.text = str.toString
+    execute(saying, noun, secondNoun, silent, location)
   }
 
   def Title(str : StringExpression): Unit = {
@@ -264,101 +263,31 @@ object Parser extends RegexParsers{
   }
 
 
-  def FindAllTransitivelyAccessible(z : ZextObject) : Array[ZextObject] = {
+  def TryToFindRootWord(string: String): Option[Seq[String]] = {
+    // if one word
+    val words = string.split(" ")
 
-    val itemAndParts = Array(z) concat z.parts.flatMap(FindAllTransitivelyAccessible)
-
-    z match {
-      case c: Container if (c.open) =>
-        itemAndParts concat c.contents.flatMap(FindAllTransitivelyAccessible)
-
-      case _ => itemAndParts
-    }
+    None
   }
 
-  def FindAccessibleSet() : ArrayBuffer[ZextObject] = {
-
-    val accessSet = new ArrayBuffer[ZextObject]()
-
-    accessSet.addAll(FindAllTransitivelyAccessible(currentLocation))
-    accessSet.addAll(player.contents)   // this doesn't transitively give you the contents of the player or the globals.
-    accessSet.addAll(World.currentWorld.globals)
-
-    accessSet
-  }
-
-
-  def FindAllTransitivelyVisible(z : ZextObject) : Array[ZextObject] = {
-
-    val itemAndParts = Array(z) concat z.parts.flatMap(FindAllTransitivelyVisible)
-
-    z match {
-      case c : Container if(c.transparent || c.open) =>
-          itemAndParts concat c.contents.flatMap(FindAllTransitivelyVisible)
-
-      case _ => itemAndParts
-    }
-
-  }
-
-
-  def FindVisibleSet() : ArrayBuffer[ZextObject] = {
-
-
-    /*
-    conditions for item visibility:
-    1) in the same container
-    2) in the player's inventory
-    3) in a transparent container contained (transitively) within the room
-    4) the current room or an adjacent room (? maybe ?),
-    5) a global object
-    6) a part of a visible object
-    7) a backdrop in the current room
-    8) a backdrop in the current region
-    9) a backdrop that is in the everywhere region
-    */
-
-    val visibleSet = new ArrayBuffer[ZextObject]()
-
-    visibleSet.addAll( FindAllTransitivelyVisible(currentLocation) )
-    visibleSet.addAll( player.contents ) // this doesn't transitively give you the contents of the player or the globals.
-    visibleSet.addAll( World.currentWorld.globals )
-    visibleSet.addAll( currentLocation.backdrops.flatMap(_.contents) )
-
-    for(region <- World.currentWorld.regions){
-      if(region.rooms.contains(currentLocation)){
-        visibleSet.addAll(region.backdrops.flatMap(_.contents))
-      }
-    }
-
-    visibleSet.addAll(everywhere.backdrops.flatMap(_.contents))
-
-    visibleSet
-  }
 
   def GetWords(z : ZextObject) : Seq[String] = {
     var names = Seq(z.name).concat(z.aliases).map(_.toString)
-    if(z.pluralized){
+
+    if(z.pluralized.isEmpty && z.isInstanceOf[Thing] && z[Thing].isAutomaticallyPlural) {
       names = names.concat(names.map(Inflector.singularize))
     }
-    
-    
-    names
-  }
-
-  object findingVisibleSet extends Action(0) {
-    var visibleSet = ArrayBuffer[ZextObject]()
-
-    inflict(findingVisibleSet) {
-      visibleSet = FindVisibleSet()
+    else if(z.pluralized.isDefined && z.pluralized.get){
+      names = names.concat(names.map(Inflector.singularize))
     }
 
+    if(z.autoexplode)
+      names = names concat names.flatMap(NLP.GetNouns)
 
-    def makeVisible(zextObject: ZextObject) = {
-      if (!visibleSet.contains(zextObject)) {
-        visibleSet.addOne(zextObject)
-      }
-    }
+    // this is highly stupid
+    val set = new mutable.HashSet[String]()
+    set.addAll(names)
+    set.toSeq
   }
 
 
@@ -373,9 +302,7 @@ object Parser extends RegexParsers{
       }
     }
 
-    execute(findingVisibleSet, reflexively)
-
-    findingVisibleSet.visibleSet.foreach { z =>
+    ZextObject.allObjects.foreach { z =>
       Understand(z, GetWords(z)*)
     }
   }
@@ -396,10 +323,8 @@ object Parser extends RegexParsers{
     val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
 
     if(bestParsables.length > 1){
-     // println(str + " IS AMBIGUOUS! " + parsables.toString())
     }
 
-    // val bestParsable = bestParsables.head
     val parser = str.toLowerCase ^^ {s => bestParsables.map(_.target)}
 
     Some(parser)
@@ -484,7 +409,6 @@ object Parser extends RegexParsers{
 
   def Disambiguate(parsables : Seq[ParsableType], hint : ZextObject => Boolean) : ParsableType = {
 
-
     val orange = "\u001b[38;5;214m"
 
     if(parsables.length == 1)
@@ -513,7 +437,7 @@ object Parser extends RegexParsers{
     s = s.stripSuffix(" or ")
     s += "?"
 
-    Say(s)
+    SystemMessage(s)
 
     var done = false
     var choiceIndex = -1
@@ -540,27 +464,33 @@ object Parser extends RegexParsers{
     Some(Command(action, None, None))
   }
 
-
   def BuildOneTargetCommand(action: Action, firsts : Option[Seq[ParsableType]]) : Option[Command] = {
 
     if(firsts.isEmpty && action.implicitTargetSelector != null){
-      val visibleSet = FindVisibleSet()
-      val candidates = visibleSet.filter(action.implicitTargetSelector)
+      //val visibleSet = FindVisibleSet()
+      val candidates = ZextObject.allObjects.filter(action.implicitTargetSelector).filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
         val first = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Some(first), None))
       } else {
-        Say(s"${action.verbs(0)} with what?")
+        SystemMessage(s"${action.verbs(0)} with what?")
         // no implicit candidates
         return None
       }
     } else if (firsts.isEmpty){
-      Say(s"${action.verbs(0)} with what?")
+      SystemMessage(s"${action.verbs(0)} with what?")
       // no first noun and no implicit selector
       return None
     }
 
-    val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    val visible = firsts.get.filter {
+      case z: ZextObject => z.isVisibleTo(player)
+      case _ => false
+    }
+    if(visible.isEmpty)
+      return None
+
+    val first = Disambiguate(visible, action.disambiguationHint).asInstanceOf[ZextObject]
     Some(Command(action, Some(first), None))
   }
 
@@ -569,22 +499,33 @@ object Parser extends RegexParsers{
 
     val first : ZextObject =
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
-        val visibleSet = FindVisibleSet()
-        val candidates = visibleSet.filter(action.implicitSubjectSelector)
+        //val visibleSet = FindVisibleSet()
+        val candidates = ZextObject.allObjects.filter(action.implicitSubjectSelector).filter(_.isVisibleTo(player))
 
         if (candidates.nonEmpty) {
           Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
         } else {
-          Say(s"${action.verbs(0)} with what?")
+          SystemMessage(s"${action.verbs(0)} with what?")
           // no implicit candidates
           null
         }
 
       } else if (firsts.isEmpty) {
-        Say(s"${action.verbs(0)} with what?")
+        SystemMessage(s"${action.verbs(0)} with what?")
         // no first noun and no implicit selector
         null
-      } else Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+      } else  {
+
+        val visible = firsts.get.filter {
+          case z: ZextObject => z.isVisibleTo(player)
+          case _ => false
+        }
+
+        if(visible.isEmpty)
+          null
+        else
+          Disambiguate(visible, action.disambiguationHint).asInstanceOf[ZextObject]
+      }
 
     if(first == null){
       return None
@@ -594,23 +535,31 @@ object Parser extends RegexParsers{
     _noun = first
 
     if(seconds.isEmpty && action.implicitTargetSelector != null){
-      val visibleSet = FindVisibleSet()
-      val candidates = visibleSet.filter(action.implicitTargetSelector)
+      //val visibleSet = FindVisibleSet()
+      val candidates = ZextObject.allObjects.filter(action.implicitTargetSelector).filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
         val second = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Some(first), Some(second)))
       } else {
         // no implicit candidates
-        Say(s"${action.verbs(0)} $first with what?")
+        SystemMessage(s"${action.verbs(0)} $first with what?")
         return None
       }
     } else if( seconds.isEmpty){
       // no second target and no implicit selector
-      Say(s"${action.verbs(0)} $first with what?")
+      SystemMessage(s"${action.verbs(0)} $first with what?")
       return  None
     }
 
-    val second = Disambiguate(seconds.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    val visible = seconds.get.filter {
+      case z: ZextObject => z.isVisibleTo(player)
+      case _ => false
+    }
+
+    if (visible.isEmpty)
+      return None
+
+    val second = Disambiguate(visible, action.disambiguationHint).asInstanceOf[ZextObject]
     Some(Command(action, Some(first), Some(second)))
   }
 
@@ -659,7 +608,7 @@ object Parser extends RegexParsers{
       if (command.nonEmpty) {
         val c = command.get
         ExecuteAction(c.action, c.noun, c.secondNoun)
-        execute(being, currentLocation)
+        execute(being, playerLocation)
       } else {
         Say("[REDACTED]")
       }
@@ -677,6 +626,7 @@ object Parser extends RegexParsers{
   }
 
 
+
   def StartInterpreter(player : PlayerClass, gamePackageName : String): Unit = {
     World.Init(player, gamePackageName)
 
@@ -690,8 +640,10 @@ object Parser extends RegexParsers{
       val command = BuildCommand(input, commandParser)
       if(command.nonEmpty){
         val c = command.get
+        RunApplyingBeforeRules(c)
         ExecuteAction(c.action, c.noun, c.secondNoun)
-        execute(being, currentLocation)
+        RunApplyingRules(c)
+        execute(being, playerLocation)
       } else {
         println("[REDACTED]")
       }

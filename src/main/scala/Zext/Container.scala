@@ -7,6 +7,8 @@ import Zext.QueryPrecedence.Containment
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
 
+import zobjectifier.Macros
+
 object Container {
   implicit def z(container: Container) : ZextObject = container.asInstanceOf[ZextObject]
 

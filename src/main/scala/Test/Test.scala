@@ -3,14 +3,22 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
-import Zext.Parser.findingVisibleSet
 
-val guy = new PlayerClass:
+object guy extends PlayerClass {
   override val name = "SLEEMO"
   override val description = "Your bipes bip fast."
   var insured = false
-
   val stick = ~"sticky"
+
+}
+
+
+
+
+extension(z : ZextObjectProxy[PlayerClass]) {
+  implicit def toGuy : guy.type = z.resolve.asInstanceOf[guy.type]
+}
+
 
 object count {
 
@@ -130,29 +138,83 @@ object crowsBackdrop extends Backdrop {
   val crows = ~"Several crows are circling above you."
 }
 
-object Circus extends RoomRegion {
+object Circus extends RoomRegion("Circus Region") {
 
   addRooms(BigTop, CrowsNest)
 
   val circusBackdrop = new Backdrop {
+
+    val circus = ~"The Sleemo Brothers Ring-a-Ding Circus Extravaganza"
     val tent = ~"A spiral candystripe towering overhead" aka "roof"
   }
 
   addBackdrop(circusBackdrop)
 }
 
+case class wet(var wetness: Int) extends Property
+
+object drying extends Action(1, "dry") {
+
+  applying(drying, of[wet]) {
+    if (noun[wet].wetness > 0 && scala.util.Random.nextInt(4) == 0){
+      continue
+    } else stop
+  }
+
+  inflict(drying, of[wet]) {
+    noun[wet].wetness -= 1
+  }
+
+  after(drying, of[wet]) {
+    val wetness = noun[wet].wetness
+    if (wetness != 0)
+      Say(s"$noun dries out a little. It looks like it has $wetness drops of water left.")
+    else if (wetness == 0)
+      Say(s"$noun is completely dry")
+  }
+
+}
+
+
 object BigTop extends Room with StartingRoom {
 
 
   override val name: StringExpression = "The Big Top"
-  override val description: StringExpression =  "You are in a giant stadium, covered by a bright tent. It seems to be sagging in the middle"
+  override val description: StringExpression = "You are in a giant stadium, covered by a bright tent. It seems to be sagging in the middle"
 
   val sagging = ~"Upon further inspection you see the sagging is caused by a small trapeze." is scenery is fixed aka "sag"
 
   val ladder = ~"It leads to the crow's nest" is fixed
 
+
+  object bucket extends Thing with Container {
+    this is wet(3)
+
+    override val name = str {
+      if( this[wet].wetness > 0 ) {
+        "bucket of water"
+      } else {
+        "dry bucket"
+      }
+    }
+
+    override val description = str {
+      if( this[wet].wetness > 0 ) {
+        "a bucket with an amount of quick-dry water"
+      } else {
+        "bone dry"
+      }
+    }
+  }
+
+  Connect(south, WormPile)
+
   Connect(up, CrowsNest)
 }
+
+
+
+
 
 
 object CrowsNest extends Room {
@@ -162,16 +224,19 @@ object CrowsNest extends Room {
   val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
     "It looks like a barber pole, only it's orange and purple" is fixed
 
-  report(examining, trapeze, !trapeze.isAccessible(currentLocation)) Say "A handlebar that seems to be hanging from something in the sky"
+  report(examining, trapeze, !trapeze.isAccessibleTo(player)) Say "A handlebar that seems to be hanging from something in the sky"
 
-  instead(hanging, player -> trapeze, !guy.insured) Say "You are not insured for that"
+  instead(hanging, player -> trapeze, !player.insured) Say "You are not insured for that"
 
   addBackdrop(crowsBackdrop)
 
-  after(findingVisibleSet, Circus){
-    findingVisibleSet.makeVisible(trapeze)
+  after(dropping, player.stick) {
+    player.insured = true
   }
 
+  inflict(determiningVisibility, trapeze, Circus.here){
+    replace
+  }
 
 
 }

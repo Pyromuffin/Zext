@@ -15,13 +15,14 @@ object reflexively extends ZextObject {
   val description = ""
 }
 
+object nothing extends ZextObject {
+  val name = "nothing"
+  val description = ""
+}
 
-class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ZextObject {
+class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ConditionHelper {
 
   var not = false
-  val name = "ZextObjectClassHolder"
-  val description = ""
-
   def unary_! = {
     not = !not
     this
@@ -53,11 +54,10 @@ class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int,
 }
 
 
-class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ZextObject {
+
+class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ConditionHelper {
 
   var not = false
-  val name = "ZextObjectPropertyHolder"
-  val description = ""
 
   def unary_! = {
     not = !not
@@ -139,8 +139,7 @@ object World  {
   val testOutput = new ArrayBuffer[String]()
 
   var currentWorld = new WorldState
-  //def player = currentWorld.player
-  def currentLocation = player.parentContainer.asInstanceOf[Room]
+  def playerLocation = player.parentContainer.asInstanceOf[Room]
 
 
   def RevealSecrets(path: String, className : String): Unit = {
@@ -169,7 +168,6 @@ object World  {
   "Actions$SecretHolder",
   "Inflector$SecretHolder",
   "Interpreter$SecretHolder",
-  "Macros$SecretHolder",
   "Person$SecretHolder",
   "Room$SecretHolder",
   "Rule$SecretHolder",
