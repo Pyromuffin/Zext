@@ -1,5 +1,6 @@
 package Zext
 
+import EverythingParser.{ParseResultType, time}
 import Zext.*
 import Zext.Actions.*
 import Zext.Condition.canBecome
@@ -18,8 +19,8 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.StdIn.readLine
 import scala.language.postfixOps
-import scala.util.parsing.combinator.*
-
+import scala.util.boundary
+import boundary.break
 import zobjectifier.Macros
 
 
@@ -244,10 +245,9 @@ object Interpreter{
 
 
 
-object Parser extends RegexParsers{
+object Parser {
 
   var exit = false
-  override def skipWhitespace = false
 
   val boldControlCode = "\u001b[0;1m"
   val unboldControlCode = "\u001b[0;0m"
@@ -263,16 +263,11 @@ object Parser extends RegexParsers{
   }
 
 
-  def TryToFindRootWord(string: String): Option[Seq[String]] = {
-    // if one word
-    val words = string.split(" ")
-
-    None
-  }
-
-
   def GetWords(z : ZextObject) : Seq[String] = {
-    var names = Seq(z.name).concat(z.aliases).map(_.toString)
+    var names = Seq(z.name).concat(z.aliases).map(_.toString.toLowerCase)
+
+    // filter out ignored words
+    names = names.map( _.stripPrefix("the ").stripPrefix("a ").stripPrefix("some "))
 
     if(z.pluralized.isEmpty && z.isInstanceOf[Thing] && z[Thing].isAutomaticallyPlural) {
       names = names.concat(names.map(Inflector.singularize))
@@ -306,30 +301,6 @@ object Parser extends RegexParsers{
       Understand(z, GetWords(z)*)
     }
   }
-
-
-  def WordParser(str : String, parsables: Seq[Parsable[ParsableType]]) : Option[Parser[Seq[ParsableType]]] = {
-    // first check if word conditions are applicable, if not splode
-
-    val possibles = parsables.filter(_.possible)
-
-    if (possibles.isEmpty)
-      return Option.empty
-
-    val maxPrecedence = possibles.map(_.precedence).max
-    val maxPrecedenceParsables = possibles.filter(_.precedence == maxPrecedence)
-
-    val maxSpecificity = maxPrecedenceParsables.map(_.specificity).max
-    val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
-
-    if(bestParsables.length > 1){
-    }
-
-    val parser = str.toLowerCase ^^ {s => bestParsables.map(_.target)}
-
-    Some(parser)
-  }
-
 
 
   // ok so it seem like
@@ -377,37 +348,9 @@ object Parser extends RegexParsers{
     Understand(target, words*)()
   }
 
-
   case class Command(action: Action, noun: Option[ZextObject], secondNoun : Option[ZextObject])
 
-
-  type CommandParserType = Parser[(Seq[ParsableType], Option[Seq[ParsableType]], Option[Seq[ParsableType]])]
-
-  def BuildParser2() : CommandParserType = {
-
-    BuildUnderstandables()
-
-    val allParsers : Seq[Parser[Seq[ParsableType]]] = understandables.map(WordParser).filter(_.isDefined).map(_.get).toSeq
-    val space = "\\s+".r
-    val anySpace = "\\s*".r
-    val prepositions = Array("on", "to", "on to", "into", "at", "on top of", "in", "from", "about", "with")
-    val prepositionParser = prepositions.map(Parser(_)).reduce(_ ||| _)
-    val ignored = Array("a", "the", "some")
-    val ignoredParser = ignored.map(Parser(_)).reduce(_ ||| _)
-
-    val allParser =  opt(ignoredParser ~ space) ~> allParsers.reduce( _ ||| _ )
-
-    val command = anySpace ~> allParser ~ opt(space ~> allParser) ~ (opt(space ~> prepositionParser) ~> opt(space ~> allParser)) ^^ { (a) =>
-      val action = a._1._1
-      val firstNoun = a._1._2
-      val secondNoun = a._2
-      (action, firstNoun, secondNoun)
-    }
-
-    command
-  }
-
-  def Disambiguate(parsables : Seq[ParsableType], hint : ZextObject => Boolean) : ParsableType = {
+  def Disambiguate(parsables : Seq[ParsableType], hint : ParsableType => Boolean) : ParsableType = {
 
     val orange = "\u001b[38;5;214m"
 
@@ -415,13 +358,7 @@ object Parser extends RegexParsers{
       return parsables.head
 
     if(hint != null){
-
-      val parsableHint : ParsableType => Boolean = {
-        case z: ZextObject => hint(z)
-        case _ => true
-      }
-
-      val likely = parsables.filter(parsableHint)
+      val likely = parsables.filter(hint)
 
       if (likely.length == 1)
         return likely.head
@@ -464,7 +401,7 @@ object Parser extends RegexParsers{
     Some(Command(action, None, None))
   }
 
-  def BuildOneTargetCommand(action: Action, firsts : Option[Seq[ParsableType]]) : Option[Command] = {
+  def BuildOneTargetCommand(action: Action, firsts : Option[Array[ParsableType]]) : Option[Command] = {
 
     if(firsts.isEmpty && action.implicitTargetSelector != null){
       //val visibleSet = FindVisibleSet()
@@ -495,7 +432,7 @@ object Parser extends RegexParsers{
   }
 
 
-  def BuildTwoTargetCommand(action: Action, firsts : Option[Seq[ParsableType]], seconds : Option[Seq[ParsableType]]) : Option[Command] =  {
+  def BuildTwoTargetCommand(action: Action, firsts : Option[Array[ParsableType]], seconds : Option[Array[ParsableType]]) : Option[Command] =  {
 
     val first : ZextObject =
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
@@ -564,26 +501,37 @@ object Parser extends RegexParsers{
   }
 
 
-
-
-  def BuildCommand(input : String, parser : CommandParserType) : Option[Command]=  {
+  def BuildCommand(input : String, result: ParseResultType) : Option[Command]=  {
 
     if(commandAliases.contains(input)){
       return Some(commandAliases(input))
     }
-
-    val result = parseAll(parser, input)
 
     if(result.isEmpty){
       return None
     }
 
     val triple = result.get
-    val zeroth = Disambiguate(triple._1, null)
+
+    val parsedTargetCount =
+      if (triple._2.isDefined && triple._3.isDefined) 2
+      else if (triple._2.isDefined) 1
+      else 0
+
+    val parsedTargetCountFilter : ParsableType => Boolean = {
+      case a: Action => a.targets == parsedTargetCount
+      case _ => false
+    }
+
+    val zeroth = Disambiguate(triple._1, parsedTargetCountFilter)
     if(zeroth.part != PartOfSpeech.verb)
       return None
 
     val action = zeroth.asInstanceOf[Action]
+
+    if(parsedTargetCount > action.targets) {
+      return None
+    }
 
     action.targets match {
       case 0 => BuildZeroTargetCommand(action)
@@ -603,14 +551,23 @@ object Parser extends RegexParsers{
     testOutput.clear()
 
     for(input <- inputStrings) {
-      val commandParser = BuildParser2()
-      val command = BuildCommand(input.toLowerCase, commandParser)
-      if (command.nonEmpty) {
-        val c = command.get
-        ExecuteAction(c.action, c.noun, c.secondNoun)
-        execute(being, playerLocation)
-      } else {
-        Say("[REDACTED]")
+      val result = EverythingParser.parse(input)
+
+      val command1 = BuildCommand(input, result._1)
+      val command2 = BuildCommand(input, result._2)
+      val command3 = BuildCommand(input, result._3)
+
+      val commands = Array(command3, command2, command1)
+
+      boundary{
+        for (command <- commands) {
+          command does { c =>
+            ExecuteAction(c.action, c.noun, c.secondNoun)
+            execute(being, playerLocation)
+            break()
+          }
+        }
+        SystemMessage("[REDACTED]")
       }
     }
 
@@ -625,28 +582,46 @@ object Parser extends RegexParsers{
     true
   }
 
-
-
   def StartInterpreter(player : PlayerClass, gamePackageName : String): Unit = {
     World.Init(player, gamePackageName)
 
+    time("startup"){
+      EverythingParser.parse("start")
+      execute(starting, reflexively)
+    }
+
     execute(examining, reflexively)
 
-    while(!exit){
-      val commandParser = BuildParser2()
-
+    while(!exit) {
       print("> ")
       val input = readLine().toLowerCase
-      val command = BuildCommand(input, commandParser)
-      if(command.nonEmpty){
-        val c = command.get
-        RunApplyingBeforeRules(c)
-        ExecuteAction(c.action, c.noun, c.secondNoun)
-        RunApplyingRules(c)
-        execute(being, playerLocation)
-      } else {
-        println("[REDACTED]")
+
+      time("interpreter loop") {
+
+        val results  = time("parsing") {
+          val r = EverythingParser.parse(input)
+          Array(r._3, r._2, r._1)
+        }
+
+        boundary {
+          for (result <- results) {
+            val command = BuildCommand(input, result)
+            command does { c =>
+              RunApplyingBeforeRules(c)
+              time("command execution"){
+                ExecuteAction(c.action, c.noun, c.secondNoun)
+              }
+              RunApplyingRules(c)
+              execute(being, playerLocation)
+              break()
+            }
+          }
+          SystemMessage("[REDACTED]")
+        }
       }
     }
   }
 }
+
+
+

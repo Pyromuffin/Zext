@@ -176,8 +176,17 @@ object drying extends Action(1, "dry") {
 }
 
 
-object BigTop extends Room with StartingRoom {
+object dryingWith extends Action(2, "dry") {
 
+  report(dryingWith) {
+    Say(s"You dry $noun with $secondNoun")
+  }
+
+}
+
+
+
+object BigTop extends Room with StartingRoom {
 
   override val name: StringExpression = "The Big Top"
   override val description: StringExpression = "You are in a giant stadium, covered by a bright tent. It seems to be sagging in the middle"
@@ -186,6 +195,10 @@ object BigTop extends Room with StartingRoom {
 
   val ladder = ~"It leads to the crow's nest" is fixed
 
+  val red_hat  = ~"a red hat"
+  val blue_hat  = ~"a blue hat"
+  val hat  = ~"a hat"
+  val hat_hat  = ~"a hat hat"
 
   object bucket extends Thing with Container {
     this is wet(3)

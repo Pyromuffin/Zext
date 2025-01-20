@@ -18,11 +18,12 @@ object NLP {
     val words = str.split(" ")
     val tags = tagger.tag(words)
     val zipped = words.zip(tags)
-    //println(zipped.mkString("Array(", ", ", ")"))
+    // println(zipped.mkString("Array(", ", ", ")"))
     val nouns = zipped.filter{ (word, tag) =>
 
         if(tag == "NOUN") true
         else if(tag == "PROPN") true
+        else if(tag == "PRON") true // maybe
         else false
 
     }.map(_._1.toLowerCase())

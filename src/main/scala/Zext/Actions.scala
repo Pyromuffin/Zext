@@ -24,7 +24,6 @@ object Actions {
     commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
   }
 
-
   def UnderstandAlias(strs: Seq[String], action: Action, zextObject1: ZextObject, zextObject2: ZextObject) : Unit = {
     commandAliases.addAll(strs.map( _ -> Command(action, Option(zextObject1), Option(zextObject2))))
   }
@@ -34,6 +33,19 @@ object Actions {
     report(waiting) Say "You wait for minute"
   }
 
+  object starting extends Action(0) {
+    var started = false
+    Understand(starting, "start")(!started)
+
+    inflict(starting) {
+      started = false
+    }
+
+    report(starting){
+      println("------Zext--------")
+    }
+
+  }
 
   object postprocessingText extends Action(0) {
     var text : String = null
@@ -60,8 +72,9 @@ object Actions {
       postprocessingText.text = text
       execute(postprocessingText, noun, secondNoun, silent, location)
 
-      if (testingOutput)
+      if (testingOutput){
         testOutput.addOne(postprocessingText.text)
+      }
       else
         println(postprocessingText.text)
     }
@@ -75,9 +88,6 @@ object Actions {
       i think we want the behavior to be something like
       1) check if leaving, going, and entering is possible, if not, dont do any of those things.
       2) do going, leaving, entering in that order
-
-
-
    */
 
 
@@ -185,8 +195,9 @@ object Actions {
   object dropping extends Action(1,"drop", "abandon") {
 
     // for ambiguously dropping things, don't try dropping things that are not in your inventory
-    disambiguationHint = { z =>
-      z.parentContainer == player
+    disambiguationHint = {
+      case z : ZextObject => z.parentContainer == player
+      case _ => false
     }
 
     instead(dropping, reflexively) {
@@ -216,8 +227,9 @@ object Actions {
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
     // for ambiguously taking things, don't try to take items that are already in your inventory.
-    disambiguationHint = { z =>
-      z.parentContainer != player
+    disambiguationHint = {
+      case z: ZextObject => z.parentContainer != player
+      case _ => false
     }
 
     check(taking){
@@ -255,7 +267,7 @@ object Actions {
   }
 
   extension[T] (o : Option[T]) {
-    def does( something : T => Unit): Unit = {
+    inline def does(inline something : T => Unit): Unit = {
       if(o.isDefined)
         something(o.get)
     }
@@ -427,7 +439,6 @@ object Actions {
       }
     }
   }
-
 
   object exiting extends Action(0,"exit") {
     inflict(exiting) {

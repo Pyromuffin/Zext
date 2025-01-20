@@ -161,9 +161,6 @@ object World  {
     }
   }
 
-  object StartingGame extends Action(0) // for hooking.
-  object EndingDay extends Action(0)
-
   val secretNames = Array(
   "Actions$SecretHolder",
   "Inflector$SecretHolder",
@@ -176,8 +173,6 @@ object World  {
   "Container$SecretHolder",
   "Zext$SecretHolder",
   )
-
-
 
   def Init(gamesPlayer : PlayerClass, gamePackageName : String): Unit = {
 
@@ -196,10 +191,6 @@ object World  {
     startingRoom.contents.addOne(gamesPlayer)
 
 
-
-    ExecuteAction(StartingGame)
-
-    println("-------------")
 
   }
 

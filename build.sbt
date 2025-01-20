@@ -30,7 +30,7 @@ lazy val zext = (project in file("."))
     addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.1.0"),
 
     libraryDependencies += "com.pyromuffin" %% "zobjectifier" % "1.1.0",
-    libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.3.0",
+    libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
     libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.17.0",
     libraryDependencies += "org.apache.opennlp" % "opennlp-tools" % "2.5.3",
     libraryDependencies += "org.apache.opennlp" % "opennlp-tools-models" % "2.5.3",
@@ -43,7 +43,7 @@ lazy val zext = (project in file("."))
 
 )
 
-Compile / scalacOptions ++= Seq("-Xplugin-require:Zobjectifier")
+Compile / scalacOptions ++= Seq("-Xplugin-require:Zobjectifier", "-Wconf:msg=Non local returns:s" )
 
 
 /*

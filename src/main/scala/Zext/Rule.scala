@@ -317,7 +317,7 @@ object Rule {
          true
     }
 
-    def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false, location : Room = playerLocation): Boolean = {
+    inline def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false, location : Room = playerLocation): Boolean = {
         ExecuteAction(rule, Option(target), Option(target2), silent, location)
     }
 }
@@ -381,7 +381,7 @@ object Condition {
     implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
 
 
-    type ConditionTypes = ZextObject | ZextObjectProxy[_] | ConditionHelper
+    type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper
 
     implicit def fromTuple(t: => (ConditionTypes, ConditionTypes)): Condition = {
 
@@ -524,7 +524,7 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     var implicitTargetSelector : ZextObject => Boolean = null
     var implicitSubjectSelector : ZextObject => Boolean = null
-    var disambiguationHint : ZextObject => Boolean = null
+    var disambiguationHint : ParsableType => Boolean = null
 
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
