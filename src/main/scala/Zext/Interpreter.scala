@@ -132,8 +132,9 @@ object StringExpression{
 
 class StringExpression(lazyStr : => String) extends Serializable{
 
-  @targetName("plus")
-  def +(rhs: String) = StringExpression(this.toString + rhs)
+  def unary_~(using c: Container): Thing = {
+    SimpleThing(this)
+  }
 
   override def toString: String = {
     lazyStr
@@ -467,7 +468,7 @@ object Parser {
     if(first == null){
       return None
     }
-    //val first = Disambiguate(firsts.get, action.disambiguationHint).asInstanceOf[ZextObject]
+    
     // for tests against noun in the target selector hint
     _noun = first
 

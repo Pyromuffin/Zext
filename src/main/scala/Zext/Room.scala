@@ -50,6 +50,7 @@ abstract class Room extends ZextObject with Container {
 
   World.currentWorld.rooms.append(this)
 
+  enterable = true
   autoexplode = false
   pluralized = Some(false)
 

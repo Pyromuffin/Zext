@@ -215,7 +215,8 @@ object Actions {
     }
 
     inflict(dropping) {
-        noun.transferTo(playerLocation)
+      playerLocation contains noun
+        //noun.transferTo(playerLocation)
     }
 
     report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
@@ -394,6 +395,8 @@ object Actions {
 
 
   object opening extends Action(1, "open"){
+
+    instead(opening, !of[Container]) Say s"It doesn't seem like you can open $noun"
 
     check(opening, of[Container]){
 

@@ -1,19 +1,15 @@
 package Zext
 
 import Zext.Actions.{UnderstandAlias, allActions, examining}
-import Zext.Interpreter.*
 import Zext.Parser.*
-import Zext.QueryPrecedence.Location
 import Zext.Rule.*
 import Zext.RuleContext.*
 import Zext.RuleControl.{Continue, Replace, Stop}
-import Zext.StringExpression.str
 import Zext.World.*
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
-import scala.quoted.*
 import scala.reflect.{ClassTag, TypeTest}
 import scala.util.control.{Breaks, ControlThrowable}
 import zobjectifier.Macros
@@ -36,8 +32,8 @@ abstract class ZextObjectProxy[T <: ZextObject]  {
         }
     }
 
-    infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Containment)
-    infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Containment)
+    infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Content)
+    infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Content)
 }
 
 object noun extends ZextObjectProxy[ZextObject] {
@@ -93,7 +89,9 @@ object Rule {
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
 
 
-    inline def applying(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+
+
+    inline def applying(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({
             body; Continue
         }, conditions *)
@@ -103,7 +101,7 @@ object Rule {
     }
 
 
-    inline def check(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+    inline def check(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions *)
         rule.definitionPosition = CodePosition()
         ruleSets(r).checkRules += rule
@@ -111,35 +109,35 @@ object Rule {
     }
 
 
-    inline def before(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+    inline def before(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).beforeRules += rule
         rule
     }
 
-    inline def instead(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+    inline def instead(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Stop}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).insteadRules += rule
         rule
     }
 
-    inline def inflict(r: Action, conditions: Condition*)(body: => Unit) : ActionRule = {
+    inline def inflict(r: Action, conditions: Condition*)(inline body: => Unit) : ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).executeRules += rule
         rule
     }
 
-    inline def report(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+    inline def report(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule( {body; Replace}, conditions* )
         rule.definitionPosition = CodePosition()
         ruleSets(r).reportRules += rule
         rule
     }
 
-    inline def after(r: Action, conditions: Condition*)(body: => Unit): ActionRule = {
+    inline def after(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
@@ -329,7 +327,7 @@ abstract class Rule {
 
 
 enum QueryPrecedence:
-    case Generic, Class, SecondClass, Property, SecondProperty, Containment, Object, SecondObject, Location
+    case Generic, Class, SecondClass, Property, SecondProperty, Content, Object, SecondObject, Location
 
 
 class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
@@ -379,7 +377,6 @@ object Condition {
     implicit def fromClassHolder(ch: => ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
     implicit def fromPropHolder(ph: => ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
     implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
-
 
     type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper
 

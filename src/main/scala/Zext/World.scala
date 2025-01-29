@@ -7,7 +7,6 @@ import Zext.Condition.canBecome
 import Zext.Parser.BuildUnderstandables
 import Zext.Rule.*
 
-import scala.ref.WeakReference
 import scala.reflect.TypeTest
 
 object reflexively extends ZextObject {
@@ -139,7 +138,7 @@ object World  {
   val testOutput = new ArrayBuffer[String]()
 
   var currentWorld = new WorldState
-  def playerLocation = player.parentContainer.asInstanceOf[Room]
+  def playerLocation = player.parentContainer
 
 
   def RevealSecrets(path: String, className : String): Unit = {
@@ -198,3 +197,86 @@ object World  {
 
 
 }
+
+import scala.quoted.* // imports Quotes, Expr
+def inspectCode(x: Expr[Any])(using Quotes): Expr[Any] =
+  import quotes.reflect.*
+
+  println(x.show)
+
+  val ext = '{
+    extension(x : Any) {
+      def potato = println(x)
+    }
+  }
+
+  val method = '{
+      def potato(z : Any) = println(z)
+  }
+
+
+  println(ext.asTerm)
+  println(method.asTerm)
+  x
+
+inline def inspect(inline x: Any): Any = ${ inspectCode('x) }
+
+transparent inline def MakeOption[T](thing : T) : Any = ${ MakeOptionImpl('thing) }
+
+def MakeOptionImpl[T](expr: Expr[T])(using Quotes, Type[T]): Expr[Option[T]] = {
+  //import quotes.reflect.*
+
+  '{Option(${expr})}
+}
+
+
+/*
+
+class printTree extends MacroAnnotation {
+
+  override def transform(using q : Quotes)(tree: quotes.reflect.Definition, companion: Option[quotes.reflect.Definition]): List[quotes.reflect.Definition] = {
+    import q.reflect.{*, given}
+
+
+    val classSymbol = tree match {
+      case c : ClassDef => c.symbol
+    }
+
+    val body = tree match {
+      case c : ClassDef => c.body
+      case _ => null
+    }
+
+
+
+
+    for(st <- body){
+      st match {
+        case d: DefDef =>{
+          println("print defdef: " + d.show(using Printer.TreeStructure))
+          println(d.symbol.flags.show)
+
+          val stuff = DefDef.unapply(d)
+          val defdefType = stuff._3.tpe
+
+          val methodSymbol = d.symbol
+
+          val extensionSymbol = Symbol.newMethod(classSymbol, "Extension_" + d.name, defdefType, Flags.Method | Flags.ExtensionMethod | Flags.Infix, Symbol.noSymbol)
+
+
+
+
+        }
+        case _ =>
+      }
+    }
+
+
+
+
+    println("print tree: " + tree.show(using Printer.TreeStructure))
+    List(tree)
+  }
+}
+
+*/

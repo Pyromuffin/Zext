@@ -15,12 +15,18 @@ object TestRoom extends Room with StartingRoom {
   override val description = ""
 
   val pebble = ~"macrosand"
-  val box = simpleBox("Test box")
-  val table = simpleSupporter("Test table") {
+  val box = Box("Test box")
+
+
+  
+  
+  val table = new Supporter("Test table") {
     val stick =  ~"sticky"
   }
   val gum = "A wad of gum is stuck to the bottom of the table" initially
     "A dried out piece of chewing gum" inside table
+
+
 }
 
 

@@ -3,6 +3,7 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
+import Zext.Relatable.Containment.holds
 
 object guy extends PlayerClass {
   override val name = "SLEEMO"
@@ -37,10 +38,13 @@ object unlocking extends Action(1, "unlock")
 object Dirt extends Room {
 
   override val name: StringExpression = "dirt"
-  override val description: StringExpression = once("the floorboards creak underfoot.") + "You are buried in soil."
+  override val description: StringExpression = str {
+    once("the floorboards creak underfoot.")
+   "You are buried in soil."
+  }
 
 
-  val lockbox = simpleBox("A transparent lockbox with a small round keyhole") {
+  val lockbox = new Box("A transparent lockbox with a small round keyhole") {
     val treasure = ~"lucre"
   }
   lockbox.openable = false
@@ -50,7 +54,7 @@ object Dirt extends Room {
   val mud = ~"dirt juice" amount some
   val walls = ~"they're everywhere" are fixed
 
-  val bucket = simpleBox("pebble purgatory") {
+  val bucket = new Box("pebble purgatory") {
     val sand = ~"paperless sandpaper" amount some
     val pants = ~"rag ensemble" and RoomDescription("A pair of pants is tangled with bucket particles") amount some // add custom amountifiers like a pair
   }
@@ -63,7 +67,7 @@ object Dirt extends Room {
   report(opening, bucket) Say "Your pry open the bucket lid"
   // instead(opening, bucket) Say "It's sealed with bucket glue"
 
-  val hook = simpleSupporter("hungry tines")
+  val hook = Supporter("hungry tines")
 
   object not_yours extends Property
   val scarves = ~"An array of zebra patterned tactical scarves" is scenery and not_yours
@@ -92,32 +96,6 @@ object Dirt extends Room {
   inflict(leaving, here) {
     Disconnect(south)
     Disconnect(north)
-  }
-
-
-  val clothes_rack = new Supporter("Clothes Rack") {
-
-
-    this is fixed
-    this aka "rack"
-
-    automaticallyListContents = false
-
-
-    val shirt = ~"Solidified dye in the shape of a tank top"
-
-    override val description = str {
-      if (contents.contains(shirt))
-        "A shirt is pinned to a line strewn between two very serious pots."
-      else
-        "The line hangs limply"
-    }
-
-
-
-    report(taking, shirt, this has shirt) {
-      Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
-    }
   }
 
 
@@ -200,25 +178,57 @@ object BigTop extends Room with StartingRoom {
   val hat  = ~"a hat"
   val hat_hat  = ~"a hat hat"
 
-  object bucket extends Thing with Container {
+
+
+  val bucket = new Box {
     this is wet(3)
 
     override val name = str {
-      if( this[wet].wetness > 0 ) {
+      if (this[wet].wetness > 0) {
         "bucket of water"
       } else {
         "dry bucket"
       }
     }
 
+
     override val description = str {
-      if( this[wet].wetness > 0 ) {
+      if (this[wet].wetness > 0) {
         "a bucket with an amount of quick-dry water"
       } else {
         "bone dry"
       }
     }
   }
+
+  
+  bucket holds hat
+
+
+  val clothes_rack = new Supporter {
+
+
+    this is fixed
+    //this aka "rack"
+
+    automaticallyListContents = false
+
+
+    val shirt = ~"Solidified dye in the shape of a tank top"
+
+    override val description = str {
+      if (contents.contains(shirt))
+        "A shirt is pinned to a line strewn between two very serious pots."
+      else
+        "The line hangs limply"
+    }
+
+
+    report(taking, shirt, this has shirt) {
+      Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
+    }
+  }
+
 
   Connect(south, WormPile)
 

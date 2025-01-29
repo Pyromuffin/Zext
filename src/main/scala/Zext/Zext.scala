@@ -14,6 +14,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
+import Zext.Relatable.Containment
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
@@ -65,7 +66,7 @@ def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
 }
 
 
-
+type TT[X] = TypeTest[Any, X]
 
 
 object ZextObject{
@@ -77,6 +78,14 @@ object ZextObject{
     }
 
     val allObjects = ArrayBuffer[ZextObject]()
+
+    def GetAll[T <: Relatable : TT as tt] : Seq[T] = {
+
+        allObjects.filter { z =>
+           tt.unapply(z).isDefined
+        }.map(_.asInstanceOf[T]).toSeq
+
+    }
 }
 
 
@@ -202,7 +211,7 @@ object determiningVisibility extends Action(2) {
 }
 
 @SerialVersionUID(100L)
-abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable {
+abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable with Relatable {
 
     val dynamic = false
 
@@ -220,10 +229,11 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var proper = false
 
 
+
     def findRoom(): Room = {
         parentContainer match {
             case r: Room => r
-            case playerClass: PlayerClass => playerLocation
+            //case playerClass: PlayerClass => playerLocation
             case backdrop: Backdrop => nowhere
             case zextObject: ZextObject => zextObject.findRoom()
             case null => throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
@@ -232,9 +242,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     //@todo eventually fix zextobject/thing confusion
-    var parentContainer: Container = null
-    val parts = ArrayBuffer[ZextObject]()
-    var compositeObject: ZextObject = null // turn composite into a property
+    def parentContainer: ZextObject & Container = parents(Containment).head
 
 
     override def equals(obj: Any) = {
@@ -245,11 +253,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         }
     }
 
-    infix def transferTo(container: Container): Unit = {
-        parentContainer.contents.remove(parentContainer.contents.indexOf(this))
-        parentContainer = container
-        container.contents.addOne(this)
-    }
+
 
 
     def definite: String = {
@@ -358,12 +362,9 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
 object Thing {
     extension(d: StringExpression)  {
-        inline def unary_~(using c : Container) : Thing = {
-            SimpleThing(FixName(Macros.variableName), d)
-        }
 
-        inline def initially(desc: StringExpression)(using c: Container): Thing = {
-            SimpleThing(FixName(Macros.variableName), desc) and RoomDescription(d)
+        inline infix def initially(desc: StringExpression)(using c: Container): Thing = {
+            SimpleThing(desc) and RoomDescription(d)
         }
     }
 
@@ -374,20 +375,33 @@ object Thing {
     enum NounAmount {
         case singular, plural, some
     }
+
+
+
 }
 
 case class RoomDescription(desc: StringExpression) extends Property {
     var disturbed = false
 }
 
-case class SimpleThing(name : StringExpression, description: StringExpression)(using c : Container) extends Thing
+case class SimpleThing(description: StringExpression)(using c : Container) extends Thing {
+}
 
-abstract class Thing(using c : Container) extends ZextObject{
 
-    var valueInLucre = 0
+abstract class Thing (using c : Container) extends ZextObject {
 
     parentContainer = c
     c.contents += this
+
+    var autoname: String = null
+
+    // called by compiler plugin with valdef name
+    def SetName(s: String): this.type = {
+        if(autoname == null) autoname = Thing.FixName(s)
+        this
+    }
+
+    override val name = autoname
 
     def isAutomaticallyPlural = {
         Inflector.pluralize(name.toString) == name.toString
@@ -429,10 +443,7 @@ abstract class Thing(using c : Container) extends ZextObject{
         this
     }
 
-    infix def worth(value : Int) : this.type = {
-        valueInLucre = value
-        this
-    }
+
 }
 
 

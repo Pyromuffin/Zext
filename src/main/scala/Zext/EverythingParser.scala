@@ -3,7 +3,7 @@ package Zext
 import Zext.Parser.{BuildUnderstandables, Parsable, ParsableType, understandables}
 import fastparse.*
 import fastparse.NoWhitespace.*
-import fastparse.Parsed.Success
+import fastparse.Parsed.{Failure, Success}
 
 import java.lang.System.nanoTime
 
@@ -52,8 +52,6 @@ object EverythingParser {
       understandables.map(PossibleWord).filter(_.isDefined).map(_.get).toArray.sortBy(_._1.length).reverse.unzip
     }
 
-
-
     def space[$: P] = P( CharIn(" \t\n\r").rep(1))
     def anySpace[$: P] = P(CharIn(" \t\n\r").rep)
     def prepositionParser[$: P] = StringIn("on top of", "about", "on to", "with", "from", "into", "in", "at", "to", "on")
@@ -66,20 +64,21 @@ object EverythingParser {
     def parseEverything[$: P] = allWordsWithIndices.map(indexResultParser).foldLeft(Fail.map(_=> -1))((l, r) => l | r())
     def parseEverythingRequireNext[$: P] = allWordsWithIndices.map(indexResultParserNext).foldLeft(Fail.map(_=> -1))( (l, r) => l | r())
 
-    def indexResultParserNextNext[ $: P](t : (String, Int)) = () => P(     (ignored ~ space).? ~ t._1 ~ &(space ~ parseEverythingRequireNext)     ).map(_ => t._2)
+    def indexResultParserNextNext[ $: P](t : (String, Int)) = () => P(     (ignored ~ space).? ~ t._1 ~ &(space ~ parseEverythingRequireNext ~ &(spaceOrEnd))     ).map(_ => t._2)
     def parseEverythingRequireNextNext[$: P] = allWordsWithIndices.map(indexResultParserNextNext).foldLeft(Fail.map(_=> -1))( (l, r) => l | r())
-
-    def command1Parser[$: P] = P( anySpace ~ parseEverything ~ (space ~ parseEverything).? ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything) ).? ~ End)
-    def command2Parser[$: P] = P( anySpace ~ parseEverythingRequireNext ~ (space ~ parseEverything) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything) ).? ~ End)
-    def command3Parser[$: P] = P( anySpace ~ parseEverythingRequireNextNext ~ (space ~ parseEverythingRequireNext) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything) ) ~ End)
+    def spaceOrEnd[$: P] = P(space | End)
 
 
+    def command1Parser[$: P] = P( anySpace ~ parseEverything ~ (space ~ parseEverything ~ &(spaceOrEnd)).? ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).? ~ End)
+    def command2Parser[$: P] = P( anySpace ~ parseEverythingRequireNext ~ (space ~ parseEverything ~ &(spaceOrEnd)) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).? ~ End)
+    def command3Parser[$: P] = P( anySpace ~ parseEverythingRequireNextNext ~ (space ~ parseEverythingRequireNext ~ &(spaceOrEnd)) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ) ~ End)
 
 
     val result1 = time("parse1") {
       fastparse.parse(input, implicit p => command1Parser)
       match {
         case s: Success[(Int, Option[Int], Option[Int])] => Some(allParsables(s.value._1), s.value._2.map( allParsables(_)), s.value._3.map( allParsables(_)))
+        //case f: Failure => println(f.trace().longMsg); None
         case _ => None
       }
     }
@@ -88,6 +87,7 @@ object EverythingParser {
       fastparse.parse(input, implicit p => command2Parser)
       match {
         case s: Success[(Int, Int, Option[Int])] => Some(allParsables(s.value._1), Option(allParsables(s.value._2)), s.value._3.map(allParsables(_)))
+        //case f: Failure => println(f.trace().longMsg); None
         case _ => None
       }
     }
@@ -96,10 +96,12 @@ object EverythingParser {
       fastparse.parse(input, implicit p => command3Parser)
       match {
         case s: Success[(Int, Int, Int)] => Some(allParsables(s.value._1), Option(allParsables(s.value._2)), Option(allParsables(s.value._3)))
+        //case f: Failure => println(f.trace().longMsg); None
         case _ => None
       }
     }
 
-    (result1, result2, result3)
+    val ret = (result1, result2, result3)
+    ret
   }
 }
