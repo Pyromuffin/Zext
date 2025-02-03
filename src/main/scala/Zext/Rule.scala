@@ -21,20 +21,22 @@ object ZextObjectProxy {
 }
 
 
-abstract class ZextObjectProxy[T <: ZextObject]  {
+abstract class ZextObjectProxy[+T]  {
     override def toString = resolve.toString
     def resolve : T
 
     override def equals(obj: Any) = {
+        val me = resolve.asInstanceOf[ZextObject] // or else!
+
          obj match {
-             case zextObjectProxy: ZextObjectProxy[_] => resolve.objectID == zextObjectProxy.objectID
-             case zextObject: ZextObject => resolve.objectID == zextObject.objectID
+             case zextObjectProxy: ZextObjectProxy[ZextObject] => me.objectID == zextObjectProxy.objectID
+             case zextObject: ZextObject => me.objectID == zextObject.objectID
              case null => false
         }
     }
 
-    infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Content)
-    infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Content)
+    //infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Content)
+    //infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Content)
 }
 
 object noun extends ZextObjectProxy[ZextObject] {
@@ -66,7 +68,7 @@ object RuleContext {
     def location : Room = _location
 }
 
-case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean, location : Room)
+case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean, location : ZContainer)
 
 object Rule {
 
@@ -281,7 +283,7 @@ object Rule {
         }
     }
 
-     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : Room = playerLocation): Boolean = {
+     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : ZContainer = playerLocation): Boolean = {
         val set = ruleSets(rule)
 
          /*
@@ -316,7 +318,7 @@ object Rule {
          true
     }
 
-    inline def execute(rule: Action, target: ZextObject, target2: ZextObject = null, silent : Boolean = false, location : Room = playerLocation): Boolean = {
+    inline def execute(rule: Action, target: ZextObject = null, target2: ZextObject = null, silent : Boolean = false, location : ZContainer = playerLocation): Boolean = {
         ExecuteAction(rule, Option(target), Option(target2), silent, location)
     }
 }
@@ -387,7 +389,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case zextObjectProxy: ZextObjectProxy[_] => fromObject(zextObjectProxy.resolve)
+            case zextObjectProxy: ZextObjectProxy[ZextObject] => fromObject(zextObjectProxy.resolve)
             case zextObject: ZextObject => fromObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
@@ -396,7 +398,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case zextObjectProxy: ZextObjectProxy[_] => fromSecondObject(zextObjectProxy.resolve)
+            case zextObjectProxy: ZextObjectProxy[ZextObject] => fromSecondObject(zextObjectProxy.resolve)
             case zextObject: ZextObject => fromSecondObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }

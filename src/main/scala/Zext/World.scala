@@ -99,15 +99,15 @@ object nowhere extends Room {
 }
 
 
-abstract class PlayerClass extends ZextObject with Container {
+abstract class PlayerClass extends Thing(using World.GetStartingLocation()) with Container {
 
   properties += scenery
   automaticallyListContents = false
   open = false
   transparent = false
 
-  def Move(room: Room): Unit = {
-    transferTo(room)
+  def Move(container: ZContainer): Unit = {
+    container contains this
   }
 
   this.aliases.addOne("self").addOne("me")
@@ -115,7 +115,6 @@ abstract class PlayerClass extends ZextObject with Container {
 
 class WorldState{
 
-  val globals = ArrayBuffer[ZextObject]()
   val rooms = ArrayBuffer[Room]()
   val regions = ArrayBuffer[RoomRegion]()
   var player : PlayerClass = null
@@ -169,6 +168,11 @@ object World  {
   "Zext$SecretHolder",
   )
 
+  def GetStartingLocation() : ZContainer = {
+    currentWorld.rooms.find(_.isInstanceOf[StartingRoom]).get
+
+  }
+
   def Init(gamesPlayer : PlayerClass, gamePackageName : String): Unit = {
 
     // i think it will be hard or impossible to switch players, but maybe that's ok.
@@ -180,10 +184,10 @@ object World  {
 
     TouchPackage(gamePackageName)
 
-    val startingRoom = currentWorld.rooms.find(_.isInstanceOf[StartingRoom]).get
-    startingRoom.visited = true
-    gamesPlayer.parentContainer = startingRoom
-    startingRoom.contents.addOne(gamesPlayer)
+    //val startingRoom = GetStartingLocation()
+    //startingRoom.visited = true
+    //gamesPlayer.parentContainer = startingRoom
+    //startingRoom.contents.addOne(gamesPlayer)
 
 
 

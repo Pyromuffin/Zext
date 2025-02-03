@@ -11,6 +11,7 @@ import Zext.RuleContext.*
 import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
+import Zext.Relations.*
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -112,6 +113,7 @@ object Actions {
 
     instead(going, nothing) Say "You don't have to go right now."
 
+    /*
     UnderstandAlias("east", going, Direction.east)
     UnderstandAlias("e", going, Direction.east)
     UnderstandAlias("west", going, Direction.west)
@@ -124,6 +126,7 @@ object Actions {
     UnderstandAlias("u", going, Direction.up)
     UnderstandAlias("down", going, Direction.down)
     UnderstandAlias("d", going, Direction.down)
+    */
 
 
     /*
@@ -142,7 +145,8 @@ object Actions {
 
     check(going, of[Direction]){
       val d = noun[Direction]
-      val connected = playerLocation.connections.contains(d)
+
+      val connected = playerRoom.connections(d).isDefined //playerLocation.connections.contains(d)
 
       // this is so dumb but maybe it will work?
       val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
@@ -154,7 +158,7 @@ object Actions {
         Say(s"You can't go $d")
         stop
       }
-      val destination = playerLocation.connections(d)
+      val destination = playerRoom.connections(d).get
 
       val enterCtx = RuleContext(Some(destination), None, false,  playerLocation)
       if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
@@ -165,14 +169,14 @@ object Actions {
 
     report(going, of[Direction]) {
       val d = noun[Direction]
-      val room = playerLocation.connections(d)
+      val room = playerRoom.connections(d)
 
       Say(s"You went $d to $room.")
     }
 
     inflict(going, of[Direction]) {
       val d = noun[Direction]
-      val room = playerLocation.connections(d)
+      val room = playerRoom.connections(d).get
 
       val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
@@ -250,7 +254,7 @@ object Actions {
       Say(s"You're going to have a difficult time removing $noun from ${noun[Thing].compositeObject}")
     }
 
-    instead(taking, player has noun) {
+    instead(taking, player contains noun[Thing]) {
       Say(s"You rummage around the items in your backpack, looking for $noun")
     }
 
@@ -493,7 +497,7 @@ object Actions {
 
   object putting extends Action(2,"put", "insert", "place") {
 
-    before(putting, secondNoun has noun) {
+    before(putting, secondNoun[ZContainer] contains noun[Thing]) {
       Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")
       stop
     }

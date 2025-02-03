@@ -1,27 +1,9 @@
 package Zext
 
-import Zext.Relatable.TT
+import Zext.SetComprehension.CombinedComprehension
+
 import scala.reflect.TypeTest
 
-/*
-trait SetCompable[Extended, Inner <: Relatable] {
-  extension(e : Extended) {
-    def getSet() : Seq[Inner]
-  }
-}
-
-object SetCompable {
-  /*
-  implicit def fromComp[X, XI <: Relatable](s: X)(using SetCompable[X, XI]): SetComprehension[XI] = {
-    () => s.getSet()
-  }
-  */
-
-  given [T <: Thing] => SetCompable[T, T]:
-    extension (thingy: T) def getSet(): Seq[T] = Seq(thingy)
-
-}
-*/
 
 trait SetComprehension[+T] {
   def getSet(): Seq[T]
@@ -30,27 +12,27 @@ trait SetComprehension[+T] {
     inverted = !inverted
     this
   }
+
 }
 
 object SetComprehension {
 
-  /*
-  given [I <: Relatable] =>SetCompable[SetComprehension[I], I]:
-    extension (e: SetComprehension[I]) def getSet(): Seq[I] = e.getSet()
-  */
-
-  case class FilterComprehension[T <: Relatable : TT](filter: T => Boolean) {
+  case class FilterComprehension[T <: Relatable : TT](filter: T => Boolean) extends SetComprehension[T]{
     def getSet(): Seq[T] = {
       ZextObject.GetAll[T].filter(filter)
     }
   }
 
-  case class SingleComprehension[R <: Relatable](r: R) {
+  case class SingleComprehension[R <: Relatable](r: R) extends SetComprehension[R]{
     def getSet(): Seq[R] = Seq(r)
   }
 
-  case class ArrayComprehension[R <: Relatable](r: R*) {
+  case class ArrayComprehension[R <: Relatable](r: R*) extends SetComprehension[R] {
     def getSet(): Seq[R] = r
+  }
+
+  case class CombinedComprehension[R <: Relatable](setComprehensions: SetComprehension[R]*) extends SetComprehension[R] {
+    def getSet(): Seq[R] = setComprehensions.flatMap(_.getSet())
   }
 
 

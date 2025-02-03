@@ -3,7 +3,6 @@ package Zext
 import Zext.*
 import Zext.exports.*
 import Zext.QueryPrecedence.Content
-import Zext.Relatable.Containment
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
@@ -14,10 +13,12 @@ object Container {
 
 }
 
+type ZContainer = ZextObject & Container
+
 trait Container {
   this: ZextObject =>
 
-  given c: Container = this
+  given c: ZContainer = this
 
   def contents: Seq[Thing] = relations(Containment).toSeq
   var preposition = "inside"
@@ -45,14 +46,14 @@ object Supporter {
 
 
 // tables, hooks, etc always open and cannot be closed.
-case class Supporter(override val description: StringExpression = "")(using Container) extends Thing with Container {
+case class Supporter(override val description: StringExpression = "")(using c : Container & ZextObject) extends Thing with Container {
   open = true
   transparent = true
   openable = false
   preposition = "on"
 }
 
-case class Box(override val description: StringExpression = "")(using Container) extends Thing with Container {
+case class Box(override val description: StringExpression = "")(using c : Container & ZextObject) extends Thing with Container {
   transparent = false
   open = false
 }

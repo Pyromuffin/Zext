@@ -1,6 +1,5 @@
 package Zext
 
-import Zext.Direction.*
 import Zext.Interpreter.*
 import Zext.Parser.*
 import Zext.QueryPrecedence.*
@@ -14,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
-import Zext.Relatable.{Composition, Containment}
+import Zext.Relations.*
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
@@ -25,7 +24,6 @@ import scala.reflect.TypeTest
 trait Property
 
 
-object holdable extends Property
 object fixed extends Property
 object scenery extends Property
 object wet extends Property
@@ -35,7 +33,6 @@ object exports{
     export Rule.*
     export Condition.*
     export World.*
-    export Direction.*
     export ZextObject.*
     export Actions.*
     export Zext.Thing.*
@@ -43,6 +40,8 @@ object exports{
     export Zext.Device.*
     export Zext.StringExpression.*
     export Zext.RuleContext.*
+    export Relations.*
+    export Zext.Relations.RoomAdjacency.*
 }
 
 
@@ -73,7 +72,7 @@ object ZextObject{
 
     def Destroy(zextObject: ZextObject) = {
         // unrelate all relations.
-        val relations = zextObject.relations
+        val relations = zextObject.listRelations()
         for(r <- relations)
             zextObject.deleteRelation(r)
 
@@ -244,12 +243,12 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     //@todo eventually fix zextobject/thing confusion
-    def parentContainer: ZextObject & Container = parent(Containment).get
+    def parentContainer: ZContainer = parent(Containment).get
 
 
     override def equals(obj: Any) = {
         obj match {
-            case zextObjectProxy: ZextObjectProxy[_] => objectID == zextObjectProxy.objectID
+            case zextObjectProxy: ZextObjectProxy[ZextObject] => objectID == zextObjectProxy.objectID
             case zextObject: ZextObject => objectID == zextObject.objectID
             case null => false
         }

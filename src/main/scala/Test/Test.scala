@@ -3,7 +3,8 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
-import Zext.Relatable.Containment
+import Zext.SetComprehension.ArrayComprehension
+
 
 object guy extends PlayerClass {
   override val name = "SLEEMO"
@@ -12,8 +13,6 @@ object guy extends PlayerClass {
   val stick = ~"sticky"
 
 }
-
-
 
 
 extension(z : ZextObjectProxy[PlayerClass]) {
@@ -94,8 +93,8 @@ object Dirt extends Room {
 
   report(leaving, here) Say "The tunnel collapses behind you."
   inflict(leaving, here) {
-    Disconnect(south)
-    Disconnect(north)
+    //Disconnect(south)
+    //Disconnect(north)
   }
 
 
@@ -112,21 +111,22 @@ object hanging extends Action(2, "hang") {
 }
 
 
-object crowsBackdrop extends Backdrop {
+object crows_above extends Backdrop {
   val crows = ~"Several crows are circling above you."
 }
 
 object Circus extends RoomRegion("Circus Region") {
 
-  addRooms(BigTop, CrowsNest)
+  this designates (BigTop, CrowsNest)
 
-  val circusBackdrop = new Backdrop {
+  val circusStuff = new Backdrop {
 
     val circus = ~"The Sleemo Brothers Ring-a-Ding Circus Extravaganza"
     val tent = ~"A spiral candystripe towering overhead" aka "roof"
+
+    this backdrops Circus
   }
 
-  addBackdrop(circusBackdrop)
 }
 
 case class wet(var wetness: Int) extends Property
@@ -201,7 +201,7 @@ object BigTop extends Room with StartingRoom {
     }
   }
 
-  
+
   bucket contains hat
 
 
@@ -224,15 +224,14 @@ object BigTop extends Room with StartingRoom {
     }
 
 
-    report(taking, shirt, this has shirt) {
+    report(taking, shirt, this contains shirt) {
       Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
     }
   }
 
+  this southward WormPile
+  this upward CrowsNest
 
-  Connect(south, WormPile)
-
-  Connect(up, CrowsNest)
 }
 
 
@@ -251,7 +250,7 @@ object CrowsNest extends Room {
 
   instead(hanging, player -> trapeze, !player.insured) Say "You are not insured for that"
 
-  addBackdrop(crowsBackdrop)
+  crows_above backdrops this
 
   after(dropping, player.stick) {
     player.insured = true
@@ -274,7 +273,8 @@ object WormPile extends Room {
 
   val pile_of_worms = ~"writhing all around you."
 
-  Connect(south, Dirt)
+  this southward Dirt
+
 }
 
 
@@ -287,8 +287,7 @@ object FairyFountain extends Room {
 
   instead(leaving, here) Say "The big guy wants your attention here"
 
-
-  Connect(north, Dirt)
+  this northward Dirt
 }
 
 

@@ -1,8 +1,9 @@
 package Zext
 
 import Zext.*
-import Zext.Relatable.{SC, convert}
+import Zext.Relatable.narrow
 import Zext.Relation.*
+import Zext.SetComprehension.CombinedComprehension
 import Zext.exports.*
 
 import scala.collection.{immutable, mutable}
@@ -172,10 +173,8 @@ class RelationQueryContext {
 
 class RelationHolder[RequiredValence <: RelationValence] {
   private[Zext] val nodes = mutable.HashMap[Relation[?,?,?], mutable.HashSet[Relatable]]()
-
   def apply[T <: Relatable, V <: RequiredValence](r : Relation[?,T,V]) : mutable.HashSet[T] = nodes.getOrElseUpdate(r,mutable.HashSet()).asInstanceOf[mutable.HashSet[T]]
 }
-
 
 class SingleRelationHolder[RequiredValence <: RelationValence] {
   private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], Relatable]()
@@ -186,7 +185,6 @@ class ReverseSingleRelationHolder[RequiredValence <: RelationValence] {
   private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], Relatable]()
   def apply[T <: Relatable, V <: RequiredValence](relation: Relation[T, ?, V]): Option[T] = nodes.get(relation).map(_.asInstanceOf[T])
 }
-
 
 class ReverseRelationHolder[RequiredValence <: RelationValence] {
   private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], mutable.HashSet[Relatable]]()
@@ -202,6 +200,31 @@ extension[T <: Relatable](related : Related[T]) {
       case s: Set[T] => s.contains(item)
     }
   }
+}
+
+object Relatable {
+  def narrow[R <: Relatable : TT](r: SC[R]): SetComprehension[R] = {
+    r match {
+      case proxy: ZextObjectProxy[R] => () => Seq(proxy.resolve)
+      case relatable: R => () => Seq(relatable)
+      case _ => r.asInstanceOf[SetComprehension[R]]
+    }
+  }
+
+
+  /*
+  implicit def tupleToComp2[LUB, A <: LUB, B <: LUB, T <: (A, B)](t: T): SetComprehension[LUB] = {
+    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
+  }
+
+  implicit def tupleToComp3[LUB, A <: LUB, B <: LUB, C <: LUB, T <: (A, B, C)](t: T): SetComprehension[LUB] = {
+    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
+  }
+
+  implicit def tupleToComp4[LUB, A <: LUB, B <: LUB, C <: LUB, D <: LUB, T <: (A, B, C, D)](t: T): SetComprehension[LUB] = {
+    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
+  }
+  */
 }
 
 trait Relatable {
@@ -408,7 +431,7 @@ trait Relatable {
     }
   }
 
-  def relations: Seq[Relation[?,?,?]] = {
+  def listRelations(): Seq[Relation[?,?,?]] = {
     val out = child.nodes.keys concat
       children.nodes.keys concat
       partners.nodes.keys concat
@@ -428,9 +451,14 @@ trait Relatable {
   val partners = RelationHolder[ManySymmetric]()
   val partner = SingleRelationHolder[SingleSymmetric]()
   val groups = RelationHolder[Equivalence]()
+
+
 }
 
 object Relation {
+
+  type SC[X] = SetComprehension[X] | X | ZextObjectProxy[X]
+  type QC[X] = RelationQueryContext
 
   type RelationValence
   type OneToOne <: RelationValence
@@ -440,9 +468,6 @@ object Relation {
   type Equivalence <: RelationValence
   type SingleSymmetric <: RelationValence
   type ManySymmetric <: RelationValence
-
-  type AllValences = OneToOne | ManyToOne | OneToMany | ManyToMany | Equivalence | SingleSymmetric | ManySymmetric
-
 
   def when(queryBlock : RelationQueryContext ?=> Unit)(implication : => Unit) = {
     val potato = new RelationQueryContext
@@ -475,115 +500,97 @@ implicit object NotAQuery extends RelationQueryContext
 
 class Relation[S <: Relatable, T <: Relatable, Valence <: RelationValence]  {
 
+  /* here's an example of what you should type for the implementation of a relation verb
+    extension [X <: Source : TT](s: SC[X])
+      infix def contains[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
+   */
+
+
   val precedence = QueryPrecedence.Generic
-  
+
   type Source = S
   type Target = T
 
   relations.addOne(this)
 
-  def relates[A <: Source, B <: Target](_a: SC[A], _b : SC[B])(using ctx : RelationQueryContext) : A = {
-    val a = convert(_a)
-    val b = convert(_b)
-
-    val a_filtered = a.getSet()
-
-    if(ctx != NotAQuery) {
-      ctx.queries.addOne(RelationQuery(a,b, this))
-    } else {
-      val b_filtered = b.getSet()
-
-      for(a_node <- a_filtered){
-        a_node.addRelation(this, b_filtered*)
-      }
-    }
-    a_filtered.head
-  }
-
-  def reverseRelates[A <: Source, B <: Target](_b: SC[B], _a : SC[A])(using ctx : RelationQueryContext) : A = {
-    val a = convert(_a)
-    val b = convert(_b)
-
-    val a_filtered = a.getSet()
-
-    if(ctx != NotAQuery) {
-      ctx.queries.addOne(RelationQuery(a,b, this))
-    } else {
-      val b_filtered = b.getSet()
-
-      for(a_node <- a_filtered){
-        a_node.addRelation(this, b_filtered*)
-      }
-    }
-    a_filtered.head
-  }
-
-}
-
-
-object Relatable {
-
-  type SC[X] = SetComprehension[X] | X
-  type QC[X] = RelationQueryContext
-
-   def convert[R <: Relatable : TT]( r : SC[R]) : SetComprehension[R] = {
-    r match {
-      case relatable : R => () => Seq(relatable)
-      case _  => r.asInstanceOf[SetComprehension[R]]
-    }
-  }
-
-
-  implicit object Containment extends Relation[ZextObject & Container, Thing, OneToMany] {
-
-    override val precedence = QueryPrecedence.Content
-    
-    extension [X <: Source : TT](s: SC[X])
-      infix def contains[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
-      infix def has[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
-  }
-
-  implicit object Composition extends Relation[Thing, Thing, ManyToOne]{
-
-    override val precedence = QueryPrecedence.Content
-    
-    extension [X <: Source](s : X) {
-      def isComposite = s.relations(Composition).nonEmpty
-      def compositeObject = s.relations(Composition).get
-    }
-
-    extension [X <: Source : TT](s: SC[X]) {
-      infix def makes[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
-      infix def made_from[Y <: Target : {QC, TT}](target: SC[Y]): X = reverseRelates(target, s)
-    }
-  }
-
-  implicit object Likes extends Relation[Thing, Thing, ManyToMany]{
-    extension [X <: Source : TT](s: SC[X])
-      infix def likes[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
+  def relates[A <: Source, B <: Target](_a: SC[A], _b: Seq[SC[B]])(using RelationQueryContext): A = {
+    val scs = _b.map(narrow(_))
+    relates(_a, CombinedComprehension(scs*))
   }
 
   /*
-  implicit def tupleToComp2[LUB, A <: LUB, B <: LUB, T <: (A, B)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
-  }
-
-  implicit def tupleToComp3[LUB, A <: LUB, B <: LUB, C <: LUB, T <: (A, B, C)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
-  }
-
-  implicit def tupleToComp4[LUB, A <: LUB, B <: LUB, C <: LUB, D <: LUB, T <: (A, B, C, D)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
+  def reverseRelates[A <: Source, B <: Target](_a: SC[A], _b: Seq[SC[B]])(using ctx: RelationQueryContext): A = {
+    val scs = _b.map(narrow(_))
+    reverseRelates(_a, CombinedComprehension(scs *))
   }
   */
+
+
+  def reverseRelates[A <: Source, B <: Target](_b : SC[B], _a: Seq[SC[A]])(using RelationQueryContext): B = {
+    val scs = _a.map(narrow(_))
+    reverseRelates(_b, scs)
+  }
+
+
+  def relates[A <: Source, B <: Target](_a: SC[A], _b : SC[B])(using ctx : RelationQueryContext) : A = {
+    val a = narrow(_a)
+    val b = narrow(_b)
+
+    val a_filtered = a.getSet()
+
+    if(ctx != NotAQuery) {
+      ctx.queries.addOne(RelationQuery(a,b, this))
+    } else {
+      val b_filtered = b.getSet()
+
+      for(a_node <- a_filtered){
+        a_node.addRelation(this, b_filtered*)
+      }
+    }
+    a_filtered.head
+  }
+
+  def reverseRelates[A <: Source, B <: Target](_b : SC[B], _a: SC[A])(using ctx : RelationQueryContext) : B = {
+    val a = narrow(_a)
+    val b = narrow(_b)
+
+    val b_filtered = b.getSet()
+
+    if(ctx != NotAQuery) {
+      ctx.queries.addOne(RelationQuery(a,b, this))
+    } else {
+      val a_filtered = a.getSet()
+      for(a_node <- a_filtered){
+        a_node.addRelation(this, b_filtered*)
+      }
+    }
+    b_filtered.head
+  }
+
 }
+
+class ReciprocalRelation[S <: Relatable, T <: Relatable, Valence <: RelationValence](reciprocal: ReciprocalRelation[T, S, ?]) extends Relation[S, T, Valence] {
+
+  def reciprocates[A <: Source, B <: Target](_a: SC[A], _b: SC[B])(using ctx: RelationQueryContext): A = {
+    reciprocal.relates(_b, _a)
+    relates(_a, _b)
+  }
+}
+
+
+abstract class ConditionalRelation[S <: Relatable, T <: Relatable, Valence <: RelationValence] extends Relation[S, T, Valence] {
+  def condition(source: S, target: T): Boolean
+}
+
+
+
+
+
 
 
 
 
 object RelationsTest extends App {
-
-
 
 
   object House extends Room {
@@ -610,7 +617,7 @@ object RelationsTest extends App {
 
     val box = Box("may conceal something hidden")
 
-    println(statue.relations(Relatable.Composition))
+    println(statue.relations(Composition))
   }
 
   House

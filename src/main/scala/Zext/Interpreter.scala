@@ -132,7 +132,7 @@ object StringExpression{
 
 class StringExpression(lazyStr : => String) extends Serializable{
 
-  def unary_~(using c: Container): Thing = {
+  def unary_~(using c: Container & ZextObject): Thing = {
     SimpleThing(this)
   }
 
@@ -294,7 +294,7 @@ object Parser {
     for(a <- Actions.allActions){
       Understand(a, a.verbs *)
       if (a.targets == 1) {
-        UnderstandAlias(a.verbs, a, reflexively, null)
+        UnderstandAlias(a.verbs, a, nothing, null)
       }
     }
 
@@ -588,10 +588,10 @@ object Parser {
 
     time("startup"){
       EverythingParser.parse("start")
-      execute(starting, reflexively)
+      execute(starting)
     }
 
-    execute(examining, reflexively)
+    execute(examining)
 
     while(!exit) {
       print("> ")
