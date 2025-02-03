@@ -108,7 +108,9 @@ object Actions {
 
   object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
 
-    instead(going, reflexively) Say "You don't have to go right now."
+    implicitTargetSelector = _ == nothing
+
+    instead(going, nothing) Say "You don't have to go right now."
 
     UnderstandAlias("east", going, Direction.east)
     UnderstandAlias("e", going, Direction.east)
@@ -194,29 +196,30 @@ object Actions {
 
   object dropping extends Action(1,"drop", "abandon") {
 
+    // if you don't provide an object, try dropping nothing
+    implicitTargetSelector = _ == nothing
+
     // for ambiguously dropping things, don't try dropping things that are not in your inventory
     disambiguationHint = {
       case z : ZextObject => z.parentContainer == player
       case _ => false
     }
 
-    instead(dropping, reflexively) {
-
+    instead(dropping, nothing) {
       Say(randomly("You stop, drop, and roll.", "You fall to your knees for no reason.",
         """You throw yourself to the floor.
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
     check(dropping) {
-      if( noun != reflexively && noun.parentContainer != player) {
+      if( noun != nothing && noun.parentContainer != player) {
         Say("Can't drop what you don't have.")
         stop
       }
     }
 
-    inflict(dropping) {
-      playerLocation contains noun
-        //noun.transferTo(playerLocation)
+    inflict(dropping, of[Thing]) {
+      playerLocation contains noun[Thing]
     }
 
     report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
@@ -226,6 +229,8 @@ object Actions {
 
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
+
+    implicitTargetSelector = _ == nothing
 
     // for ambiguously taking things, don't try to take items that are already in your inventory.
     disambiguationHint = {
@@ -239,10 +244,10 @@ object Actions {
         stop
     }
 
-    instead(taking, reflexively) Say s"You wrap your arms around yourself, doesn't that feel nice?"
+    instead(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
-    instead(taking, noun.isComposite) {
-      Say(s"You're going to have a difficult time removing $noun from ${noun.compositeObject}")
+    instead(taking, noun[Thing].isComposite) {
+      Say(s"You're going to have a difficult time removing $noun from ${noun[Thing].compositeObject}")
     }
 
     instead(taking, player has noun) {
@@ -257,8 +262,8 @@ object Actions {
       Say(s"You slip $noun into your backpack.")
     }
 
-    inflict(taking) {
-      noun.transferTo(player)
+    inflict(taking){
+      player contains noun[Thing]
     }
 
     after(taking, of[RoomDescription]) {
@@ -278,17 +283,15 @@ object Actions {
 
   object examining extends Action(1,"examine", "x", "look", "l") {
 
-    instead(examining, reflexively) {
-      execute(examining, playerLocation)
-    }
+    implicitTargetSelector = _ == playerLocation
 
     report(examining) {
-      Say({noun.description})
+      Say(noun.description)
     }
 
     report(examining, ofDebug[Room]("report room examining")) {
       Title(playerLocation.name)
-      Say({noun.description})
+      Say(noun.description)
     }
 
     after(examining, ofDebug[Room]("after room examining")) {
@@ -469,7 +472,7 @@ object Actions {
     inflict(loading) {
       Saving.LoadWorld()
       LineBreak()
-      execute(examining, reflexively)
+      execute(examining, playerLocation)
     }
   }
 
@@ -486,11 +489,6 @@ object Actions {
       Say("visible set: " + visibleSet.toString)
       Say("accessible set: " + accessibleSet.toString)
     }
-  }
-
-
-  implicit final class BackArrow[A](private val self:  A) extends AnyVal {
-    @inline def <~ [B](y: B): (B, A) = (y, self)
   }
 
   object putting extends Action(2,"put", "insert", "place") {

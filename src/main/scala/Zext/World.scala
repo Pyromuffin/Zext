@@ -9,11 +9,6 @@ import Zext.Rule.*
 
 import scala.reflect.TypeTest
 
-object reflexively extends ZextObject {
-  val name = "reflexively"
-  val description = ""
-}
-
 object nothing extends ZextObject {
   val name = "nothing"
   val description = ""
@@ -139,6 +134,7 @@ object World  {
 
   var currentWorld = new WorldState
   def playerLocation = player.parentContainer
+  def playerRoom = player.findRoom()
 
 
   def RevealSecrets(path: String, className : String): Unit = {

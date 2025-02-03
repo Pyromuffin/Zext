@@ -20,6 +20,7 @@ object ZextObjectProxy {
     implicit def toZext[T <: ZextObject](z : ZextObjectProxy[T]): T = z.resolve
 }
 
+
 abstract class ZextObjectProxy[T <: ZextObject]  {
     override def toString = resolve.toString
     def resolve : T
@@ -307,7 +308,7 @@ object Rule {
          for(rules <- set.GetAllRules()) {
              if (!RunRule(context, rules)) {
                  blackboard = previousBlackboard
-                 return false // cry about it.
+                 return false
              }
          }
 

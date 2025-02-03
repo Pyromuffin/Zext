@@ -26,15 +26,15 @@ trait Container {
   var transparent = true
   var automaticallyListContents = true
   var enterable = false
-  
+
 
   def ContentsString: Option[String] = {
     ListNamesNicely(contents)
   }
 
   // i think these containment conditions are not ?? dynamic. The haver is fixed, so if that changes then this wont work properly.
-  infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == this, QueryPrecedence.Content)
-  infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != this, QueryPrecedence.Content)
+  //infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == this, QueryPrecedence.Content)
+  //infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != this, QueryPrecedence.Content)
 }
 
 

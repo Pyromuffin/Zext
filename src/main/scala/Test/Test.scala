@@ -3,7 +3,7 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
-import Zext.Relatable.Containment.holds
+import Zext.Relatable.Containment
 
 object guy extends PlayerClass {
   override val name = "SLEEMO"
@@ -202,7 +202,7 @@ object BigTop extends Room with StartingRoom {
   }
 
   
-  bucket holds hat
+  bucket contains hat
 
 
   val clothes_rack = new Supporter {

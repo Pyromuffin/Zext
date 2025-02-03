@@ -210,6 +210,69 @@ trait Relatable {
     def defaulted(r : Relation[?,?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
   }
 
+  // removes relation and all related from relatable
+  def deleteRelation[Valence <: RelationValence](r: Relation[?, ?, Valence]): Unit = {
+    val buddies = related(r).iterator.toSeq
+    removeRelation(r, buddies*)
+
+    r match {
+      case r: Relation[?, ?, OneToMany] => children.nodes.remove(r)
+      case r: Relation[?, ?, ManyToMany] => children.nodes.remove(r)
+      case r: Relation[?, ?, OneToOne] => child.nodes.remove(r)
+      case r: Relation[?, ?, ManyToOne] => child.nodes.remove(r)
+      case r: Relation[?, ?, SingleSymmetric] => partner.nodes.remove(r)
+      case r: Relation[?, ?, ManySymmetric] => partners.nodes.remove(r)
+      case r: Relation[?, ?, Equivalence] => groups.nodes.remove(r)
+    }
+  }
+
+  def removeRelation[Valence <: RelationValence](r: Relation[?, ?, Valence], relatables: Relatable*): Unit = {
+    r match {
+      case oneToMany: Relation[?, ?, OneToMany] =>
+        for (child <- relatables) {
+          children.nodes.defaulted(oneToMany).remove(child)
+          child.parent.nodes.remove(oneToMany)
+        }
+
+      case manyToMany: Relation[?,?,ManyToMany] =>
+        for (child <- relatables) {
+          children.nodes.defaulted(manyToMany).remove(child)
+          child.parents.nodes.defaulted(manyToMany).remove(this)
+        }
+
+      case oneToOne: Relation[?,?,OneToOne] =>
+        for (c <- relatables) {
+          child.nodes.remove(oneToOne)
+          c.parent.nodes.remove(oneToOne)
+        }
+
+      case manyToOne: Relation[?,?,ManyToOne] =>
+        for (c <- relatables) {
+          child.nodes.remove(manyToOne)
+          c.parents.nodes(manyToOne).remove(this)
+        }
+
+      case symmetric: Relation[?,?,SingleSymmetric] =>
+        for (c <- relatables) {
+          partner.nodes.remove(symmetric)
+          c.partner.nodes.remove(symmetric)
+        }
+
+      case manySymmetric: Relation[?,?,ManySymmetric] =>
+        for (c <- relatables) {
+          partners.nodes.defaulted(manySymmetric).remove(c)
+          c.partners.nodes.defaulted(manySymmetric).remove(this)
+        }
+
+      case equivalent: Relation[?,?,Equivalence] =>
+        // well we're just saying that these nodes are not equivalent in this relation anymore.
+        // this doesn't make too much sense, so i guess just remove this item from the shared set, and then remove the relation
+        groups.nodes.defaulted(equivalent).remove(this)
+        groups.nodes.remove(equivalent)
+    }
+  }
+
+
   def addRelation[Valence <: RelationValence](r: Relation[?, ?, Valence], relatables: Relatable*) = {
 
     r match {
@@ -229,6 +292,13 @@ trait Relatable {
         for (child <- relatables) {
           child.parents.nodes.defaulted(manyToMany).add(this)
         }
+
+      case manySymmetric: Relation[?,?,ManySymmetric] =>
+        partners.nodes.defaulted(manySymmetric).addAll(relatables)
+        for (child <- relatables) {
+          child.partners.nodes.defaulted(manySymmetric).add(this)
+        }
+
 
         //  maybe like wearing a hat? Can't wear more than one hat.
       case oneToOne: Relation[?,?,OneToOne] =>
@@ -270,7 +340,7 @@ trait Relatable {
 
 
         // almost the same as one to one
-      case symmetric: Relation[?,?,Symmetric] =>
+      case symmetric: Relation[?,?,SingleSymmetric] =>
         require(relatables.length == 1)
         val newPartner = relatables.head
         // 1) remove old partner's partner and 2) remove old partner,
@@ -310,30 +380,42 @@ trait Relatable {
 
   def related[V <: RelationValence, T <: Relatable](relation: Relation[?,T,V]) : Related[T] = {
     relation match {
-      case r: Relation[?, ?, OneToMany] => children(relation).toSet
-      case r: Relation[?, ?, ManyToMany] => children(relation).toSet
-      case r: Relation[?, ?, Equivalence] => groups(relation).toSet
+      case r : Relation[?, ?, OneToMany] => children(relation).toSet
+      case r : Relation[?, ?, ManyToMany] => children(relation).toSet
+      case r : Relation[?, ?, Equivalence] => groups(relation).toSet
       case r : Relation[?,?,OneToOne] => child(relation)
       case r : Relation[?,?,ManyToOne] => child(relation)
-      case r : Relation[?,?,Symmetric] => partner(relation)
+      case r : Relation[?,?,SingleSymmetric] => partner(relation)
+      case r : Relation[?,?,ManySymmetric] => partners(relation).toSet
     }
   }
 
 
-  def relations[V <: OneToOne | ManyToOne | Symmetric, T <: Relatable](relation: Relation[?, T, V]): Option[T] = {
+  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T, V]): Option[T] = {
     relation match {
       case r : Relation[?,?,OneToOne] => child(relation)
       case r : Relation[?,?,ManyToOne] => child(relation)
-      case r : Relation[?,?,Symmetric] => partner(relation)
+      case r : Relation[?,?,SingleSymmetric] => partner(relation)
     }
   }
 
-  def relations[V <: OneToMany | ManyToMany | Equivalence, T <: Relatable](relation : Relation[?,T,V])(using DummyImplicit) : Set[T] = {
+  def relations[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T,V])(using DummyImplicit) : Set[T] = {
     relation match {
       case r : Relation[?,?,OneToMany] => children(relation).toSet
       case r : Relation[?,?,ManyToMany] => children(relation).toSet
       case r : Relation[?,?,Equivalence] => groups(relation).toSet
+      case r : Relation[?,?,ManySymmetric] => partners(relation).toSet
     }
+  }
+
+  def relations: Seq[Relation[?,?,?]] = {
+    val out = child.nodes.keys concat
+      children.nodes.keys concat
+      partners.nodes.keys concat
+      partner.nodes.keys concat
+      groups.nodes.keys
+
+    out.toSeq
   }
 
   val child = SingleRelationHolder[OneToOne | ManyToOne]()
@@ -343,7 +425,8 @@ trait Relatable {
   val parents = ReverseRelationHolder[ManyToOne | ManyToMany]()
   val parent = ReverseSingleRelationHolder[OneToOne | OneToMany]()
 
-  val partner = SingleRelationHolder[Symmetric]()
+  val partners = RelationHolder[ManySymmetric]()
+  val partner = SingleRelationHolder[SingleSymmetric]()
   val groups = RelationHolder[Equivalence]()
 }
 
@@ -355,9 +438,10 @@ object Relation {
   type OneToMany <: RelationValence
   type ManyToMany <: RelationValence
   type Equivalence <: RelationValence
-  type Symmetric <: RelationValence
+  type SingleSymmetric <: RelationValence
+  type ManySymmetric <: RelationValence
 
-  type AllValences = OneToOne | ManyToOne | OneToMany | ManyToMany | Equivalence | Symmetric
+  type AllValences = OneToOne | ManyToOne | OneToMany | ManyToMany | Equivalence | SingleSymmetric | ManySymmetric
 
 
   def when(queryBlock : RelationQueryContext ?=> Unit)(implication : => Unit) = {
@@ -391,6 +475,8 @@ implicit object NotAQuery extends RelationQueryContext
 
 class Relation[S <: Relatable, T <: Relatable, Valence <: RelationValence]  {
 
+  val precedence = QueryPrecedence.Generic
+  
   type Source = S
   type Target = T
 
@@ -449,12 +535,23 @@ object Relatable {
 
 
   implicit object Containment extends Relation[ZextObject & Container, Thing, OneToMany] {
+
+    override val precedence = QueryPrecedence.Content
+    
     extension [X <: Source : TT](s: SC[X])
       infix def contains[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
       infix def has[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
   }
 
   implicit object Composition extends Relation[Thing, Thing, ManyToOne]{
+
+    override val precedence = QueryPrecedence.Content
+    
+    extension [X <: Source](s : X) {
+      def isComposite = s.relations(Composition).nonEmpty
+      def compositeObject = s.relations(Composition).get
+    }
+
     extension [X <: Source : TT](s: SC[X]) {
       infix def makes[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
       infix def made_from[Y <: Target : {QC, TT}](target: SC[Y]): X = reverseRelates(target, s)

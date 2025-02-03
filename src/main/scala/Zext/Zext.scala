@@ -14,7 +14,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
-import Zext.Relatable.Containment
+import Zext.Relatable.{Composition, Containment}
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
@@ -72,9 +72,11 @@ type TT[X] = TypeTest[Any, X]
 object ZextObject{
 
     def Destroy(zextObject: ZextObject) = {
-        zextObject.parentContainer.contents.remove(zextObject.parentContainer.contents.indexOf(zextObject))
-        zextObject.parentContainer = null
-        // anything else?
+        // unrelate all relations.
+        val relations = zextObject.relations
+        for(r <- relations)
+            zextObject.deleteRelation(r)
+
     }
 
     val allObjects = ArrayBuffer[ZextObject]()
@@ -242,7 +244,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     //@todo eventually fix zextobject/thing confusion
-    def parentContainer: ZextObject & Container = parents(Containment).head
+    def parentContainer: ZextObject & Container = parent(Containment).get
 
 
     override def equals(obj: Any) = {
@@ -252,9 +254,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             case null => false
         }
     }
-
-
-
 
     def definite: String = {
         if (proper)
@@ -283,7 +282,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         toString + " " + be + " " + rhs
     }
 
-    def isComposite = compositeObject != null
 
 
     def isVisibleTo(other: ZextObject): Boolean = {
@@ -302,17 +300,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
     }
 
-    infix def composes(zextObject: ZextObject): this.type = {
-        this transferTo nowhere
-        compositeObject = zextObject
-        zextObject.parts.addOne(this)
-        this
-    }
 
-    infix def inside(container : Container): this.type = {
-        this transferTo container
-        this
-    }
 
     def apply[T](using TypeTest[Property, T]): T = {
         val maybe = this.get[T]
@@ -384,14 +372,12 @@ case class RoomDescription(desc: StringExpression) extends Property {
     var disturbed = false
 }
 
-case class SimpleThing(description: StringExpression)(using c : Container) extends Thing {
-}
+case class SimpleThing(description: StringExpression)(using c : Container & ZextObject) extends Thing
 
 
-abstract class Thing (using c : Container) extends ZextObject {
+abstract class Thing (using c : Container & ZextObject) extends ZextObject {
 
-    parentContainer = c
-    c.contents += this
+    c contains this
 
     var autoname: String = null
 
