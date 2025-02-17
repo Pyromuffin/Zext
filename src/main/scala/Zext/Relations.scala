@@ -51,15 +51,15 @@ object Relations {
   abstract class DirectionalRelation(direction : => Direction) extends ReciprocalRelation[Room, Room] with OneToOne {
     override val precedence = QueryPrecedence.Location
     override def getReciprocal = direction.opposite
-    DirectionalRelation.directions.addOne(this)
   }
 
 
-  object DirectionalRelation {
-    val directions = ArrayBuffer[DirectionalRelation]()
+  object Direction {
+    val directions = ArrayBuffer[Direction]()
   }
 
   case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends ZextObject {
+    Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
     proper = true
     override val description = "just a direction"
@@ -82,8 +82,8 @@ object Relations {
     override val precedence = QueryPrecedence.Location
 
     override def condition(source: Room, target: Room): Boolean = {
-      for (direction <- DirectionalRelation.directions) {
-        val adjacent = source.relations(direction)
+      for (direction <- Direction.directions) {
+        val adjacent = source.relations(direction.relation)
         if (adjacent.contains(target)) return true
       }
       false

@@ -75,7 +75,7 @@ object ZextObject{
         // unrelate all relations.
         val relations = zextObject.listRelations()
         for(r <- relations)
-            zextObject.deleteRelation(r)
+            zextObject.removeRelation(r)
 
     }
 

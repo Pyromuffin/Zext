@@ -3,6 +3,7 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
+import Zext.RoomRegioning.designates
 
 import scala.language.postfixOps
 
@@ -88,14 +89,14 @@ object Dirt extends Room {
 
   report(being) Add s"The time is $time"
 
-
   report(going, south, here) Say "You tunnel to the south."
   report(going, north, here) Say "You mosey to the north."
 
   report(leaving, here) Say "The tunnel collapses behind you."
+  
   inflict(leaving, here) {
-    //Disconnect(south)
-    //Disconnect(north)
+    disconnect(north)
+    disconnect(south)
   }
 
 
@@ -119,6 +120,8 @@ object crows_above extends Backdrop {
 object Circus extends RoomRegion("Circus Region") {
 
   this designates (BigTop, CrowsNest)
+
+
 
   val circusStuff = new Backdrop {
     val circus = ~"The Sleemo Brothers Ring-a-Ding Circus Extravaganza"
@@ -162,6 +165,39 @@ object dryingWith extends Action(2, "dry") {
 
 }
 
+
+object finding extends Action(1, "find") with DebugAction {
+
+  def getConnectedDirection(start : Room, next : Room): Option[Direction] = {
+
+    for (d <- Direction.directions) {
+      if( start.relations(d.relation).contains(next) ) {
+        return Some(d)
+      }
+    }
+
+    None
+  }
+
+
+
+  inflict(finding, of[Room]) {
+    val start = player.room
+    val end = noun[Room]
+    val route = Graph.findPath(start, end, RoomAdjacency)
+    var str = start.name.toString
+    var prev = start
+    for(i <- 1 until route.length){
+      val next = route(i).asInstanceOf[Room]
+      val dir = getConnectedDirection(prev, next)
+      str += " -> " + dir.get.name + " -> " + next.name.toString
+      prev = next
+    }
+
+    println(str)
+  }
+
+}
 
 
 object BigTop extends Room {

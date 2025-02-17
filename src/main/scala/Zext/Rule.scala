@@ -520,7 +520,10 @@ class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
 
 
 
-
+// debug actions will have the entire set of objects in their scope
+trait DebugAction {
+    this : Action =>
+}
 
 class Action(val targets : Int, val verbs : String*) extends Rule with ParsableType(PartOfSpeech.verb) {
 

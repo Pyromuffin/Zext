@@ -410,9 +410,14 @@ object Parser {
     }
 
     val visible = firsts.get.filter {
-      case z: ZextObject => z.isVisibleTo(player)
+      case z: ZextObject =>
+        if(action.isInstanceOf[DebugAction]) true
+        else z.isVisibleTo(player)
+
       case _ => false
     }
+
+
     if(visible.isEmpty)
       return None
 
@@ -444,7 +449,10 @@ object Parser {
       } else  {
 
         val visible = firsts.get.filter {
-          case z: ZextObject => z.isVisibleTo(player)
+          case z: ZextObject =>
+            if (action.isInstanceOf[DebugAction]) true
+            else z.isVisibleTo(player)
+
           case _ => false
         }
 
@@ -480,7 +488,10 @@ object Parser {
     }
 
     val visible = seconds.get.filter {
-      case z: ZextObject => z.isVisibleTo(player)
+      case z: ZextObject =>
+        if(action.isInstanceOf[DebugAction]) true
+        else z.isVisibleTo(player)
+
       case _ => false
     }
 

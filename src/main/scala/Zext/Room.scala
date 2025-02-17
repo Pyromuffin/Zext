@@ -4,6 +4,7 @@ import Zext.Actions.*
 import Zext.Interpreter.Say
 import Zext.QueryPrecedence.Location
 import Zext.Relation.*
+import Zext.Relations.Direction
 import Zext.Rule.{after, execute, inflict}
 import Zext.World.currentWorld
 
@@ -33,6 +34,11 @@ abstract class Room extends ZextObject with Container {
 
   val here = Condition(this == player.location, Location )
   var visited = false
+
+
+  def disconnect(dir : Direction) : Unit = {
+    removeRelation(dir.relation)
+  }
 
 }
 

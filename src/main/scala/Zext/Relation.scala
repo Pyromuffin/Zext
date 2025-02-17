@@ -240,9 +240,9 @@ trait Relatable {
 
 
   // removes relation and all related from relatable
-  def deleteRelation(r: Relation[?, ?]): Unit = {
+  def removeRelation(r: Relation[?, ?]): Unit = {
     val buddies = getRelated(r).iterator.toSeq
-    removeRelation(r, buddies*)
+    removeRelated(r, buddies*)
 
     r match {
       case r: OneToMany => children.nodes.remove(r)
@@ -255,7 +255,7 @@ trait Relatable {
     }
   }
 
-  def removeRelation(r: Relation[?, ?], relatables: Relatable*): Unit = {
+  private def innerRemove(r: Relation[?, ?], relatables: Relatable*): Unit = {
     r match {
       case oneToMany: OneToMany =>
         for (child <- relatables) {
@@ -302,8 +302,25 @@ trait Relatable {
   }
 
 
+  def removeRelated(r: Relation[?, ?], relatables: Relatable*): Unit = {
 
-  def addRelation(r: Relation[?, ?], _relatables: Relatable*) = {
+    r match {
+      // please dont call this with a conditional relation
+      case c : ConditionalRelation[?,?] => return
+
+      case reciprocal: ReciprocalRelation[?,?] =>
+        for(relatable <- relatables){
+          relatable.innerRemove(reciprocal.getReciprocal, this)
+        }
+      case _ =>
+    }
+
+    innerRemove(r, relatables*)
+  }
+
+
+
+  def addRelated(r: Relation[?, ?], _relatables: Relatable*) = {
 
     // filter out already related
     val currentlyRelated = getRelated(r).asInstanceOf[Set[Relatable]]
@@ -414,6 +431,7 @@ trait Relatable {
 
   def getRelated[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
     relation match {
+      case conditional : ConditionalRelation[?,T] => conditional.calculateRelated(this)
       case r : OneToMany => children(r)
       case r : ManyToMany => children(r)
       case r : Equivalence => groups(r)
@@ -557,18 +575,12 @@ implicit object NotAQuery extends RelationQueryContext {
 }
 
 
-class Relation[S <: Relatable, T <: Relatable]  {
-
-  /* here's an example of what you should type for the implementation of a relation verb
-    extension [X <: Source : TT](s: SC[X])
-      infix def contains[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
-   */
+class Relation[S <: Relatable : TT, T <: Relatable : TT]  {
 
   val precedence = QueryPrecedence.Generic
 
   type Source = S | SetComprehension[S]
   type Target = T | SetComprehension[T]
-
 
   relations.addOne(this)
 
@@ -608,7 +620,7 @@ class Relation[S <: Relatable, T <: Relatable]  {
   }
 
 
-  def makeRelation(a: SetComprehension[S], b : SetComprehension[T])(using ctx : RelationQueryContext) : Unit = {
+  private def makeRelation(a: SetComprehension[S], b : SetComprehension[T])(using ctx : RelationQueryContext) : Unit = {
 
     val not = a.not || b.not
 
@@ -624,15 +636,15 @@ class Relation[S <: Relatable, T <: Relatable]  {
 
       for(a_node <- a_filtered){
         if(!not)
-          a_node.addRelation(this, b_filtered *)
+          a_node.addRelated(this, b_filtered *)
         else
-          a_node.removeRelation(this, b_filtered *)
+          a_node.removeRelated(this, b_filtered *)
 
       }
     }
   }
 
-  def makeReverseRelation(b : SetComprehension[T], a: SetComprehension[S])(using ctx : RelationQueryContext) : Unit = {
+  private def makeReverseRelation(b : SetComprehension[T], a: SetComprehension[S])(using ctx : RelationQueryContext) : Unit = {
 
     val not = a.not || b.not
 
@@ -647,16 +659,16 @@ class Relation[S <: Relatable, T <: Relatable]  {
       val b_filtered = b.getSet()
       for(a_node <- a_filtered){
         if (!not)
-          a_node.addRelation(this, b_filtered *)
+          a_node.addRelated(this, b_filtered *)
         else
-          a_node.removeRelation(this, b_filtered *)
+          a_node.removeRelated(this, b_filtered *)
       }
     }
   }
 
 }
 
-abstract class ReciprocalRelation[S <: Relatable, T <: Relatable] extends Relation[S, T] {
+abstract class ReciprocalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S, T] {
   def getReciprocal : Relation[T,S]
   def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A = {
     getReciprocal.relates(_b, _a)
@@ -665,7 +677,16 @@ abstract class ReciprocalRelation[S <: Relatable, T <: Relatable] extends Relati
 }
 
 
-abstract class ConditionalRelation[S <: Relatable, T <: Relatable] extends Relation[S, T] {
+abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S, T] {
+
+  def calculateRelated(source : Relatable) : Set[T] =
+    source match {
+      case s : S =>
+        val candidates = ZextObject.GetAll[T]
+        candidates.filter(condition(s, _)).toSet
+      case _ => Set()
+    }
+
   def condition(source: S, target: T): Boolean
 }
 
