@@ -14,6 +14,8 @@ import Condition.*
 import Zext.Relations.*
 
 import scala.collection.mutable.ArrayBuffer
+import scala.language.postfixOps
+import ZextObjectProxy.*
 
 
 object Actions {
@@ -61,7 +63,7 @@ object Actions {
     var text : String = null
 
     check(saying) {
-      if(location != playerLocation)
+      if(location != player.location)
         stop
     }
 
@@ -109,7 +111,7 @@ object Actions {
 
   object going extends Action(1,"go", "travel", "walk", "run", "cartwheel") {
 
-    implicitTargetSelector = _ == nothing
+    override def implicitTargetSelector = nothing
 
     instead(going, nothing) Say "You don't have to go right now."
 
@@ -146,10 +148,10 @@ object Actions {
     check(going, of[Direction]){
       val d = noun[Direction]
 
-      val connected = playerRoom.connections(d).isDefined //playerLocation.connections.contains(d)
+      val connected = player.room.connections(d).isDefined
 
       // this is so dumb but maybe it will work?
-      val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
+      val leaveCtx = RuleContext(Some(player.location), None, false, player.location)
       if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
@@ -158,9 +160,9 @@ object Actions {
         Say(s"You can't go $d")
         stop
       }
-      val destination = playerRoom.connections(d).get
+      val destination = player.room.connections(d).get
 
-      val enterCtx = RuleContext(Some(destination), None, false,  playerLocation)
+      val enterCtx = RuleContext(Some(destination), None, false,  player.location)
       if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
@@ -169,31 +171,31 @@ object Actions {
 
     report(going, of[Direction]) {
       val d = noun[Direction]
-      val room = playerRoom.connections(d)
+      val room = player.room.connections(d).get
 
       Say(s"You went $d to $room.")
     }
 
     inflict(going, of[Direction]) {
       val d = noun[Direction]
-      val room = playerRoom.connections(d).get
+      val room = player.room.connections(d).get
 
-      val leaveCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
+      val leaveCtx = RuleContext(Some(player.location), None, false, player.location)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
       RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
-      blackboard = playerLocation
+      blackboard = player.location
       player.Move(room)
 
-      val enterCtx = RuleContext(Some(playerLocation), None, false, playerLocation)
+      val enterCtx = RuleContext(Some(player.location), None, false, player.location)
       RunRule(enterCtx, ruleSets(entering).reportRules)
       RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(Some(previousRoom), None, false, playerLocation), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(Some(playerLocation), None, false, playerLocation), ruleSets(entering).afterRules)
+      RunRule(RuleContext(Some(previousRoom), None, false, player.location), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(Some(player.location), None, false, player.location), ruleSets(entering).afterRules)
     }
 
   }
@@ -201,7 +203,7 @@ object Actions {
   object dropping extends Action(1,"drop", "abandon") {
 
     // if you don't provide an object, try dropping nothing
-    implicitTargetSelector = _ == nothing
+    override def implicitTargetSelector = nothing
 
     // for ambiguously dropping things, don't try dropping things that are not in your inventory
     disambiguationHint = {
@@ -223,7 +225,7 @@ object Actions {
     }
 
     inflict(dropping, of[Thing]) {
-      playerLocation contains noun[Thing]
+      player.location holds noun[Thing]
     }
 
     report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
@@ -234,7 +236,7 @@ object Actions {
 
   object taking extends Action(1,"take", "get", "pick up", "g") {
 
-    implicitTargetSelector = _ == nothing
+    override def implicitTargetSelector = nothing
 
     // for ambiguously taking things, don't try to take items that are already in your inventory.
     disambiguationHint = {
@@ -243,7 +245,7 @@ object Actions {
     }
 
     check(taking){
-      if !noun.isAccessibleTo(playerLocation) then
+      if !noun.isAccessibleTo(player) then
         Say(noun is "inaccessible") // maybe say why?
         stop
     }
@@ -254,7 +256,7 @@ object Actions {
       Say(s"You're going to have a difficult time removing $noun from ${noun[Thing].compositeObject}")
     }
 
-    instead(taking, player contains noun[Thing]) {
+    instead(taking, player holds noun?) {
       Say(s"You rummage around the items in your backpack, looking for $noun")
     }
 
@@ -267,7 +269,7 @@ object Actions {
     }
 
     inflict(taking){
-      player contains noun[Thing]
+      player holds noun[Thing]
     }
 
     after(taking, of[RoomDescription]) {
@@ -287,14 +289,14 @@ object Actions {
 
   object examining extends Action(1,"examine", "x", "look", "l") {
 
-    implicitTargetSelector = _ == playerLocation
+    override def implicitTargetSelector = player.location
 
     report(examining) {
       Say(noun.description)
     }
 
     report(examining, ofDebug[Room]("report room examining")) {
-      Title(playerLocation.name)
+      Title(player.location.name)
       Say(noun.description)
     }
 
@@ -476,7 +478,7 @@ object Actions {
     inflict(loading) {
       Saving.LoadWorld()
       LineBreak()
-      execute(examining, playerLocation)
+      execute(examining, player.location)
     }
   }
 
@@ -497,12 +499,12 @@ object Actions {
 
   object putting extends Action(2,"put", "insert", "place") {
 
-    before(putting, secondNoun[ZContainer] contains noun[Thing]) {
+    before(putting, secondNoun holds noun?) {
       Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")
       stop
     }
 
-    before(putting, player lacks noun, secondNoun lacks noun){
+    before(putting, !player holds noun?, !secondNoun holds noun?){
       if( execute(taking, noun, silent = true) ){
         Say(s"(First taking $noun)")
       }
@@ -514,8 +516,8 @@ object Actions {
       }
     }
 
-    instead(putting, player lacks noun) Say s"You need to pick up $noun before putting it somewhere."
-    instead(putting, player lacks noun, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
+    instead(putting, !player holds noun?) Say s"You need to pick up $noun before putting it somewhere."
+    instead(putting, !player holds noun?, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
     instead(putting, anything -> !of[Container] ) Say s"I don't think $secondNoun can hold $noun"
 
     check(putting, anything -> ofDebug[Container]("anything -> container")){
@@ -536,8 +538,8 @@ object Actions {
       }
     }
 
-    inflict(putting, anything -> of[Container]) {
-        noun transferTo secondNoun[Container]
+    inflict(putting, anything -> of[ZContainer]) {
+        noun[Thing] inside secondNoun[ZContainer]
     }
 
     report(putting, anything -> of[Container]) Say s"You put $noun into $secondNoun"

@@ -10,7 +10,7 @@ import java.lang.System.nanoTime
 object EverythingParser {
 
 
-   inline def time[T](name: String)(inline block : => T): T = {
+  inline def time[T](name: String)(inline block : => T): T = {
     val t0 = nanoTime()
     val result = block
     val t1 = nanoTime()
@@ -23,23 +23,23 @@ object EverythingParser {
 
 
 
-  def PossibleWord(str: String, parsables: Seq[Parsable[ParsableType]]): Option[(String, Array[ParsableType])] = {
+    def PossibleWord(str: String, parsables: Seq[Parsable[ParsableType]]): Option[(String, Array[ParsableType])] = {
     // first check if word conditions are applicable, if not splode
 
-    val possibles = parsables.filter(_.possible)
-
-    if (possibles.isEmpty)
-      return Option.empty
-
-    val maxPrecedence = possibles.map(_.precedence).max
-    val maxPrecedenceParsables = possibles.filter(_.precedence == maxPrecedence)
-
-    val maxSpecificity = maxPrecedenceParsables.map(_.specificity).max
-    val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
-
-    val parser = (str.toLowerCase, bestParsables.map(_.target).toArray)
-    Some(parser)
-  }
+      val possibles = parsables.filter(_.possible)
+    
+      if (possibles.isEmpty)
+        return Option.empty
+    
+      val maxPrecedence = possibles.map(_.precedence).max
+      val maxPrecedenceParsables = possibles.filter(_.precedence == maxPrecedence)
+    
+      val maxSpecificity = maxPrecedenceParsables.map(_.specificity).max
+      val bestParsables = maxPrecedenceParsables.filter(_.specificity == maxSpecificity)
+    
+      val parser = (str.toLowerCase, bestParsables.map(_.target).toArray)
+      Some(parser)
+    }
 
 
   type ParseResultType = Option[(Array[ParsableType], Option[Array[ParsableType]], Option[Array[ParsableType]])]

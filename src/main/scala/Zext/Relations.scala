@@ -1,49 +1,56 @@
 package Zext
 
 import Relation.*
+import Zext.Actions.{UnderstandAlias, going}
 
+import scala.annotation.targetName
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.TypeTest
 
 object Relations {
 
-  object Likes extends Relation[Thing, Thing, ManyToMany] {
-    extension [X <: Source : TT](s: SC[X])
-      infix def likes[Y <: Target : {QC, TT}](target: SC[Y]*): X = relates(s, target)
-  }
-
-  implicit object Composition extends Relation[Thing, Thing, ManyToOne] {
+  implicit object Composition extends Relation[Thing, Thing] with ManyToOne {
 
     override val precedence = QueryPrecedence.Content
 
-    extension [X <: Source](s: X) {
+    extension [X <: Thing](s: X) {
       def isComposite = s.relations(Composition).nonEmpty
       def compositeObject = s.relations(Composition).get
     }
 
-    extension [X <: Source : TT](s: SC[X])
-      infix def makes[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
+    extension [X <: Source](s: X)
+      infix def makes[Y <: Target](target: Y): X = {
+        relates(s, target)
+      }
 
-    extension [X <: Target : TT](s: SC[X])
-      infix def made_from[Y <: Source : {QC, TT}](target: SC[Y]*): X = reverseRelates(s, target)
+
+    extension [X <: Target](s: X)
+      infix def made_from[Y <: Source](target: Y*): X = {
+        reverseRelates(s, target)
+      }
   }
 
 
-  implicit object Containment extends Relation[ZContainer, Thing, OneToMany] {
+  implicit object Containment extends Relation[ZContainer, Thing] with OneToMany{
 
     override val precedence = QueryPrecedence.Content
 
-    extension [X <: Source : TT](s: SC[X])
-      infix def contains[Y <: Target : {QC, TT}](target: SC[Y]*): X = relates(s, target)
+    extension [X <: Source](s: X) {
+      infix def holds[Y <: Target](target: Y*) = {
+        relates(s, target)
+      }
 
-    extension [X <: Target : TT](s: SC[X])
-      infix def inside[Y <: Source : {QC, TT}](target: SC[Y]): X = reverseRelates(s, target)
+    }
+
+    extension [X <: Target](s: X)
+      infix def inside[Y <: Source](target: Y): X = reverseRelates(s, target)
 
   }
 
 
-
-  case class DirectionalRelation(opposite: DirectionalRelation, name: String) extends ReciprocalRelation[Room, Room, OneToOne](opposite) {
+  abstract class DirectionalRelation(direction : => Direction) extends ReciprocalRelation[Room, Room] with OneToOne {
     override val precedence = QueryPrecedence.Location
+    override def getReciprocal = direction.opposite
     DirectionalRelation.directions.addOne(this)
   }
 
@@ -52,21 +59,25 @@ object Relations {
     val directions = ArrayBuffer[DirectionalRelation]()
   }
 
-  case class Direction(override val name: String, relation : Relation[Room,Room,OneToOne]) extends ZextObject {
+  case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends ZextObject {
+    UnderstandAlias(name.toString, going, this)
+    proper = true
     override val description = "just a direction"
   }
 
-  val east = Direction("east", RoomAdjacency.east_going)
-  val west = Direction("west", RoomAdjacency.west_going)
-  val south = Direction("south", RoomAdjacency.south_going)
-  val north = Direction("north", RoomAdjacency.north_going)
-  val in = Direction("in", RoomAdjacency.in_going)
-  val out = Direction("out", RoomAdjacency.out_going)
-  val up = Direction("up", RoomAdjacency.up_going)
-  val down = Direction("down", RoomAdjacency.down_going)
+  import RoomAdjacency.*
+
+  val east = Direction("east", east_going, west_going)
+  val west = Direction("west", west_going, east_going)
+  val south = Direction("south", south_going, north_going)
+  val north = Direction("north", north_going, south_going)
+  val in = Direction("in", in_going, out_going)
+  val out = Direction("out", out_going, in_going)
+  val up = Direction("up", up_going, down_going)
+  val down = Direction("down", down_going, up_going)
 
 
-  implicit object RoomAdjacency extends ConditionalRelation[Room, Room, OneToOne] {
+  implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with OneToOne {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location
 
@@ -78,50 +89,51 @@ object Relations {
       false
     }
 
-    extension [X <: Source](room: X) {
+    extension (room: Room) {
       def connections(direction: Direction) : Option[Room] = {
         room.relations(direction.relation)
       }
     }
 
-    implicit object east_going extends DirectionalRelation(west_going, "east") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def eastward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+
+    implicit object east_going extends DirectionalRelation(east) {
+      extension [X <: Source](s: X)
+        infix def eastward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object west_going extends DirectionalRelation(east_going, "west") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def westward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object west_going extends DirectionalRelation(west)  {
+      extension [X <: Source](s: X)
+        infix def westward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object north_going extends DirectionalRelation(south_going, "north") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def northward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object north_going extends DirectionalRelation(north) {
+      extension [X <: Source](s: X)
+        infix def northward[Y <: Target](target: Y): X = reciprocates(s,target)
     }
 
-    implicit object south_going extends DirectionalRelation(north_going, "south") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def southward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object south_going extends DirectionalRelation(south)  {
+      extension [X <: Source](s: X)
+        infix def southward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object in_going extends DirectionalRelation(out_going, "in") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def inward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object in_going extends DirectionalRelation(in)  {
+      extension [X <: Source](s: X)
+        infix def inward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object out_going extends DirectionalRelation(in_going, "out") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def outward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object out_going extends DirectionalRelation(out)  {
+      extension [X <: Source](s: X)
+        infix def outward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object up_going extends DirectionalRelation(down_going, "up") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def upward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object up_going extends DirectionalRelation(up)  {
+      extension [X <: Source](s: X)
+        infix def upward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
 
-    implicit object down_going extends DirectionalRelation(up_going, "down") {
-      extension [X <: Source : TT](s: SC[X])
-        infix def downward[Y <: Target : {QC, TT}](target: SC[Y]): X = reciprocates(s, target)
+    implicit object down_going extends DirectionalRelation(down)  {
+      extension [X <: Source](s: X)
+        infix def downward[Y <: Target](target: Y): X = reciprocates(s, target)
     }
   }
 }

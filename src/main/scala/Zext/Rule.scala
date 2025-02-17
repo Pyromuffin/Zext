@@ -2,6 +2,7 @@ package Zext
 
 import Zext.Actions.{UnderstandAlias, allActions, examining}
 import Zext.Parser.*
+import Zext.Relation.RelationQuery
 import Zext.Rule.*
 import Zext.RuleContext.*
 import Zext.RuleControl.{Continue, Replace, Stop}
@@ -18,25 +19,25 @@ import zobjectifier.Macros.CodePosition
 
 object ZextObjectProxy {
     implicit def toZext[T <: ZextObject](z : ZextObjectProxy[T]): T = z.resolve
+
 }
 
+abstract class ZextObjectProxy[+T <: ZextObject] extends SetComprehension[Nothing]{
 
-abstract class ZextObjectProxy[+T]  {
+    override def getSet() = Seq(resolve).asInstanceOf[Seq[Nothing]]
+
     override def toString = resolve.toString
     def resolve : T
 
     override def equals(obj: Any) = {
-        val me = resolve.asInstanceOf[ZextObject] // or else!
 
          obj match {
-             case zextObjectProxy: ZextObjectProxy[ZextObject] => me.objectID == zextObjectProxy.objectID
-             case zextObject: ZextObject => me.objectID == zextObject.objectID
+             case zextObjectProxy: ZextObjectProxy[?] => this.objectID == zextObjectProxy.objectID
+             case zextObject: ZextObject => this.objectID == zextObject.objectID
              case null => false
         }
     }
 
-    //infix def has(zextObject: => ZextObject) = Condition(zextObject.parentContainer == resolve, QueryPrecedence.Content)
-    //infix def lacks(zextObject: => ZextObject) = Condition(zextObject.parentContainer != resolve, QueryPrecedence.Content)
 }
 
 object noun extends ZextObjectProxy[ZextObject] {
@@ -54,7 +55,7 @@ object RuleContext {
     private[Zext] var _subject: ZextObject = null
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
-    private[Zext] var _location: Room = nowhere
+    private[Zext] var _location: ZContainer = nowhere
 
     private[Zext] def SetContext(ctx : RuleContext) : Unit = {
         _noun = ctx.z1.orNull
@@ -65,7 +66,7 @@ object RuleContext {
 
     def first : Boolean =  _first
     def silent : Boolean = _silent
-    def location : Room = _location
+    def location : ZContainer = _location
 }
 
 case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean, location : ZContainer)
@@ -283,7 +284,7 @@ object Rule {
         }
     }
 
-     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : ZContainer = playerLocation): Boolean = {
+     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : ZContainer = player.location): Boolean = {
         val set = ruleSets(rule)
 
          /*
@@ -318,7 +319,7 @@ object Rule {
          true
     }
 
-    inline def execute(rule: Action, target: ZextObject = null, target2: ZextObject = null, silent : Boolean = false, location : ZContainer = playerLocation): Boolean = {
+    inline def execute(rule: Action, target: ZextObject = null, target2: ZextObject = null, silent : Boolean = false, location : ZContainer = player.location): Boolean = {
         ExecuteAction(rule, Option(target), Option(target2), silent, location)
     }
 }
@@ -337,11 +338,13 @@ class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
     def evaluate = condition
     var specificity = 1
     def precedence = queryType.ordinal
+    /*
     def unary_! : Condition = {
         val c = new Condition(!condition, queryType)
         c.specificity = specificity
         c
     }
+    */
 
     def &&(other: Condition): Condition = {
         // combine predicates
@@ -380,6 +383,7 @@ object Condition {
     implicit def fromClassHolder(ch: => ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
     implicit def fromPropHolder(ph: => ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
     implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
+    implicit def fromQuery(query: => RelationQuery[?,?]) : Condition = new Condition(query.evaluate(), query.relation.precedence)
 
     type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper
 
@@ -389,7 +393,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case zextObjectProxy: ZextObjectProxy[ZextObject] => fromObject(zextObjectProxy.resolve)
+            case zextObjectProxy: ZextObjectProxy[?] => fromObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
             case zextObject: ZextObject => fromObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
@@ -398,7 +402,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case zextObjectProxy: ZextObjectProxy[ZextObject] => fromSecondObject(zextObjectProxy.resolve)
+            case zextObjectProxy: ZextObjectProxy[?] => fromSecondObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
             case zextObject: ZextObject => fromSecondObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
@@ -522,8 +526,8 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     allActions.addOne(this)
 
-    var implicitTargetSelector : ZextObject => Boolean = null
-    var implicitSubjectSelector : ZextObject => Boolean = null
+    def implicitTargetSelector : SetComprehension[?] = null
+    def implicitSubjectSelector : SetComprehension[?] = null
     var disambiguationHint : ParsableType => Boolean = null
 
     ruleSets(this) = new ActionRuleSet

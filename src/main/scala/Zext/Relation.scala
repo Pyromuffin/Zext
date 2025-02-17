@@ -1,14 +1,14 @@
 package Zext
 
 import Zext.*
-import Zext.Relatable.narrow
 import Zext.Relation.*
-import Zext.SetComprehension.CombinedComprehension
+import Zext.SetComprehension.{AllOf, AnyOf, CombinedComprehension}
 import Zext.exports.*
 
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.{ArrayBuffer, HashMap}
-import scala.reflect.TypeTest
+import scala.language.postfixOps
+import scala.reflect.{TypeTest, Typeable}
 /*
 examples
 
@@ -163,7 +163,7 @@ Gratuitous various-to-various relations are therefore not a good idea.
 */
 
 class RelationQueryContext {
-  val queries = ArrayBuffer[RelationQuery[?,?,?]]()
+  val queries = ArrayBuffer[RelationQuery[?,?]]()
   def evaluate : Boolean = {
     if(queries.nonEmpty)
       queries.forall(_.evaluate())
@@ -171,46 +171,49 @@ class RelationQueryContext {
   }
 }
 
-class RelationHolder[RequiredValence <: RelationValence] {
-  private[Zext] val nodes = mutable.HashMap[Relation[?,?,?], mutable.HashSet[Relatable]]()
-  def apply[T <: Relatable, V <: RequiredValence](r : Relation[?,T,V]) : mutable.HashSet[T] = nodes.getOrElseUpdate(r,mutable.HashSet()).asInstanceOf[mutable.HashSet[T]]
+class RelationHolder[RequiredValence <: AllValence] {
+  private[Zext] val nodes = mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]()
+  def apply[T <: Relatable](r : Relation[?,T] & RequiredValence) : Set[T] = nodes.getOrElseUpdate(r,mutable.HashSet()).asInstanceOf[mutable.HashSet[T]].toSet
 }
 
-class SingleRelationHolder[RequiredValence <: RelationValence] {
-  private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], Relatable]()
-  def apply[T <: Relatable, V <: RequiredValence](relation: Relation[?, T, V]): Option[T] = nodes.get(relation).map(_.asInstanceOf[T])
+class SingleRelationHolder[RequiredValence <: AllValence] {
+  private[Zext] val nodes = mutable.HashMap[Relation[?, ?], Relatable]()
+  def apply[T <: Relatable](relation: Relation[?, T] & RequiredValence): Option[T] = nodes.get(relation).map(_.asInstanceOf[T])
 }
 
-class ReverseSingleRelationHolder[RequiredValence <: RelationValence] {
-  private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], Relatable]()
-  def apply[T <: Relatable, V <: RequiredValence](relation: Relation[T, ?, V]): Option[T] = nodes.get(relation).map(_.asInstanceOf[T])
+class ReverseSingleRelationHolder[RequiredValence <: AllValence] {
+  private[Zext] val nodes = mutable.HashMap[Relation[?, ?], Relatable]()
+  def apply[T <: Relatable, V <: RequiredValence](relation: Relation[T, ?] & RequiredValence): Option[T] = nodes.get(relation).map(_.asInstanceOf[T])
 }
 
-class ReverseRelationHolder[RequiredValence <: RelationValence] {
-  private[Zext] val nodes = mutable.HashMap[Relation[?, ?, ?], mutable.HashSet[Relatable]]()
-  def apply[S <: Relatable, V <: RequiredValence](r: Relation[S, ?, V]): mutable.HashSet[S] = nodes.getOrElseUpdate(r, mutable.HashSet()).asInstanceOf[mutable.HashSet[S]]
+class ReverseRelationHolder[RequiredValence <: AllValence] {
+  private[Zext] val nodes = mutable.HashMap[Relation[?, ?], mutable.HashSet[Relatable]]()
+  def apply[S <: Relatable, V <: RequiredValence](r: Relation[S, ?] & RequiredValence): Set[S] = nodes.getOrElseUpdate(r, mutable.HashSet()).asInstanceOf[mutable.HashSet[S]].toSet
 }
 
-type Related[T] =  Option[T] | Set[T]
-
-extension[T <: Relatable](related : Related[T]) {
-  def contains(item : T): Boolean = {
-    related match {
-      case o: Option[T] => o.contains(item)
-      case s: Set[T] => s.contains(item)
-    }
-  }
-}
 
 object Relatable {
-  def narrow[R <: Relatable : TT](r: SC[R]): SetComprehension[R] = {
-    r match {
-      case proxy: ZextObjectProxy[R] => () => Seq(proxy.resolve)
-      case relatable: R => () => Seq(relatable)
-      case _ => r.asInstanceOf[SetComprehension[R]]
+
+
+  extension (queryBlock: => Relatable) {
+    def ? : RelationQuery[?,?] = {
+      NotAQuery.stack.push(ArrayBuffer())
+      queryBlock
+      val queries = NotAQuery.stack.pop()
+      assert(queries.length == 1)
+      queries.head
+    }
+
+
+    def question : Boolean = { //RelationQuery[?, ?] = {
+      NotAQuery.stack.push(ArrayBuffer())
+      queryBlock
+      val queries = NotAQuery.stack.pop()
+      assert(queries.length == 1)
+      queries.head
+      false
     }
   }
-
 
   /*
   implicit def tupleToComp2[LUB, A <: LUB, B <: LUB, T <: (A, B)](t: T): SetComprehension[LUB] = {
@@ -227,67 +230,70 @@ object Relatable {
   */
 }
 
+
+
 trait Relatable {
 
-  extension(h : mutable.HashMap[Relation[?,?,?], mutable.HashSet[Relatable]]) {
-    def defaulted(r : Relation[?,?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
+  extension(h : mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]) {
+    def defaulted(r : Relation[?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
   }
 
+
   // removes relation and all related from relatable
-  def deleteRelation[Valence <: RelationValence](r: Relation[?, ?, Valence]): Unit = {
-    val buddies = related(r).iterator.toSeq
+  def deleteRelation(r: Relation[?, ?]): Unit = {
+    val buddies = getRelated(r).iterator.toSeq
     removeRelation(r, buddies*)
 
     r match {
-      case r: Relation[?, ?, OneToMany] => children.nodes.remove(r)
-      case r: Relation[?, ?, ManyToMany] => children.nodes.remove(r)
-      case r: Relation[?, ?, OneToOne] => child.nodes.remove(r)
-      case r: Relation[?, ?, ManyToOne] => child.nodes.remove(r)
-      case r: Relation[?, ?, SingleSymmetric] => partner.nodes.remove(r)
-      case r: Relation[?, ?, ManySymmetric] => partners.nodes.remove(r)
-      case r: Relation[?, ?, Equivalence] => groups.nodes.remove(r)
+      case r: OneToMany => children.nodes.remove(r)
+      case r: ManyToMany => children.nodes.remove(r)
+      case r: OneToOne => child.nodes.remove(r)
+      case r: ManyToOne => child.nodes.remove(r)
+      case r: SingleSymmetric => partner.nodes.remove(r)
+      case r: ManySymmetric => partners.nodes.remove(r)
+      case r: Equivalence => groups.nodes.remove(r)
     }
   }
 
-  def removeRelation[Valence <: RelationValence](r: Relation[?, ?, Valence], relatables: Relatable*): Unit = {
+  def removeRelation(r: Relation[?, ?], relatables: Relatable*): Unit = {
     r match {
-      case oneToMany: Relation[?, ?, OneToMany] =>
+      case oneToMany: OneToMany =>
         for (child <- relatables) {
           children.nodes.defaulted(oneToMany).remove(child)
           child.parent.nodes.remove(oneToMany)
         }
 
-      case manyToMany: Relation[?,?,ManyToMany] =>
+      case manyToMany: ManyToMany =>
         for (child <- relatables) {
           children.nodes.defaulted(manyToMany).remove(child)
           child.parents.nodes.defaulted(manyToMany).remove(this)
         }
 
-      case oneToOne: Relation[?,?,OneToOne] =>
+      case oneToOne: OneToOne =>
         for (c <- relatables) {
           child.nodes.remove(oneToOne)
           c.parent.nodes.remove(oneToOne)
         }
 
-      case manyToOne: Relation[?,?,ManyToOne] =>
+      case manyToOne: ManyToOne =>
         for (c <- relatables) {
           child.nodes.remove(manyToOne)
           c.parents.nodes(manyToOne).remove(this)
         }
 
-      case symmetric: Relation[?,?,SingleSymmetric] =>
+      case symmetric: SingleSymmetric =>
         for (c <- relatables) {
           partner.nodes.remove(symmetric)
           c.partner.nodes.remove(symmetric)
         }
 
-      case manySymmetric: Relation[?,?,ManySymmetric] =>
+      case manySymmetric: ManySymmetric =>
         for (c <- relatables) {
           partners.nodes.defaulted(manySymmetric).remove(c)
           c.partners.nodes.defaulted(manySymmetric).remove(this)
         }
 
-      case equivalent: Relation[?,?,Equivalence] =>
+      case equivalent: Equivalence =>
         // well we're just saying that these nodes are not equivalent in this relation anymore.
         // this doesn't make too much sense, so i guess just remove this item from the shared set, and then remove the relation
         groups.nodes.defaulted(equivalent).remove(this)
@@ -296,12 +302,17 @@ trait Relatable {
   }
 
 
-  def addRelation[Valence <: RelationValence](r: Relation[?, ?, Valence], relatables: Relatable*) = {
+
+  def addRelation(r: Relation[?, ?], _relatables: Relatable*) = {
+
+    // filter out already related
+    val currentlyRelated = getRelated(r).asInstanceOf[Set[Relatable]]
+    val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
 
     r match {
       // containment, we have to unparent the children and make it this
       // we also need to unchild the previous parent
-      case oneToMany: Relation[?,?,OneToMany] =>
+      case oneToMany: OneToMany =>
         children.nodes.defaulted(oneToMany).addAll(relatables)
         for (child <- relatables) {
           val childsPreviousParent = child.parent.nodes.get(oneToMany)
@@ -310,13 +321,13 @@ trait Relatable {
         }
 
         // anything goes.
-      case manyToMany: Relation[?,?,ManyToMany] =>
+      case manyToMany: ManyToMany =>
         children.nodes.defaulted(manyToMany).addAll(relatables)
         for (child <- relatables) {
           child.parents.nodes.defaulted(manyToMany).add(this)
         }
 
-      case manySymmetric: Relation[?,?,ManySymmetric] =>
+      case manySymmetric: ManySymmetric =>
         partners.nodes.defaulted(manySymmetric).addAll(relatables)
         for (child <- relatables) {
           child.partners.nodes.defaulted(manySymmetric).add(this)
@@ -324,7 +335,7 @@ trait Relatable {
 
 
         //  maybe like wearing a hat? Can't wear more than one hat.
-      case oneToOne: Relation[?,?,OneToOne] =>
+      case oneToOne: OneToOne =>
         // we have to do 6 things.
         require(relatables.length == 1)
         val nextChild = relatables.head
@@ -348,7 +359,7 @@ trait Relatable {
 
         // composition, many things can compose only one object
         // on change we nead to clear out current children to make sure we don't compose more than one object
-      case manyToOne: Relation[?,?,ManyToOne] =>
+      case manyToOne: ManyToOne =>
         require(relatables.length == 1)
         val nextChild = relatables.head
         // go to the previous child and unparent this from it
@@ -363,7 +374,7 @@ trait Relatable {
 
 
         // almost the same as one to one
-      case symmetric: Relation[?,?,SingleSymmetric] =>
+      case symmetric: SingleSymmetric =>
         require(relatables.length == 1)
         val newPartner = relatables.head
         // 1) remove old partner's partner and 2) remove old partner,
@@ -383,7 +394,7 @@ trait Relatable {
 
       // this is somewhat unlike the others. for each node, find the 'transitive closure'
       // which is all the nodes in the subgraph
-      case equivalent: Relation[?,?,Equivalence] =>
+      case equivalent: Equivalence =>
         val nodes = Seq(this) concat relatables
         val set = nodes.map(_.groups.nodes.get(equivalent))
           .filter(_.isDefined).map(_.get).distinct
@@ -401,37 +412,37 @@ trait Relatable {
 
 
 
-  def related[V <: RelationValence, T <: Relatable](relation: Relation[?,T,V]) : Related[T] = {
+  def getRelated[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
     relation match {
-      case r : Relation[?, ?, OneToMany] => children(relation).toSet
-      case r : Relation[?, ?, ManyToMany] => children(relation).toSet
-      case r : Relation[?, ?, Equivalence] => groups(relation).toSet
-      case r : Relation[?,?,OneToOne] => child(relation)
-      case r : Relation[?,?,ManyToOne] => child(relation)
-      case r : Relation[?,?,SingleSymmetric] => partner(relation)
-      case r : Relation[?,?,ManySymmetric] => partners(relation).toSet
+      case r : OneToMany => children(r)
+      case r : ManyToMany => children(r)
+      case r : Equivalence => groups(r)
+      case r : OneToOne => child(r).toSet
+      case r : ManyToOne => child(r).toSet
+      case r : SingleSymmetric => partner(r).toSet
+      case r : ManySymmetric => partners(r)
     }
   }
 
 
-  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T, V]): Option[T] = {
+  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
     relation match {
-      case r : Relation[?,?,OneToOne] => child(relation)
-      case r : Relation[?,?,ManyToOne] => child(relation)
-      case r : Relation[?,?,SingleSymmetric] => partner(relation)
+      case r : OneToOne => child(r)
+      case r : ManyToOne => child(r)
+      case r : SingleSymmetric => partner(r)
     }
   }
 
-  def relations[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T,V])(using DummyImplicit) : Set[T] = {
+  def relations[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T] & V)(using DummyImplicit) : Set[T] = {
     relation match {
-      case r : Relation[?,?,OneToMany] => children(relation).toSet
-      case r : Relation[?,?,ManyToMany] => children(relation).toSet
-      case r : Relation[?,?,Equivalence] => groups(relation).toSet
-      case r : Relation[?,?,ManySymmetric] => partners(relation).toSet
+      case r : OneToMany => children(r)
+      case r : ManyToMany => children(r)
+      case r : Equivalence => groups(r)
+      case r : ManySymmetric => partners(r)
     }
   }
 
-  def listRelations(): Seq[Relation[?,?,?]] = {
+  def listRelations(): Seq[Relation[?,?]] = {
     val out = child.nodes.keys concat
       children.nodes.keys concat
       partners.nodes.keys concat
@@ -457,140 +468,211 @@ trait Relatable {
 
 object Relation {
 
-  type SC[X] = SetComprehension[X] | X | ZextObjectProxy[X]
-  type QC[X] = RelationQueryContext
-
-  type RelationValence
-  type OneToOne <: RelationValence
-  type ManyToOne <: RelationValence
-  type OneToMany <: RelationValence
-  type ManyToMany <: RelationValence
-  type Equivalence <: RelationValence
-  type SingleSymmetric <: RelationValence
-  type ManySymmetric <: RelationValence
-
-  def when(queryBlock : RelationQueryContext ?=> Unit)(implication : => Unit) = {
-    val potato = new RelationQueryContext
-    queryBlock(using potato)
-    if(potato.evaluate) {
-      implication
-    }
+  trait AllValence {
+    this: Relation[?,?] =>
+  }
+  trait OneToOne extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait ManyToOne extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait OneToMany extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait ManyToMany extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait Equivalence extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait SingleSymmetric extends AllValence{
+    this: Relation[?,?] =>
+  }
+  trait ManySymmetric extends AllValence{
+    this: Relation[?,?] =>
   }
 
 
-  case class RelationQuery[A <: Relatable, B <: Relatable, V <: RelationValence](a : SetComprehension[A], b : SetComprehension[B], relation : Relation[A,B,V]) {
 
-    def evaluate() : Boolean = {
-      val a_filtered = a.getSet()
-      val b_filtered = b.getSet()
+  object RelationQuery {
+    implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
+  }
 
-      a_filtered.forall{ first =>
-        val related = first.related(relation)
-        b_filtered.forall{ second =>
-          related.contains(second)
+  case class RelationQuery[A <: Relatable, B <: Relatable](ays : SetComprehension[A], bees : SetComprehension[B], relation : Relation[A,B]) {
+
+     def evaluate() : Boolean = {
+      val a_set = ays.getSet()
+      val b_set = bees.getSet()
+
+      val firstAll = !ays.any
+      val secondAll = !bees.any
+      val firstAny = ays.any
+      val secondAny = bees.any
+
+      val not = ays.not || bees.not
+
+      val success = if(firstAll && secondAll) {
+         a_set.forall { first =>
+          val related = first.getRelated(relation)
+          b_set.forall { second =>
+            related.contains(second)
+          }
         }
-      }
+
+      } else if (firstAny && secondAll) {
+        a_set.exists { first =>
+          val related = first.getRelated(relation)
+          b_set.forall { second =>
+            related.contains(second)
+          }
+        }
+
+      } else if (firstAny && secondAny) {
+        a_set.exists { first =>
+          val related = first.getRelated(relation)
+          b_set.exists { second =>
+            related.contains(second)
+          }
+        }
+      } else if (firstAll && secondAny) {
+        a_set.forall { first =>
+          val related = first.getRelated(relation)
+          b_set.exists { second =>
+            related.contains(second)
+          }
+        }
+      } else false
+
+      if(not) !success else success
     }
+
   }
 
-  val relations = ArrayBuffer[Relation[?,?,?]]()
+  val relations = ArrayBuffer[Relation[?,?]]()
 }
 
-implicit object NotAQuery extends RelationQueryContext
+implicit object NotAQuery extends RelationQueryContext {
+  val stack : mutable.Stack[ArrayBuffer[RelationQuery[?,?]]] = mutable.Stack()
+}
 
-class Relation[S <: Relatable, T <: Relatable, Valence <: RelationValence]  {
+
+class Relation[S <: Relatable, T <: Relatable]  {
 
   /* here's an example of what you should type for the implementation of a relation verb
     extension [X <: Source : TT](s: SC[X])
       infix def contains[Y <: Target : {QC, TT}](target: SC[Y]): X = relates(s, target)
    */
 
-
   val precedence = QueryPrecedence.Generic
 
-  type Source = S
-  type Target = T
+  type Source = S | SetComprehension[S]
+  type Target = T | SetComprehension[T]
+
 
   relations.addOne(this)
 
-  def relates[A <: Source, B <: Target](_a: SC[A], _b: Seq[SC[B]])(using RelationQueryContext): A = {
-    val scs = _b.map(narrow(_))
+  def narrowSource[X <: Source](x: X): SetComprehension[S] = {
+    x match {
+      case set: SetComprehension[?] => set.asInstanceOf[SetComprehension[S]]
+      case relatable: Relatable => () => Seq(relatable.asInstanceOf[S])
+    }
+  }
+
+  def narrowTarget[X <: Target](x: X): SetComprehension[T] = {
+    x match {
+      case set: SetComprehension[?] => set.asInstanceOf[SetComprehension[T]]
+      case relatable: Relatable => () => Seq(relatable.asInstanceOf[T])
+    }
+  }
+
+
+  def relates[A <: Source, B <: Target](_a: A, _b: Seq[B]) : A = {
+    val scs = _b.map(narrowTarget)
     relates(_a, CombinedComprehension(scs*))
   }
 
-  /*
-  def reverseRelates[A <: Source, B <: Target](_a: SC[A], _b: Seq[SC[B]])(using ctx: RelationQueryContext): A = {
-    val scs = _b.map(narrow(_))
-    reverseRelates(_a, CombinedComprehension(scs *))
-  }
-  */
-
-
-  def reverseRelates[A <: Source, B <: Target](_b : SC[B], _a: Seq[SC[A]])(using RelationQueryContext): B = {
-    val scs = _a.map(narrow(_))
-    reverseRelates(_b, scs)
+  def reverseRelates[A <: Source, B <: Target](_b : B, _a: Seq[A]) : B = {
+    val scs = _a.map(narrowSource)
+    reverseRelates(_b, CombinedComprehension(scs*))
   }
 
+  def relates[A <: Source, B <: Target](_a: A, _b: B): A = {
+    makeRelation(narrowSource(_a), narrowTarget(_b))
+    _a
+  }
 
-  def relates[A <: Source, B <: Target](_a: SC[A], _b : SC[B])(using ctx : RelationQueryContext) : A = {
-    val a = narrow(_a)
-    val b = narrow(_b)
+  def reverseRelates[A <: Source, B <: Target](_b: B, _a: A): B = {
+    makeReverseRelation(narrowTarget(_b), narrowSource(_a))
+    _b
+  }
 
-    val a_filtered = a.getSet()
 
-    if(ctx != NotAQuery) {
-      ctx.queries.addOne(RelationQuery(a,b, this))
-    } else {
-      val b_filtered = b.getSet()
+  def makeRelation(a: SetComprehension[S], b : SetComprehension[T])(using ctx : RelationQueryContext) : Unit = {
 
-      for(a_node <- a_filtered){
-        a_node.addRelation(this, b_filtered*)
-      }
+    val not = a.not || b.not
+
+    val secretMode = ctx == NotAQuery && NotAQuery.stack.nonEmpty
+    if(secretMode){
+      NotAQuery.stack.top.addOne(RelationQuery(a,b, this))
     }
-    a_filtered.head
-  }
-
-  def reverseRelates[A <: Source, B <: Target](_b : SC[B], _a: SC[A])(using ctx : RelationQueryContext) : B = {
-    val a = narrow(_a)
-    val b = narrow(_b)
-
-    val b_filtered = b.getSet()
-
-    if(ctx != NotAQuery) {
+    else if(ctx != NotAQuery) {
       ctx.queries.addOne(RelationQuery(a,b, this))
     } else {
       val a_filtered = a.getSet()
+      val b_filtered = b.getSet()
+
       for(a_node <- a_filtered){
-        a_node.addRelation(this, b_filtered*)
+        if(!not)
+          a_node.addRelation(this, b_filtered *)
+        else
+          a_node.removeRelation(this, b_filtered *)
+
       }
     }
-    b_filtered.head
+  }
+
+  def makeReverseRelation(b : SetComprehension[T], a: SetComprehension[S])(using ctx : RelationQueryContext) : Unit = {
+
+    val not = a.not || b.not
+
+    val secretMode = ctx == NotAQuery && NotAQuery.stack.nonEmpty
+    if(secretMode){
+      NotAQuery.stack.top.addOne(RelationQuery(a,b, this))
+    }
+    else if(ctx != NotAQuery) {
+      ctx.queries.addOne(RelationQuery(a,b, this))
+    } else {
+      val a_filtered = a.getSet()
+      val b_filtered = b.getSet()
+      for(a_node <- a_filtered){
+        if (!not)
+          a_node.addRelation(this, b_filtered *)
+        else
+          a_node.removeRelation(this, b_filtered *)
+      }
+    }
   }
 
 }
 
-class ReciprocalRelation[S <: Relatable, T <: Relatable, Valence <: RelationValence](reciprocal: ReciprocalRelation[T, S, ?]) extends Relation[S, T, Valence] {
-
-  def reciprocates[A <: Source, B <: Target](_a: SC[A], _b: SC[B])(using ctx: RelationQueryContext): A = {
-    reciprocal.relates(_b, _a)
+abstract class ReciprocalRelation[S <: Relatable, T <: Relatable] extends Relation[S, T] {
+  def getReciprocal : Relation[T,S]
+  def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A = {
+    getReciprocal.relates(_b, _a)
     relates(_a, _b)
   }
 }
 
 
-abstract class ConditionalRelation[S <: Relatable, T <: Relatable, Valence <: RelationValence] extends Relation[S, T, Valence] {
+abstract class ConditionalRelation[S <: Relatable, T <: Relatable] extends Relation[S, T] {
   def condition(source: S, target: T): Boolean
 }
 
 
 
-
-
-
-
-
-
 object RelationsTest extends App {
+
 
 
   object House extends Room {
@@ -603,19 +685,44 @@ object RelationsTest extends App {
     val legs = ~"beefy butt holders"
     val statue = ~"it has arms and legs" made_from legs
     val arms = ~"pool noodles" makes statue
-
     val feet = Box("better left unmentioned")
 
-    val hat = Box("not you again") contains horse
-
-    val key = ~"what might this unlock?" made_from horse made_from feet
-
-
-    when(hat contains horse) {
-      println("horsing around")
+    if(arms makes statue?){
+      println("he got arms")
     }
 
+    if( (statue made_from legs?) && (!feet makes statue?) ){
+      println("and legs, but no feet")
+    }
+
+    feet makes statue
+
+    if ((statue made_from legs?) && (!feet makes statue?)) {
+      println("and legs, but no feet")
+    }
+
+
     val box = Box("may conceal something hidden")
+
+    val hat = Box("not you again") holds horse holds statue
+
+    val key = ~"what might this unlock?" made_from (horse, feet)
+
+
+
+    val sc : SetComprehension[Nothing] = ???
+
+    val notSc = !sc
+
+    val what3 = hat holds key?
+
+    val what = sc holds key
+    val what2 = sc holds key?
+    val what4 = !sc holds key?
+
+    val what5 = !feet makes statue?
+
+
 
     println(statue.relations(Composition))
   }

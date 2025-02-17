@@ -4,12 +4,12 @@ import Zext.*
 import Zext.exports.*
 
 
-object TestPlayer extends PlayerClass {
+object TestPlayer extends PlayerClass(TestRoom) {
   override val name = "Test Player"
   override val description = "Detestable"
 }
 
-object TestRoom extends Room with StartingRoom {
+object TestRoom extends Room  {
 
   override val name = "Test Room"
   override val description = ""
@@ -23,6 +23,8 @@ object TestRoom extends Room with StartingRoom {
   val table = new Supporter("Test table") {
     val stick =  ~"sticky"
   }
+
+
   val gum = "A wad of gum is stuck to the bottom of the table" initially
     "A dried out piece of chewing gum" inside table
 
@@ -47,7 +49,7 @@ object Tests extends App {
   if !Parser.RunTest("pebble box putting",  Array("put pebble in box"), Array("(First taking the pebble).", "(First opening the box).", "You put the pebble into the box.")) then failureCount += 1
   if !Parser.RunTest("pebble table putting",  Array("put pebble on the table"), Array("(First taking the pebble).", "You put the pebble on to the table.")) then failureCount += 1
   if !Parser.RunTest("already contained putting",  Array("put pebble on the table"), Array("The pebble is already on the table.")) then failureCount += 1
-  if !Parser.RunTest("table contents listing",  Array("x table"), Array("Test table.", "A wad of gum is stuck to the bottom of the table.", "On the table you can also see a stick and a pebble.")) then failureCount += 1
+  if !Parser.RunTest("table contents listing",  Array("x table"), Array("Test table.", "A wad of gum is stuck to the bottom of the table.", "On the table you can also see a pebble and a stick.")) then failureCount += 1
   if !Parser.RunTest("stick taking",  Array("take stick"), Array("You take the stick off of the table.")) then failureCount += 1
   if !Parser.RunTest("inventory listing",  Array("i"), Array("In your possessionary you have a stick.")) then failureCount += 1
   if !Parser.RunTest("stick dropping",  Array("drop stick"), Array("Discarded, the stick crashes into earth.")) then failureCount += 1

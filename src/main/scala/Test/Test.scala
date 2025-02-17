@@ -3,10 +3,11 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
-import Zext.SetComprehension.ArrayComprehension
+
+import scala.language.postfixOps
 
 
-object guy extends PlayerClass {
+object guy extends PlayerClass(BigTop) {
   override val name = "SLEEMO"
   override val description = "Your bipes bip fast."
   var insured = false
@@ -104,7 +105,7 @@ object Dirt extends Room {
 
 
 object hanging extends Action(2, "hang") {
-  implicitSubjectSelector = _ == player
+  override val implicitSubjectSelector = player
 
   report(hanging) Say s"$noun hangs from $secondNoun"
 
@@ -120,7 +121,6 @@ object Circus extends RoomRegion("Circus Region") {
   this designates (BigTop, CrowsNest)
 
   val circusStuff = new Backdrop {
-
     val circus = ~"The Sleemo Brothers Ring-a-Ding Circus Extravaganza"
     val tent = ~"A spiral candystripe towering overhead" aka "roof"
 
@@ -164,9 +164,9 @@ object dryingWith extends Action(2, "dry") {
 
 
 
-object BigTop extends Room with StartingRoom {
+object BigTop extends Room {
 
-  override val name: StringExpression = "The Big Top"
+  override val name: StringExpression = "Big Top"
   override val description: StringExpression = "You are in a giant stadium, covered by a bright tent. It seems to be sagging in the middle"
 
   val sagging = ~"Upon further inspection you see the sagging is caused by a small trapeze." is scenery is fixed aka "sag"
@@ -202,7 +202,7 @@ object BigTop extends Room with StartingRoom {
   }
 
 
-  bucket contains hat
+  bucket holds hat
 
 
   val clothes_rack = new Supporter {
@@ -224,7 +224,7 @@ object BigTop extends Room with StartingRoom {
     }
 
 
-    report(taking, shirt, this contains shirt) {
+    report(taking, shirt, this holds shirt) {
       Say("Trying not to disturb the pots, you carefully unclip the shirt from the line")
     }
   }
@@ -240,8 +240,9 @@ object BigTop extends Room with StartingRoom {
 
 
 object CrowsNest extends Room {
-  override val name: StringExpression = "The Crow's Nest"
+  override val name: StringExpression = "Crow's Nest"
   override val description: StringExpression = "A circular platform at the top of the ladder from which you can reach the trapeze"
+
 
   val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
     "It looks like a barber pole, only it's orange and purple" is fixed

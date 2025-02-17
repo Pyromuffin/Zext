@@ -30,14 +30,6 @@ import zobjectifier.Macros
 
 
 
-implicit class TernaryExtension(that : Boolean) {
-
-  def ?(str : StringExpression) : StringExpression = {
-    if(that) str else ""
-  }
-}
-
-
 object StringExpression{
 
   /**
@@ -223,7 +215,7 @@ object Interpreter{
 
   def SystemMessage(str: StringExpression): Unit = {
     saying.text = str.toString
-    execute(saying, noun, secondNoun, silent, location = playerLocation)
+    execute(saying, noun, secondNoun, silent, location = player.location)
   }
 
   def Say(str: StringExpression): Unit = {
@@ -280,10 +272,7 @@ object Parser {
     if(z.autoexplode)
       names = names concat names.flatMap(NLP.GetNouns)
 
-    // this is highly stupid
-    val set = new mutable.HashSet[String]()
-    set.addAll(names)
-    set.toSeq
+    names.distinct
   }
 
 
@@ -293,9 +282,6 @@ object Parser {
 
     for(a <- Actions.allActions){
       Understand(a, a.verbs *)
-      if (a.targets == 1) {
-        UnderstandAlias(a.verbs, a, nothing, null)
-      }
     }
 
     ZextObject.allObjects.foreach { z =>
@@ -405,8 +391,10 @@ object Parser {
   def BuildOneTargetCommand(action: Action, firsts : Option[Array[ParsableType]]) : Option[Command] = {
 
     if(firsts.isEmpty && action.implicitTargetSelector != null){
-      //val visibleSet = FindVisibleSet()
-      val candidates = ZextObject.allObjects.filter(action.implicitTargetSelector).filter(_.isVisibleTo(player))
+
+      val set = action.implicitTargetSelector.getSet().asInstanceOf[Seq[ZextObject]]
+
+      val candidates = set.filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
         val first = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Some(first), None))
@@ -437,8 +425,9 @@ object Parser {
 
     val first : ZextObject =
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
-        //val visibleSet = FindVisibleSet()
-        val candidates = ZextObject.allObjects.filter(action.implicitSubjectSelector).filter(_.isVisibleTo(player))
+
+        val set = action.implicitSubjectSelector.getSet().asInstanceOf[Seq[ZextObject]]
+        val candidates = set.filter(_.isVisibleTo(player))
 
         if (candidates.nonEmpty) {
           Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
@@ -473,8 +462,9 @@ object Parser {
     _noun = first
 
     if(seconds.isEmpty && action.implicitTargetSelector != null){
-      //val visibleSet = FindVisibleSet()
-      val candidates = ZextObject.allObjects.filter(action.implicitTargetSelector).filter(_.isVisibleTo(player))
+
+      val set = action.implicitTargetSelector.getSet().asInstanceOf[Seq[ZextObject]]
+      val candidates = set.filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
         val second = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Some(first), Some(second)))
@@ -564,7 +554,7 @@ object Parser {
         for (command <- commands) {
           command does { c =>
             ExecuteAction(c.action, c.noun, c.secondNoun)
-            execute(being, playerLocation)
+            execute(being, player.location)
             break()
           }
         }
@@ -591,7 +581,7 @@ object Parser {
       execute(starting)
     }
 
-    execute(examining)
+    execute(examining, player.location)
 
     while(!exit) {
       print("> ")
@@ -613,7 +603,7 @@ object Parser {
                 ExecuteAction(c.action, c.noun, c.secondNoun)
               }
               RunApplyingRules(c)
-              execute(being, playerLocation)
+              execute(being, player.location)
               break()
             }
           }

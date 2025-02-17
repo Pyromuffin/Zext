@@ -5,24 +5,23 @@ import Zext.Interpreter.Say
 import Zext.QueryPrecedence.Location
 import Zext.Relation.*
 import Zext.Rule.{after, execute, inflict}
-import Zext.World.{currentWorld, playerLocation, playerRoom}
+import Zext.World.currentWorld
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-implicit object Backdropping extends Relation[Backdrop, Room | RoomRegion, ManyToMany] {
-  extension [X <: Source : TT](s: SC[X])
-    infix def backdrops[Y <: Target : {QC, TT}](target: SC[Y]*): X = relates(s, target)
+implicit object Backdropping extends Relation[Backdrop, Room | RoomRegion] with ManyToMany {
+  extension [X <: Source](s: X)
+    infix def backdrops[Y <: Target](target: Y*): X = relates(s, target)
 }
 
 
-implicit object RoomRegioning extends Relation[RoomRegion, Room, ManyToMany] {
-  extension [X <: Source : TT](s: SC[X])
-    infix def designates[Y <: Target : {QC, TT}](target: SC[Y]*): X = relates(s, target)
+implicit object RoomRegioning extends Relation[RoomRegion, Room] with ManyToMany {
+  extension [X <: Source](s: X)
+    infix def designates[Y <: Target](target: Y*): X = relates(s, target)
 }
 
 
-trait StartingRoom
 
 abstract class Room extends ZextObject with Container {
 
@@ -32,7 +31,7 @@ abstract class Room extends ZextObject with Container {
   autoexplode = false
   pluralized = Some(false)
 
-  val here = Condition(this == playerLocation, Location )
+  val here = Condition(this == player.location, Location )
   var visited = false
 
 }
@@ -41,14 +40,16 @@ abstract class Room extends ZextObject with Container {
 object everywhere extends RoomRegion("everywhere")
 
 
-class Backdrop(val name : StringExpression = getClass.getName) extends ZextObject with Container
+class Backdrop(val name : StringExpression = getClass.getName) extends ZextObject with Container {
+  val description = ""
+}
 
 class RoomRegion(val name : StringExpression = getClass.getName) extends Relatable {
-  override def toString = name
+  override def toString = name.toString
 
   World.currentWorld.regions.append(this)
 
   def rooms = relations(RoomRegioning)
-  def here = Condition(rooms.contains(playerRoom), Location)
+  def here = Condition(rooms.contains(player.room), Location)
 
 }

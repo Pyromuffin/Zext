@@ -14,6 +14,7 @@ import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
 import Zext.Relations.*
+import Zext.SetComprehension.AllOf
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
@@ -87,6 +88,11 @@ object ZextObject{
         }.map(_.asInstanceOf[T]).toSeq
 
     }
+
+    implicit def toComprehension[X <: ZextObject](x : X) : SetComprehension[X] = {
+        AllOf(x)
+    }
+
 }
 
 
@@ -109,8 +115,8 @@ object determiningAccessibility extends Action(2) {
      }
 
      // if noun is composite, check if the composite object is accessible to secondNoun
-     if (noun.isComposite) {
-         result(execute(determiningAccessibility, noun.compositeObject, secondNoun))
+     if (noun[Thing].isComposite) {
+         result(execute(determiningAccessibility, noun[Thing].compositeObject, secondNoun))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
@@ -125,33 +131,6 @@ object determiningAccessibility extends Action(2) {
 }
 
 object determiningVisibility extends Action(2) {
-
-
-    /*
-    def isTransitivelyVisibleWithin(z : ZextObject, container : ZextObject) : Boolean = {
-        if(z == container)
-            return true
-
-        for(part <- container.parts) {
-            if (isTransitivelyVisibleWithin(z, part))
-                return true
-        }
-
-        container.get[Container] does { c =>
-
-            if (c.open || c.transparent) {
-                for (cc <- c.contents) {
-                    if (isTransitivelyVisibleWithin(z, cc))
-                        return true
-                }
-            }
-        }
-
-        false
-    }
-    */
-
-    // this no longer has a bearing on what are parsable words
 
     // determining if noun is visible to second noun
     inflict(determiningVisibility){
@@ -172,8 +151,8 @@ object determiningVisibility extends Action(2) {
         //@todo figure out if we want backdrops themsevles to be visible.
 
         val room = secondNoun.findRoom()
-        val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.backdrops)
-        val backdrops = regionBackdrops.addAll(room.backdrops).addAll(everywhere.backdrops)
+        val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.parents(Backdropping))
+        val backdrops = regionBackdrops.addAll(room.parents(Backdropping)).addAll(everywhere.parents(Backdropping))
 
         // direct visibility for same container or inventory, or room, or self, or is in the set of backdrops visible backdrops
         if (noun.parentContainer == secondNoun.parentContainer || noun.parentContainer == secondNoun || secondNoun.parentContainer == noun || noun == secondNoun || backdrops.contains(noun)) {
@@ -181,8 +160,8 @@ object determiningVisibility extends Action(2) {
         }
 
         // if noun is composite, check if the composite object is visible to secondNoun
-        if (noun.isComposite) {
-            result(execute(determiningVisibility, noun.compositeObject, secondNoun))
+        if (noun[Thing].isComposite) {
+            result(execute(determiningVisibility, noun[Thing].compositeObject, secondNoun))
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to secondNoun
@@ -191,22 +170,6 @@ object determiningVisibility extends Action(2) {
         }
 
         stop
-        /*
-        visibleSet.addAll(FindAllTransitivelyVisible(zextObject.parentContainer))
-        visibleSet.addAll(zextObject.contents) // this doesn't transitively give you the contents of the player or the globals.
-        visibleSet.addAll(World.currentWorld.globals)
-        visibleSet.addAll(playerLocation.backdrops.flatMap(_.contents))
-
-        for (region <- World.currentWorld.regions) {
-            if (region.rooms.contains(playerLocation)) {
-                visibleSet.addAll(region.backdrops.flatMap(_.contents))
-            }
-        }
-
-        visibleSet.addAll(everywhere.backdrops.flatMap(_.contents))
-
-        visibleSet
-        */
     }
 
 }
@@ -229,26 +192,22 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var autoexplode = true
     var proper = false
 
-
-
     def findRoom(): Room = {
         parentContainer match {
             case r: Room => r
-            //case playerClass: PlayerClass => playerLocation
             case backdrop: Backdrop => nowhere
+            case z if(z == null) =>  throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
             case zextObject: ZextObject => zextObject.findRoom()
-            case null => throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
             //case _ => nowhere
         }
     }
 
-    //@todo eventually fix zextobject/thing confusion
-    def parentContainer: ZContainer = parent(Containment).get
+    def parentContainer: ZContainer = parent(Containment).orNull // this is kind of wrong, only things can have parent containers
 
 
     override def equals(obj: Any) = {
         obj match {
-            case zextObjectProxy: ZextObjectProxy[ZextObject] => objectID == zextObjectProxy.objectID
+            case zextObjectProxy: ZextObjectProxy[?] => objectID == zextObjectProxy.resolve.objectID
             case zextObject: ZextObject => objectID == zextObject.objectID
             case null => false
         }
@@ -350,7 +309,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 object Thing {
     extension(d: StringExpression)  {
 
-        inline infix def initially(desc: StringExpression)(using c: Container): Thing = {
+        inline infix def initially(desc: StringExpression)(using c: ZContainer): Thing = {
             SimpleThing(desc) and RoomDescription(d)
         }
     }
@@ -376,7 +335,7 @@ case class SimpleThing(description: StringExpression)(using c : Container & Zext
 
 abstract class Thing (using c : Container & ZextObject) extends ZextObject {
 
-    c contains this
+    c holds this
 
     var autoname: String = null
 
@@ -385,6 +344,10 @@ abstract class Thing (using c : Container & ZextObject) extends ZextObject {
         if(autoname == null) autoname = Thing.FixName(s)
         this
     }
+
+
+    def location = parentContainer
+    def room = findRoom()
 
     override val name = autoname
 
@@ -473,7 +436,7 @@ object Device {
     }
 }
 
-abstract class Device(using Container) extends Thing {
+abstract class Device(using ZContainer) extends Thing {
 
     var on = false
 
