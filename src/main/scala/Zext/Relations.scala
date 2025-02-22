@@ -77,7 +77,7 @@ object Relations {
   val down = Direction("down", down_going, up_going)
 
 
-  implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with OneToOne {
+  implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location
 

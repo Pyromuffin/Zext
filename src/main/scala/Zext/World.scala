@@ -13,6 +13,8 @@ import scala.reflect.TypeTest
 object nothing extends ZextObject {
   val name = "nothing"
   val description = ""
+
+  ZextObject.globals.addOne(this)
 }
 
 class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ConditionHelper {
@@ -97,6 +99,7 @@ object nowhere extends Room {
   val description = ""
   proper = true
 
+
 }
 
 
@@ -118,7 +121,6 @@ class WorldState{
 
   val rooms = ArrayBuffer[Room]()
   val regions = ArrayBuffer[RoomRegion]()
-
   var player : PlayerClass = null
 
   var time = 0

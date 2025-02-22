@@ -326,6 +326,8 @@ trait Relatable {
     val currentlyRelated = getRelated(r).asInstanceOf[Set[Relatable]]
     val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
 
+
+    if (!relatables.isEmpty)
     r match {
       // containment, we have to unparent the children and make it this
       // we also need to unchild the previous parent

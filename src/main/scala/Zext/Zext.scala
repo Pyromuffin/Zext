@@ -80,6 +80,7 @@ object ZextObject{
     }
 
     val allObjects = ArrayBuffer[ZextObject]()
+    val globals = ArrayBuffer[ZextObject]() // always visible and accessible.
 
     def GetAll[T <: Relatable : TT as tt] : Seq[T] = {
 
@@ -109,19 +110,29 @@ object determiningAccessibility extends Action(2) {
 
      // determining if noun is accessible to secondNoun
 
+     val nounLocation = noun.resolve match {
+         case t: Thing => t.location
+         case _ => null
+     }
+
+     val secondNounLocation = secondNoun.resolve match {
+         case t: Thing => t.location
+         case _ => null
+     }
+
      // in the same room, or part of their inventory/contents
-     if (noun.parentContainer == secondNoun.parentContainer || noun.parentContainer == secondNoun || secondNoun.parentContainer == noun || noun == secondNoun) {
+     if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun) {
          continue
      }
 
      // if noun is composite, check if the composite object is accessible to secondNoun
-     if (noun[Thing].isComposite) {
+     if (noun.isType[Thing] && noun[Thing].isComposite) {
          result(execute(determiningAccessibility, noun[Thing].compositeObject, secondNoun))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
-     if (noun.parentContainer != null && noun.parentContainer.open && noun.parentContainer.isInstanceOf[ZextObject]) {
-         result(execute(determiningAccessibility, noun.parentContainer.asInstanceOf[ZextObject], secondNoun))
+     if (nounLocation != null && nounLocation.open) {
+         result(execute(determiningAccessibility, nounLocation, secondNoun))
      }
 
      // if not, fail
@@ -145,28 +156,41 @@ object determiningVisibility extends Action(2) {
         6) a backdrop in the current room
         7) a backdrop in the current region
         8) a backdrop that is in the everywhere region
-
+        9) a global object.
         */
 
-        //@todo figure out if we want backdrops themsevles to be visible.
+        val nounLocation = noun.resolve match {
+            case t: Thing => t.location
+            case _ => null
+        }
 
-        val room = secondNoun.findRoom()
+        val secondNounLocation = secondNoun.resolve match {
+            case t: Thing => t.location
+            case _ => null
+        }
+
+        if(ZextObject.globals.contains(noun)){
+            continue
+        }
+
+        //@todo figure out if we want backdrops themsevles to be visible.
+        val room = secondNoun[Thing].room
         val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.parents(Backdropping))
         val backdrops = regionBackdrops.addAll(room.parents(Backdropping)).addAll(everywhere.parents(Backdropping))
 
         // direct visibility for same container or inventory, or room, or self, or is in the set of backdrops visible backdrops
-        if (noun.parentContainer == secondNoun.parentContainer || noun.parentContainer == secondNoun || secondNoun.parentContainer == noun || noun == secondNoun || backdrops.contains(noun)) {
+        if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun || backdrops.contains(noun)) {
             continue
         }
 
         // if noun is composite, check if the composite object is visible to secondNoun
-        if (noun[Thing].isComposite) {
+        if (noun.isType[Thing] && noun[Thing].isComposite) {
             result(execute(determiningVisibility, noun[Thing].compositeObject, secondNoun))
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to secondNoun
-        if (noun.parentContainer != null && (noun.parentContainer.open || noun.parentContainer.transparent) && noun.parentContainer.isInstanceOf[ZextObject]) {
-            result(execute(determiningVisibility, noun.parentContainer.asInstanceOf[ZextObject], secondNoun))
+        if (nounLocation != null && (nounLocation.open || nounLocation.transparent)) {
+            result(execute(determiningVisibility, nounLocation, secondNoun))
         }
 
         stop
@@ -191,18 +215,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var pluralized : Option[Boolean] = None
     var autoexplode = true
     var proper = false
-
-    def findRoom(): Room = {
-        parentContainer match {
-            case r: Room => r
-            case backdrop: Backdrop => nowhere
-            case z if(z == null) =>  throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
-            case zextObject: ZextObject => zextObject.findRoom()
-            //case _ => nowhere
-        }
-    }
-
-    def parentContainer: ZContainer = parent(Containment).orNull // this is kind of wrong, only things can have parent containers
 
 
     override def equals(obj: Any) = {
@@ -240,8 +252,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         toString + " " + be + " " + rhs
     }
 
-
-
     def isVisibleTo(other: ZextObject): Boolean = {
         execute(determiningVisibility, this, other)
     }
@@ -252,13 +262,10 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     override def toString: String = definite
 
-
     def get[T](using TypeTest[Property, T]): Option[T] = {
         // if a zextobject has more than one property of the same "type" then it will give ?? one
         properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
     }
-
-
 
     def apply[T](using TypeTest[Property, T]): T = {
         val maybe = this.get[T]
@@ -345,9 +352,17 @@ abstract class Thing (using c : Container & ZextObject) extends ZextObject {
         this
     }
 
+    def room : Room = {
+        location match {
+            case r: Room => r
+            case backdrop: Backdrop => nowhere
+            case z if (z == null) => throw new Exception(s"ZextObject $this has null parent container, and we tried to find its room")
+            case thing: Thing => thing.room
+            //case _ => nowhere
+        }
+    }
 
-    def location = parentContainer
-    def room = findRoom()
+    def location = parent(Containment).get
 
     override val name = autoname
 

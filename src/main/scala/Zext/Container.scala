@@ -20,7 +20,7 @@ trait Container {
 
   given c: ZContainer = this
 
-  def contents: Seq[Thing] = relations(Containment).toSeq
+  def contents: Seq[Thing] = relations(Containment).toSeq.sortBy(_.name.toString)
   var preposition = "inside"
   var openable = true
   var open = true
@@ -40,8 +40,8 @@ trait Container {
 
 
 object Supporter {
-  report(putting, anything -> ofDebug[Supporter]("report putting anything -> supporter")) Say s"You put $noun on to $secondNoun"
-  report(taking, isZextObjectOf[Supporter](noun.parentContainer, Content)) Say s"You take $noun off of ${noun.parentContainer}"
+  report(putting, anything -> of[Supporter]) Say s"You put $noun on to $secondNoun"
+  report(taking, of[Thing], isZextObjectOf[Supporter](noun[Thing].location, Content)) Say s"You take $noun off of ${noun[Thing].location}"
 }
 
 

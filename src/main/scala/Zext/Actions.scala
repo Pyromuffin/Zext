@@ -201,13 +201,12 @@ object Actions {
   }
 
   object dropping extends Action(1,"drop", "abandon") {
-
     // if you don't provide an object, try dropping nothing
     override def implicitTargetSelector = nothing
 
     // for ambiguously dropping things, don't try dropping things that are not in your inventory
     disambiguationHint = {
-      case z : ZextObject => z.parentContainer == player
+      case t : Thing => t.location == player
       case _ => false
     }
 
@@ -217,8 +216,8 @@ object Actions {
           |Like a cat licking itself nonchalantly after doing something embarrassing, you pretend you dropped a contact.""".stripMargin))
     }
 
-    check(dropping) {
-      if( noun != nothing && noun.parentContainer != player) {
+    check(dropping, of[Thing]) {
+      if(noun != nothing && noun[Thing].location != player) {
         Say("Can't drop what you don't have.")
         stop
       }
@@ -240,7 +239,7 @@ object Actions {
 
     // for ambiguously taking things, don't try to take items that are already in your inventory.
     disambiguationHint = {
-      case z: ZextObject => z.parentContainer != player
+      case t: Thing => t.location != player
       case _ => false
     }
 
@@ -305,7 +304,6 @@ object Actions {
       var nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
       val people = r.contents.filter(_.isType[Person]).toSeq
 
-
       val roomDescribed = nonscenery.filter{ z =>
         val roomDesc = z.get[RoomDescription]
         roomDesc.isDefined && !roomDesc.get.disturbed
@@ -354,7 +352,7 @@ object Actions {
             Say(rd.get[RoomDescription].get.desc)
           }
           if(nondescribed.nonEmpty){
-            Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
+            Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed).get)
           }
         }
       } else  {

@@ -392,7 +392,7 @@ object Parser {
 
     if(firsts.isEmpty && action.implicitTargetSelector != null){
 
-      val set = action.implicitTargetSelector.getSet().asInstanceOf[Seq[ZextObject]]
+      val set = action.implicitTargetSelector.getSet()
 
       val candidates = set.filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
@@ -431,11 +431,11 @@ object Parser {
     val first : ZextObject =
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
 
-        val set = action.implicitSubjectSelector.getSet().asInstanceOf[Seq[ZextObject]]
+        val set = action.implicitSubjectSelector.getSet()
         val candidates = set.filter(_.isVisibleTo(player))
 
         if (candidates.nonEmpty) {
-          Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+          Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         } else {
           SystemMessage(s"${action.verbs(0)} with what?")
           // no implicit candidates
@@ -471,20 +471,20 @@ object Parser {
 
     if(seconds.isEmpty && action.implicitTargetSelector != null){
 
-      val set = action.implicitTargetSelector.getSet().asInstanceOf[Seq[ZextObject]]
+      val set = action.implicitTargetSelector.getSet()
       val candidates = set.filter(_.isVisibleTo(player))
       if(candidates.nonEmpty){
-        val second = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+        val second = Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Some(first), Some(second)))
       } else {
         // no implicit candidates
         SystemMessage(s"${action.verbs(0)} $first with what?")
         return None
       }
-    } else if( seconds.isEmpty){
+    } else if(seconds.isEmpty){
       // no second target and no implicit selector
       SystemMessage(s"${action.verbs(0)} $first with what?")
-      return  None
+      return None
     }
 
     val visible = seconds.get.filter {

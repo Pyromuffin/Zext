@@ -93,9 +93,7 @@ object Rule {
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
 
 
-
-
-    inline def applying(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def applying(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({
             body; Continue
         }, conditions *)
@@ -105,7 +103,7 @@ object Rule {
     }
 
 
-    inline def check(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def check(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions *)
         rule.definitionPosition = CodePosition()
         ruleSets(r).checkRules += rule
@@ -113,35 +111,35 @@ object Rule {
     }
 
 
-    inline def before(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def before(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).beforeRules += rule
         rule
     }
 
-    inline def instead(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def instead(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Stop}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).insteadRules += rule
         rule
     }
 
-    inline def inflict(r: Action, conditions: Condition*)(inline body: => Unit) : ActionRule = {
+    inline def inflict(r: Action, conditions: => Condition*)(inline body: => Unit) : ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).executeRules += rule
         rule
     }
 
-    inline def report(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def report(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule( {body; Replace}, conditions* )
         rule.definitionPosition = CodePosition()
         ruleSets(r).reportRules += rule
         rule
     }
 
-    inline def after(r: Action, conditions: Condition*)(inline body: => Unit): ActionRule = {
+    inline def after(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
         val rule = new ActionRule({body; Continue}, conditions*)
         rule.definitionPosition = CodePosition()
         ruleSets(r).afterRules += rule
@@ -150,13 +148,13 @@ object Rule {
 
 
     // ultra terse syntax
-    class InsteadConsequence(r: Action, conditions: Condition*) {
+    class InsteadConsequence(r: Action, conditions: => Condition*) {
         infix inline def Say(s: StringExpression): ActionRule = {
             instead(r, conditions *)(Interpreter.Say(s))
         }
     }
 
-    class ReportConsequence(r: Action, conditions: Condition*) {
+    class ReportConsequence(r: Action, conditions: => Condition*) {
         infix inline def Say(s: StringExpression): ActionRule = {
             report(r, conditions *)(Interpreter.Say(s))
         }
@@ -169,11 +167,11 @@ object Rule {
         }
     }
 
-    def report(r: Action, conditions: Condition*): ReportConsequence = {
+    def report(r: Action, conditions: => Condition*): ReportConsequence = {
         new ReportConsequence(r, conditions *)
     }
 
-    def instead(r: Action, conditions: Condition*): InsteadConsequence = {
+    def instead(r: Action, conditions: => Condition*): InsteadConsequence = {
         new InsteadConsequence(r, conditions *)
     }
 
@@ -276,7 +274,7 @@ object Rule {
             val allThings = ZextObject.allObjects.filter(_.isInstanceOf[Thing]).map(_.asInstanceOf[Thing])
 
             for(thing <- allThings){
-                val thingLocation = thing.findRoom()
+                val thingLocation = thing.location
                 val ruleContext = new RuleContext(Some(thing), None, false, thingLocation)
                 if(RunApplyingRule(ruleContext, applyingRules))
                     execute(action, thing, location = thingLocation)
@@ -448,12 +446,8 @@ object Condition {
         condition
     }
 
-    def become[X, Y](x: X)(using tt: TypeTest[X, Y]): Option[Y] = x match
-        case tt(x) => Some(x)
-        case _ => None
-
     def canBecome[X, Y](x: X)(using tt: TypeTest[X, Y]): Boolean = {
-        become[X, Y](x).isDefined
+        tt.unapply(x).isDefined
     }
 }
 
@@ -529,8 +523,8 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     allActions.addOne(this)
 
-    def implicitTargetSelector : SetComprehension[?] = null
-    def implicitSubjectSelector : SetComprehension[?] = null
+    def implicitTargetSelector : SetComprehension[ZextObject] = null
+    def implicitSubjectSelector : SetComprehension[ZextObject] = null
     var disambiguationHint : ParsableType => Boolean = null
 
     ruleSets(this) = new ActionRuleSet

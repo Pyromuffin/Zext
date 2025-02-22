@@ -93,7 +93,7 @@ object Dirt extends Room {
   report(going, north, here) Say "You mosey to the north."
 
   report(leaving, here) Say "The tunnel collapses behind you."
-  
+
   inflict(leaving, here) {
     disconnect(north)
     disconnect(south)
@@ -179,6 +179,9 @@ object finding extends Action(1, "find") with DebugAction {
     None
   }
 
+  inflict(finding, of[Thing]) {
+    execute(finding, noun[Thing].room)
+  }
 
 
   inflict(finding, of[Room]) {
@@ -326,6 +329,76 @@ object FairyFountain extends Room {
 
   this northward Dirt
 }
+
+case class ListExits() extends Property
+
+object MazeEntrance extends Room {
+  override val name: StringExpression = "Maze Entrance"
+  override val description: StringExpression = "A daunting door looms inside."
+
+
+  after(examining, of[ListExits]) {
+
+    for(dir <- Direction.directions) {
+      for( connection <- noun[Room].connections(dir) )
+      Say(s"$connection is to $dir")
+    }
+
+  }
+
+  this eastward CrowsNest
+
+  val roomCount = 100
+
+  val rooms = Array.tabulate(roomCount) { i =>
+    new Room {
+      val x = i % 10
+      val y = i / 10
+      override val name: StringExpression = s"Maze Room ($x,$y)"
+      override val description: StringExpression = "A nondescript room in the maze."
+      this.properties.addOne(ListExits())
+    }
+  }
+
+  def linearIndex(x : Int, y : Int) = x + y * 10
+  val connectionChance = 3
+
+
+  for( (room, i) <- rooms.zipWithIndex) {
+    // connect rooms randomly.
+    val x = i % 10
+    val y = i / 10
+
+    // connect north if not on the top row
+    if(y != 9 && util.Random.nextInt(connectionChance) == 0) {
+      val northern = rooms(linearIndex(x, y + 1))
+      room northward northern
+    }
+
+    // connect south
+    if (y != 0 && util.Random.nextInt(connectionChance) == 0) {
+      val southern = rooms(linearIndex(x, y - 1))
+      room southward southern
+    }
+
+    // connect east
+    if (x != 9 && util.Random.nextInt(connectionChance) == 0) {
+      val eastern = rooms(linearIndex(x + 1, y))
+      room eastward eastern
+    }
+    // connect west
+    if (x != 0 && util.Random.nextInt(connectionChance) == 0) {
+      val western = rooms(linearIndex(x - 1, y))
+      room westward western
+    }
+  }
+
+  val treasureRoom = rooms(util.Random.nextInt(100))
+  val maze_treasure = ~"the friends we made along the way" inside treasureRoom
+
+  rooms(0) inward this
+}
+
 
 
 object Test extends App{
