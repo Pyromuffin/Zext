@@ -483,12 +483,10 @@ object Actions {
 
   object debugging extends Action(0, "debug") {
 
-
     report(debugging){
 
       val visibleSet = ZextObject.allObjects.filter(execute(determiningVisibility, _, player))
       val accessibleSet = ZextObject.allObjects.filter(execute(determiningAccessibility, _, player))
-
 
       Say("visible set: " + visibleSet.toString)
       Say("accessible set: " + accessibleSet.toString)

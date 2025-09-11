@@ -2,6 +2,7 @@ package Zext
 
 import Relation.*
 import Zext.Actions.{UnderstandAlias, going}
+import Zext.Relations.Direction.*
 
 import scala.annotation.targetName
 import scala.collection.mutable.ArrayBuffer
@@ -47,7 +48,7 @@ object Relations {
 
   }
 
-
+  // @todo see if we can someday fix this requiring call by name for direction 
   abstract class DirectionalRelation(direction : => Direction) extends ReciprocalRelation[Room, Room] with OneToOne {
     override val precedence = QueryPrecedence.Location
     override def getReciprocal = direction.opposite
@@ -56,27 +57,27 @@ object Relations {
 
   object Direction {
     val directions = ArrayBuffer[Direction]()
+
+    import RoomAdjacency.*
+
+    val east = Direction("east", east_going, west_going)
+    val west = Direction("west", west_going, east_going)
+    val south = Direction("south", south_going, north_going)
+    val north = Direction("north", north_going, south_going)
+    val in = Direction("in", in_going, out_going)
+    val out = Direction("out", out_going, in_going)
+    val up = Direction("up", up_going, down_going)
+    val down = Direction("down", down_going, up_going)
+
   }
 
   case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends ZextObject {
     Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
-    proper = true
+    properties += proper
     override val description = "just a direction"
   }
-
-  import RoomAdjacency.*
-
-  val east = Direction("east", east_going, west_going)
-  val west = Direction("west", west_going, east_going)
-  val south = Direction("south", south_going, north_going)
-  val north = Direction("north", north_going, south_going)
-  val in = Direction("in", in_going, out_going)
-  val out = Direction("out", out_going, in_going)
-  val up = Direction("up", up_going, down_going)
-  val down = Direction("down", down_going, up_going)
-
-
+  
   implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location

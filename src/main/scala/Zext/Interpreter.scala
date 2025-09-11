@@ -7,7 +7,7 @@ import Zext.Condition.canBecome
 import Zext.Interpreter.*
 import Zext.Parser.{boldControlCode, unboldControlCode}
 import Zext.Rule.*
-import Zext.RuleContext.{_noun, location, silent}
+import Zext.RuleContext.{_noun, _nouns, location, silent}
 import Zext.Saving.*
 import Zext.StringExpression.str
 import Zext.World.*
@@ -241,6 +241,7 @@ object Interpreter{
 object Parser {
 
   var exit = false
+  var poisoned = false
 
   val boldControlCode = "\u001b[0;1m"
   val unboldControlCode = "\u001b[0;0m"
@@ -388,7 +389,9 @@ object Parser {
     Some(Command(action, None, None))
   }
 
-  def BuildOneTargetCommand(action: Action, firsts : Option[Array[ParsableType]]) : Option[Command] = {
+  def BuildOneTargetCommand(action: Action, targets : Array[Array[ParsableType]]) : Option[Command] = {
+
+    val firsts = targets.headOption
 
     if(firsts.isEmpty && action.implicitTargetSelector != null){
 
@@ -426,7 +429,9 @@ object Parser {
   }
 
 
-  def BuildTwoTargetCommand(action: Action, firsts : Option[Array[ParsableType]], seconds : Option[Array[ParsableType]]) : Option[Command] =  {
+  def BuildTwoTargetCommand(action: Action, targets : Array[Array[ParsableType]]) : Option[Command] =  {
+
+    val firsts = targets.headOption
 
     val first : ZextObject =
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
@@ -469,6 +474,8 @@ object Parser {
     // for tests against noun in the target selector hint
     _noun = first
 
+    val seconds = if(targets.length >= 2) Some(targets(1)) else None
+
     if(seconds.isEmpty && action.implicitTargetSelector != null){
 
       val set = action.implicitTargetSelector.getSet()
@@ -502,6 +509,41 @@ object Parser {
     Some(Command(action, Some(first), Some(second)))
   }
 
+  def BuildNTargetCommand(action: Action, targets : Array[Array[ParsableType]]) : Option[Command] =  {
+
+    if(targets.isEmpty) {
+      return None
+    }
+
+    val disambiguated = targets.map { target =>
+      val visible = target.filter {
+        case z: ZextObject =>
+          if (action.isInstanceOf[DebugAction]) true
+          else z.isVisibleTo(player)
+
+        case _ => false
+      }
+
+      // poison following results, this means that we failed to parse the entire command due to visibility
+      // we do not want to leak that something exists but is invisible.
+      if (visible.isEmpty) {
+        poisoned = true
+        return None
+      }
+
+      Disambiguate(visible, action.disambiguationHint).asInstanceOf[ZextObject]
+    }
+
+    if(disambiguated.length != targets.length) {
+      return None
+    }
+
+    RuleContext._nouns = disambiguated
+
+    Some(Command(action, None, None))
+  }
+
+
 
   def BuildCommand(input : String, result: ParseResultType) : Option[Command]=  {
 
@@ -515,10 +557,7 @@ object Parser {
 
     val triple = result.get
 
-    val parsedTargetCount =
-      if (triple._2.isDefined && triple._3.isDefined) 2
-      else if (triple._2.isDefined) 1
-      else 0
+    val parsedTargetCount = triple._2.length
 
     val parsedTargetCountFilter : ParsableType => Boolean = {
       case a: Action => a.targets == parsedTargetCount
@@ -531,14 +570,15 @@ object Parser {
 
     val action = zeroth.asInstanceOf[Action]
 
-    if(parsedTargetCount > action.targets) {
+    if(parsedTargetCount > action.targets && action.targets != -1) {
       return None
     }
 
     action.targets match {
       case 0 => BuildZeroTargetCommand(action)
       case 1 => BuildOneTargetCommand(action, triple._2)
-      case 2 => BuildTwoTargetCommand(action, triple._2, triple._3)
+      case 2 => BuildTwoTargetCommand(action, triple._2)
+      case -1 => BuildNTargetCommand(action, triple._2)
       case _ => None
     }
   }
@@ -548,6 +588,8 @@ object Parser {
       World.testingOutput = true
   }
 
+
+
   def RunTest(testName: String, inputStrings : Array[String], expectedOutput : Array[String]) : Boolean = {
 
     testOutput.clear()
@@ -555,27 +597,42 @@ object Parser {
     for(input <- inputStrings) {
       val result = EverythingParser.parse(input)
 
-      val command1 = BuildCommand(input, result._1)
-      val command2 = BuildCommand(input, result._2)
-      val command3 = BuildCommand(input, result._3)
+      poisoned = false // this is set somewhere deep in BuildCommand, it would be a pain in the butt to pipe it all way out here.
 
-      val commands = Array(command3, command2, command1)
-
-      boundary{
-        for (command <- commands) {
-          command does { c =>
+      val command4 = BuildCommand(input, result._4)
+      command4.does { c =>
+        ExecuteAction(c.action, c.noun, c.secondNoun)
+        execute(being, player.location)
+      }
+      if(command4.isEmpty && !poisoned) {
+        val command3 = BuildCommand(input, result._3)
+        command3.does { c =>
+          ExecuteAction(c.action, c.noun, c.secondNoun)
+          execute(being, player.location)
+        }
+        if(command3.isEmpty && !poisoned){
+          val command2 = BuildCommand(input, result._2)
+          command2.does { c =>
             ExecuteAction(c.action, c.noun, c.secondNoun)
             execute(being, player.location)
-            break()
+          }
+          if(command2.isEmpty && !poisoned){
+            val command1 = BuildCommand(input, result._1)
+            command1.does { c =>
+              ExecuteAction(c.action, c.noun, c.secondNoun)
+              execute(being, player.location)
+            }
+            if(command1.isEmpty || poisoned){
+              SystemMessage("Input couldn't be interpreted as a command.")
+            }
           }
         }
-        SystemMessage("[REDACTED]")
       }
     }
 
     for(output <- expectedOutput.zip(World.testOutput)) {
       if(output._1 != output._2) {
-        println(s"Test output mismatch: Expected: ${output._1} != ${output._2}")
+        println(s"$testName: Test output mismatch: Expected: ${output._1} != ${output._2}")
         return false
       }
     }
@@ -602,23 +659,26 @@ object Parser {
 
         val results  = time("parsing") {
           val r = EverythingParser.parse(input)
-          Array(r._3, r._2, r._1)
+          Array(r._4, r._3, r._2, r._1)
         }
 
+        poisoned = false
         boundary {
           for (result <- results) {
             val command = BuildCommand(input, result)
-            command does { c =>
-              RunApplyingBeforeRules(c)
-              time("command execution"){
-                ExecuteAction(c.action, c.noun, c.secondNoun)
+            if(!poisoned){
+              command does { c =>
+                RunApplyingBeforeRules(c)
+                time("command execution") {
+                  ExecuteAction(c.action, c.noun, c.secondNoun)
+                }
+                RunApplyingRules(c)
+                execute(being, player.location)
+                break()
               }
-              RunApplyingRules(c)
-              execute(being, player.location)
-              break()
             }
           }
-          SystemMessage("[REDACTED]")
+          SystemMessage("Input couldn't be interpreted as a command.")
         }
       }
     }

@@ -3,6 +3,7 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
+import Zext.Relations.Direction.*
 import Zext.RoomRegioning.designates
 
 import scala.language.postfixOps

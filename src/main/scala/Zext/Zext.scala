@@ -28,6 +28,7 @@ trait Property
 object fixed extends Property
 object scenery extends Property
 object wet extends Property
+object proper extends Property
 
 object exports{
     export Interpreter.*
@@ -207,15 +208,13 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     allObjects.addOne(this)
 
     var definiteArticle: String = "the"
-    var indefiniteArticle: String = "a"
     val name: StringExpression
     var aliases = ArrayBuffer[StringExpression]()
     val description: StringExpression
     var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
     var pluralized : Option[Boolean] = None
     var autoexplode = true
-    var proper = false
-
+    var mass = false
 
     override def equals(obj: Any) = {
         obj match {
@@ -225,15 +224,25 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         }
     }
 
+     def indefiniteArticle: String = {
+        val firstLetter = name.toString(0).toLower
+        if(mass)
+             "some"
+        else if(firstLetter == 'a' || firstLetter == 'e' || firstLetter == 'i' || firstLetter == 'o' || firstLetter == 'u' )
+            "an"
+        else
+            "a"
+    }
+
     def definite: String = {
-        if (proper)
+        if (properties.contains(proper))
             return name.toString
 
         definiteArticle + " " + name
     }
 
     def indefinite: String = {
-        if (proper)
+        if (properties.contains(proper))
             return name.toString
 
         indefiniteArticle + " " + name
@@ -400,7 +409,7 @@ abstract class Thing (using c : Container & ZextObject) extends ZextObject {
         }
 
         if (nounAmount == NounAmount.some) {
-            indefiniteArticle = "some"
+            mass = true
         }
 
         this

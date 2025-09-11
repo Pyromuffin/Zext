@@ -97,9 +97,7 @@ object anything extends ZextObject {
 object nowhere extends Room {
   val name = "nowhere"
   val description = ""
-  proper = true
-
-
+  properties += proper
 }
 
 

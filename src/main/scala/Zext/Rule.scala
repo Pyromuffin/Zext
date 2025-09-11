@@ -44,6 +44,10 @@ object noun extends ZextObjectProxy[ZextObject] {
     override def resolve = RuleContext._noun
 }
 
+def GetNouns() : Array[ZextObject] = {
+    RuleContext._nouns
+}
+
 object secondNoun extends ZextObjectProxy[ZextObject] {
     override def resolve = RuleContext._secondNoun
 }
@@ -52,11 +56,12 @@ object RuleContext {
 
     private[Zext] var _noun: ZextObject = null
     private[Zext] var _secondNoun: ZextObject = null
-    private[Zext] var _subject: ZextObject = null
+    private[Zext] var _nouns : Array[ZextObject] = null
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
     private[Zext] var _location: ZContainer = nowhere
 
+    // @todo figure out if nouns need to be set here too.
     private[Zext] def SetContext(ctx : RuleContext) : Unit = {
         _noun = ctx.z1.orNull
         _secondNoun = ctx.z2.orNull
@@ -532,3 +537,12 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
 }
 
+
+case class ParseResults(tokens : Array[String], zobjects: Array[ZextObject])
+
+abstract class CustomAction(verbs : String*) extends Action(0, verbs*) {
+
+    // when encountering a custom action, allow the user to intercept the raw text and parse results
+    def intercept(action : ParseResults => Unit) : Unit
+
+}

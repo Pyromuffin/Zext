@@ -27,9 +27,23 @@ object drying extends Action(1, "dry") {
   report(drying) Say s"You dry $noun"
 }
 
+object blessing extends Action(-1, "bless") {
+
+  report(blessing) {
+    val nouns = GetNouns()
+    Say("You bless " + nouns.mkString(", "))
+  }
+
+}
+
 object SecondRoom extends Room {
   override val name = "Second Room"
   override val description = "Even more tests!"
+
+  val tomato = ~"tomato"
+  val horse = ~"horse"
+  val moose = ~"moose"
+  val juice = ~"juice"
 
   val hat_hat = ~"troublemaker"
   val bucket = new Thing {
@@ -84,7 +98,7 @@ object Tests extends App {
 
   var failureCount = 0
 
-  if !Parser.RunTest("Invalid input", Array("Hello"), Array("[REDACTED].")) then failureCount += 1
+  if !Parser.RunTest("Invalid input", Array("Hello"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
   if !Parser.RunTest("Examine self",  Array("x self"), Array("Detestable.")) then failureCount += 1
   if !Parser.RunTest("box opening",  Array("open box"), Array("You open the box.")) then failureCount += 1
   if !Parser.RunTest("table opening",  Array("open table"), Array("The table can't be opened.")) then failureCount += 1
@@ -104,11 +118,17 @@ object Tests extends App {
   if !Parser.RunTest("empty inventory",  Array("i"), Array("In your possessionary you have nothing.")) then failureCount += 1
   if !Parser.RunTest("drop nothing",  Array("drop"), Array("You stop, drop, and roll.")) then failureCount += 1
   if !Parser.RunTest("take hat",  Array("take hat"), Array("You slip the hat into your backpack.")) then failureCount += 1
-  if !Parser.RunTest("going north",  Array("north"), Array("You went north to the Second Room.", "Even more tests!", "You can see a bucket and a hat hat.")) then failureCount += 1
+  if !Parser.RunTest("going north",  Array("north"), Array("You went north to the Second Room.", "Even more tests!", "You can see a bucket, a hat hat, a horse, a juice, a moose, and a tomato.")) then failureCount += 1
   if !Parser.RunTest("non-ambiguous hat drop",  Array("drop hat"), Array("You abandon the hat to its fate.")) then failureCount += 1
   if !Parser.RunTest("dry bucket 1", Array("dry bucket"), Array("You dry the bucket.")) then failureCount += 1
   if !Parser.RunTest("dry bucket 2", Array("dry bucket"), Array("You dry the bucket.")) then failureCount += 1
   if !Parser.RunTest("dry dry bucket", Array("dry bucket"), Array("The dry bucket is bone dry.")) then failureCount += 1
+  if !Parser.RunTest("dry dry bucket2", Array("dry dry bucket"), Array("The dry bucket is bone dry.")) then failureCount += 1
+  if !Parser.RunTest("bless dry bucket", Array("bless dry bucket"), Array("You bless the dry bucket.")) then failureCount += 1
+  if !Parser.RunTest("bless dry bucket and invisible thing", Array("bless dry bucket and gum"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
+  if !Parser.RunTest("bless dry bucket and hat hat", Array("bless dry bucket and hat hat"), Array("You bless the dry bucket, the hat hat.")) then failureCount += 1
+  if !Parser.RunTest("bless dry bucket and other stuff", Array("bless dry bucket and hat hat and horse and tomato and juice and moose"), Array("You bless the dry bucket, the hat hat, the horse, the tomato, the juice, the moose.")) then failureCount += 1
+
 
 
   println("=================================")
