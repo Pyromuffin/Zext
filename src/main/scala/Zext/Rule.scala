@@ -543,6 +543,11 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     allActions.addOne(this)
 
+    var requiresVisibility = true // must be able to see
+    var requiresAccessibility = true // must be able to access
+    var requiresProximity = true // must be in the same room
+
+
     def implicitTargetSelector : SetComprehension[ZextObject] = null
     def implicitSubjectSelector : SetComprehension[ZextObject] = null
     var disambiguationHint : ParsableType => Boolean = null

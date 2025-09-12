@@ -672,7 +672,11 @@ object Parser {
 
     while(!exit) {
       print("> ")
-      val input = readLine().toLowerCase
+      var input = readLine()
+
+      preprocessingInput.text = input
+      ExecuteAction(preprocessingInput, Array())
+      input = preprocessingInput.text
 
       time("interpreter loop") {
 

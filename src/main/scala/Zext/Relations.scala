@@ -55,6 +55,8 @@ object Relations {
   }
 
 
+
+
   object Direction {
     val directions = ArrayBuffer[Direction]()
 
@@ -71,11 +73,11 @@ object Relations {
 
   }
 
-  case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends ZextObject {
+  case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends Idea(name) {
     Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
     properties += proper
-    override val description = "just a direction"
+    properties += built_in
   }
   
   implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {

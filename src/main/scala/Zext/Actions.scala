@@ -52,6 +52,16 @@ object Actions {
 
   }
 
+
+  object preprocessingInput extends Action(0){
+    var text : String = null
+
+    inflict(preprocessingInput) {
+      text = text.toLowerCase()
+    }
+
+  }
+
   object postprocessingText extends Action(0) {
     var text : String = null
 
@@ -380,6 +390,19 @@ object Actions {
 
         Say(response)
       }
+    }
+  }
+
+  object thinking extends Action(1, "think", "think of", "imagine") {
+
+    requiresVisibility = false
+    
+    inflict(thinking, of[Idea], noun[Idea].discoverable) {
+      noun[Idea].known = true
+    }
+
+    report(thinking, of[Idea], noun[Idea].known || noun[Idea].discoverable) {
+      Say(s"Thinking of $noun reveals ${noun.description}")
     }
   }
 

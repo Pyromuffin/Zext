@@ -13,6 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
+import Zext.Idea.allIdeas
 import Zext.Relations.*
 import Zext.SetComprehension.AllOf
 import Zext.ZextObject.allObjects
@@ -29,6 +30,7 @@ object fixed extends Property
 object scenery extends Property
 object wet extends Property
 object proper extends Property
+object built_in extends Property // for built in ideas we dont really want to put in the idea list
 
 object exports{
     export Interpreter.*
@@ -174,17 +176,25 @@ object determiningVisibility extends Action(2) {
             continue
         }
 
+        // known ideas are "visible" in terms of interaction
+        // we might want to make ideas and knowing relations instead though
+        noun.resolve match {
+            case idea : Idea => if(idea.known || idea.discoverable) continue
+            case _ =>
+        }
+
         //@todo figure out if we want backdrops themsevles to be visible.
         val room = secondNoun[Thing].room
         val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.parents(Backdropping))
         val backdrops = regionBackdrops.addAll(room.parents(Backdropping)).addAll(everywhere.parents(Backdropping))
+        //val backdropContents = backdrops.flatMap(_.contents)
 
-        // direct visibility for same container or inventory, or room, or self, or is in the set of backdrops visible backdrops
-        if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun || backdrops.contains(noun)) {
+        // direct visibility for same container or inventory, or room, or self, or is in the set of visible backdrops
+        if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun || backdrops.contains(noun) ) {
             continue
         }
 
-        // if noun is composite, check if the composite object is visible to secondNoun
+        // if noun is composite, check if the composite object is visible to secondNounbackdrops = {ArrayBuffer@3175} size = 2
         if (noun.isType[Thing] && noun[Thing].isComposite) {
             result(execute(determiningVisibility, noun[Thing].compositeObject, secondNoun))
         }
@@ -471,3 +481,33 @@ abstract class Device(using ZContainer) extends Thing {
     val description = s"${if (on) onDesc else offDesc}"
 }
 
+object Idea {
+    val allIdeas = ArrayBuffer[Idea]()
+
+    object ideating extends Action(0, "ideas", "thoughts", "knowledge") {
+
+        report(ideating) {
+            val knownIdeas = Idea.allIdeas.filterNot(_.properties.contains(built_in)).filter(_.known)
+            val ideasList = ListNamesNicely(knownIdeas.toSeq)
+            if(ideasList.isEmpty){
+                Say("Much is unknown.")
+            } else {
+                Say("The following ideas are known to you: " + ideasList.get)
+            }
+        }
+
+    }
+
+}
+
+object discoverable extends Property
+
+class Idea(override val name : StringExpression, innate : Boolean = true, var discoverable : Boolean = false) extends ZextObject {
+    override val description = "the idea of " + name
+    properties += proper
+
+    var known = innate
+    if(discoverable) known = false
+
+    allIdeas.addOne(this)
+}

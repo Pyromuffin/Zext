@@ -3,6 +3,8 @@ package Test
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
+import Zext.EverythingParser.ParseResult
+import Zext.Parser.{Command, Disambiguate}
 import Zext.Relations.Direction.*
 import Zext.RoomRegioning.designates
 
@@ -116,6 +118,35 @@ object hanging extends Action(2, "hang") {
 
 object crows_above extends Backdrop {
   val crows = ~"Several crows are circling above you."
+}
+
+
+object phantom_gun extends Backdrop {
+  val gun = ~"this gun couild be anywhere."
+  this backdrops everywhere
+}
+
+object idea_world {
+
+  val violence = new Idea("violence") {
+    override val description = "it occurs to you that guns could be anywhere."
+  }
+
+  val guns = new Idea("guns", discoverable = true) {
+    override val description = "phantom guns are known to manifest when secrets are known"
+  }
+
+  val secret = new Idea("secrets", innate = false) {
+    override val description = "This is a secret thought that must be revealed via some other means."
+  }
+
+  after(thinking, guns) {
+    secret.discoverable = true
+  }
+
+  val kitties = new Idea("kitties") {
+    override val description = "that fluffy kitties are cuddly."
+  }
 }
 
 object Circus extends RoomRegion("Circus Region") {
@@ -275,8 +306,40 @@ object BigTop extends Room {
 }
 
 
+object screaming extends CustomAction(-1, "scream") {
+
+  var screamingMode = false
+
+  var screamCount = 0
+
+  after(postprocessingText, screamingMode) {
+    postprocessingText.text = postprocessingText.text.toUpperCase
+  }
 
 
+  before(preprocessingInput){
+    if(preprocessingInput.text.toUpperCase == preprocessingInput.text){
+      screamingMode = true
+      screamCount += 1
+      if (screamCount == 3) {
+        Say("Why are you screaming?")
+      }
+    } else {
+      screamingMode = false
+    }
+
+  }
+
+
+  override def intercept(rawInput: String, parseResult: ParseResult): Command = {
+    val verb = parseResult.nouns(0)(0).asInstanceOf[Action]
+    val target = Disambiguate(parseResult.nouns(1)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
+    screamingMode = true
+    ExecuteAction(verb, Array(target))
+    screamingMode = false
+    Command(screaming, Array())
+  }
+}
 
 
 object CrowsNest extends Room {
