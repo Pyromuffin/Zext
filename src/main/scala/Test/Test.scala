@@ -4,6 +4,7 @@ import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
 import Zext.EverythingParser.ParseResult
+import Zext.Idea.thinking
 import Zext.Parser.{Command, Disambiguate}
 import Zext.Relations.Direction.*
 import Zext.RoomRegioning.designates

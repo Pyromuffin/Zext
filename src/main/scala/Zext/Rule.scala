@@ -543,10 +543,9 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 
     allActions.addOne(this)
 
-    var requiresVisibility = true // must be able to see
-    var requiresAccessibility = true // must be able to access
-    var requiresProximity = true // must be in the same room
-
+    // because visibility is handled during command parsing, we can short circuit that here.
+    // be careful because this can quite possibly leak information about things if disabled.
+    var requiresVisibility = true
 
     def implicitTargetSelector : SetComprehension[ZextObject] = null
     def implicitSubjectSelector : SetComprehension[ZextObject] = null

@@ -421,9 +421,9 @@ object Parser {
 
       val set = action.implicitTargetSelector.getSet()
 
-      val candidates = set.filter(_.isVisibleTo(player))
+      val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
       if(candidates.nonEmpty){
-        val first = Disambiguate(candidates.toSeq, action.disambiguationHint).asInstanceOf[ZextObject]
+        val first = Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Array(first)))
       } else {
         SystemMessage(s"${action.verbs(0)} with what?")
@@ -438,7 +438,7 @@ object Parser {
 
     val visible = firsts.get.filter {
       case z: ZextObject =>
-        if(action.isInstanceOf[DebugAction]) true
+        if(action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
         else z.isVisibleTo(player)
 
       case _ => false
@@ -461,7 +461,7 @@ object Parser {
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
 
         val set = action.implicitSubjectSelector.getSet()
-        val candidates = set.filter(_.isVisibleTo(player))
+        val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
 
         if (candidates.nonEmpty) {
           Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
@@ -479,7 +479,7 @@ object Parser {
 
         val visible = firsts.get.filter {
           case z: ZextObject =>
-            if (action.isInstanceOf[DebugAction]) true
+            if (action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
             else z.isVisibleTo(player)
 
           case _ => false
@@ -503,7 +503,7 @@ object Parser {
     if(seconds.isEmpty && action.implicitTargetSelector != null){
 
       val set = action.implicitTargetSelector.getSet()
-      val candidates = set.filter(_.isVisibleTo(player))
+      val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
       if(candidates.nonEmpty){
         val second = Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Array(first,second)))
@@ -520,7 +520,7 @@ object Parser {
 
     val visible = seconds.get.filter {
       case z: ZextObject =>
-        if(action.isInstanceOf[DebugAction]) true
+        if(action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
         else z.isVisibleTo(player)
 
       case _ => false
@@ -543,7 +543,7 @@ object Parser {
     val disambiguated = targets.map { target =>
       val visible = target.filter {
         case z: ZextObject =>
-          if (action.isInstanceOf[DebugAction]) true
+          if (action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
           else z.isVisibleTo(player)
 
         case _ => false

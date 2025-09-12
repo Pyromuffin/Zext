@@ -393,18 +393,7 @@ object Actions {
     }
   }
 
-  object thinking extends Action(1, "think", "think of", "imagine") {
 
-    requiresVisibility = false
-    
-    inflict(thinking, of[Idea], noun[Idea].discoverable) {
-      noun[Idea].known = true
-    }
-
-    report(thinking, of[Idea], noun[Idea].known || noun[Idea].discoverable) {
-      Say(s"Thinking of $noun reveals ${noun.description}")
-    }
-  }
 
   object closing extends Action(1, "close", "shut") {
 

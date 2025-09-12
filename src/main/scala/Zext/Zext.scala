@@ -160,6 +160,7 @@ object determiningVisibility extends Action(2) {
         7) a backdrop in the current region
         8) a backdrop that is in the everywhere region
         9) a global object.
+        10) a known idea
         */
 
         val nounLocation = noun.resolve match {
@@ -174,13 +175,6 @@ object determiningVisibility extends Action(2) {
 
         if(ZextObject.globals.contains(noun)){
             continue
-        }
-
-        // known ideas are "visible" in terms of interaction
-        // we might want to make ideas and knowing relations instead though
-        noun.resolve match {
-            case idea : Idea => if(idea.known || idea.discoverable) continue
-            case _ =>
         }
 
         //@todo figure out if we want backdrops themsevles to be visible.
@@ -484,6 +478,28 @@ abstract class Device(using ZContainer) extends Thing {
 object Idea {
     val allIdeas = ArrayBuffer[Idea]()
 
+    // known ideas are always visible.
+    // visibility in this sense means that they can be parsed.
+    inflict(determiningVisibility, noun[Idea].known) {
+        replace
+    }
+
+    // @todo figure out how to stop this from leaking information by thinking about things you haven't seen.
+    object thinking extends Action(1, "think", "think of", "imagine") {
+
+        requiresVisibility = false
+
+        before(thinking, noun[Idea].discoverable) {
+            noun[Idea].known = true
+            if(noun[Idea].discoverable) Say(s"A new thought about $noun occurs to you!")
+            noun[Idea].discoverable = false
+        }
+
+        report(thinking, noun[Idea].known) {
+            Say(s"Thinking of $noun reveals: ${noun.description}")
+        }
+    }
+
     object ideating extends Action(0, "ideas", "thoughts", "knowledge") {
 
         report(ideating) {
@@ -495,13 +511,11 @@ object Idea {
                 Say("The following ideas are known to you: " + ideasList.get)
             }
         }
-
     }
-
 }
 
-object discoverable extends Property
-
+// innate ideas are initially known.
+// discoverable ideas can be added to the ideas list just by thinking about them
 class Idea(override val name : StringExpression, innate : Boolean = true, var discoverable : Boolean = false) extends ZextObject {
     override val description = "the idea of " + name
     properties += proper
