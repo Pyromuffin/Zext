@@ -24,11 +24,13 @@ object Actions {
   val allActions = ArrayBuffer[Action]()
 
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
-    commandAliases.addOne(str -> Command(action, Option(zextObject1), Option(zextObject2)))
+    val targets = ConsolidateTargets(zextObject1, zextObject2)
+    commandAliases.addOne(str -> Command(action, targets))
   }
 
   def UnderstandAlias(strs: Seq[String], action: Action, zextObject1: ZextObject, zextObject2: ZextObject) : Unit = {
-    commandAliases.addAll(strs.map( _ -> Command(action, Option(zextObject1), Option(zextObject2))))
+    val targets = ConsolidateTargets(zextObject1, zextObject2)
+    commandAliases.addAll(strs.map( _ -> Command(action, targets)))
   }
 
   object being extends Action(1)
@@ -151,7 +153,7 @@ object Actions {
       val connected = player.room.connections(d).isDefined
 
       // this is so dumb but maybe it will work?
-      val leaveCtx = RuleContext(Some(player.location), None, false, player.location)
+      val leaveCtx = RuleContext(Array(player.location), false, player.location)
       if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
@@ -162,7 +164,7 @@ object Actions {
       }
       val destination = player.room.connections(d).get
 
-      val enterCtx = RuleContext(Some(destination), None, false,  player.location)
+      val enterCtx = RuleContext(Array(destination), false,  player.location)
       if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
@@ -180,22 +182,22 @@ object Actions {
       val d = noun[Direction]
       val room = player.room.connections(d).get
 
-      val leaveCtx = RuleContext(Some(player.location), None, false, player.location)
+      val leaveCtx = RuleContext(Array(player.location), false, player.location)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
       RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
       blackboard = player.location
       player.Move(room)
 
-      val enterCtx = RuleContext(Some(player.location), None, false, player.location)
+      val enterCtx = RuleContext(Array(player.location), false, player.location)
       RunRule(enterCtx, ruleSets(entering).reportRules)
       RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(Some(previousRoom), None, false, player.location), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(Some(player.location), None, false, player.location), ruleSets(entering).afterRules)
+      RunRule(RuleContext(Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(Array(player.location), false, player.location), ruleSets(entering).afterRules)
     }
 
   }

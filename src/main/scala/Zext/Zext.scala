@@ -209,7 +209,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     var definiteArticle: String = "the"
     val name: StringExpression
-    var aliases = ArrayBuffer[StringExpression]()
+    val aliases = ArrayBuffer[StringExpression]()
     val description: StringExpression
     var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
     var pluralized : Option[Boolean] = None

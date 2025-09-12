@@ -1,6 +1,7 @@
 package Zext
 
 import Zext.Actions.{UnderstandAlias, allActions, examining}
+import Zext.EverythingParser.ParseResult
 import Zext.Parser.*
 import Zext.Relation.RelationQuery
 import Zext.Rule.*
@@ -56,15 +57,16 @@ object RuleContext {
 
     private[Zext] var _noun: ZextObject = null
     private[Zext] var _secondNoun: ZextObject = null
-    private[Zext] var _nouns : Array[ZextObject] = null
+    private[Zext] var _nouns : Array[ZextObject] = Array()
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
     private[Zext] var _location: ZContainer = nowhere
 
     // @todo figure out if nouns need to be set here too.
     private[Zext] def SetContext(ctx : RuleContext) : Unit = {
-        _noun = ctx.z1.orNull
-        _secondNoun = ctx.z2.orNull
+        _noun = ctx.nouns.headOption.orNull
+        _secondNoun = ctx.nouns.lift(1).orNull
+        _nouns = ctx.nouns
         _silent = ctx.silent
         _location = ctx.location
     }
@@ -74,7 +76,7 @@ object RuleContext {
     def location : ZContainer = _location
 }
 
-case class RuleContext(z1: Option[ZextObject], z2: Option[ZextObject], silent: Boolean, location : ZContainer)
+case class RuleContext(nouns : Array[ZextObject], silent: Boolean, location : ZContainer)
 
 object Rule {
 
@@ -240,7 +242,7 @@ object Rule {
 
     def RunRule(context : RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent, location)
+        val previousContext = RuleContext(GetNouns(), silent, location)
         SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
@@ -254,7 +256,7 @@ object Rule {
     // this is different because applying rules only run if possible, while normal rules only don't run if impossible.
     def RunApplyingRule(context: RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        val previousContext = RuleContext(Option(noun), Option(secondNoun), silent, location)
+        val previousContext = RuleContext(GetNouns(), silent, location)
         SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
@@ -280,14 +282,14 @@ object Rule {
 
             for(thing <- allThings){
                 val thingLocation = thing.location
-                val ruleContext = new RuleContext(Some(thing), None, false, thingLocation)
+                val ruleContext = new RuleContext(Array(thing), false, thingLocation)
                 if(RunApplyingRule(ruleContext, applyingRules))
                     execute(action, thing, location = thingLocation)
             }
         }
     }
 
-     def ExecuteAction(rule: Action, target: Option[ZextObject] = None, target2: Option[ZextObject] = None, silent : Boolean = false, location : ZContainer = player.location): Boolean = {
+     def ExecuteAction(rule: Action, targets: Array[ZextObject], silent : Boolean = false, location : ZContainer = player.location): Boolean = {
         val set = ruleSets(rule)
 
          /*
@@ -304,11 +306,7 @@ object Rule {
             Report: by default, make no decision.
           */
 
-         val t1 = if target.isEmpty then Some(nothing) else target
-         val t2 = if target2.isEmpty then Some(nothing) else target2
-
-         val context = RuleContext(t1, t2, silent, location)
-
+         val context = RuleContext(targets, silent, location)
          val previousBlackboard = blackboard
 
          for(rules <- set.GetAllRules()) {
@@ -322,8 +320,25 @@ object Rule {
          true
     }
 
+
+    private[Zext] inline def ConsolidateTargets(target: ZextObject, target2: ZextObject) : Array[ZextObject] = {
+        // target2 must be null if target is null
+        if (target == null)
+            require(target2 == null)
+
+        if (target != null && target2 != null)
+            Array(target, target2)
+        else if (target != null)
+            Array(target)
+        else
+            Array[ZextObject]()
+    }
+
+    // convenience for not having to create an array.
     inline def execute(rule: Action, target: ZextObject = null, target2: ZextObject = null, silent : Boolean = false, location : ZContainer = player.location): Boolean = {
-        ExecuteAction(rule, Option(target), Option(target2), silent, location)
+        // target2 must be null if target is null
+        val targets = ConsolidateTargets(target, target2)
+        ExecuteAction(rule, targets, silent, location)
     }
 }
 
@@ -538,11 +553,10 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
 }
 
 
-case class ParseResults(tokens : Array[String], zobjects: Array[ZextObject])
 
-abstract class CustomAction(verbs : String*) extends Action(0, verbs*) {
+abstract class CustomAction(targets: Int, verbs : String*) extends Action(targets, verbs*) {
 
     // when encountering a custom action, allow the user to intercept the raw text and parse results
-    def intercept(action : ParseResults => Unit) : Unit
+    def intercept(rawInput : String, parseResult: ParseResult) : Command
 
 }

@@ -1,6 +1,8 @@
 package Tests
 
 import Zext.*
+import Zext.EverythingParser.ParseResult
+import Zext.Parser.{Command, Disambiguate}
 import Zext.exports.*
 
 
@@ -42,9 +44,10 @@ object SecondRoom extends Room {
 
   val tomato = ~"tomato"
   val horse = ~"horse"
-  val moose = ~"moose"
+  val moose = ~"moostical"
   val juice = ~"juice"
 
+  val hat = ~"innocent"
   val hat_hat = ~"troublemaker"
   val bucket = new Thing {
     this is wet(2)
@@ -68,6 +71,21 @@ object SecondRoom extends Room {
   this southward TestRoom
 }
 
+object nicknaming extends CustomAction(2, "nickname") {
+
+  override def intercept(rawInput: String, parseResult: ParseResult): Command = {
+    val name = parseResult.nounStrings(1)
+    val target = Disambiguate(parseResult.nouns(0)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
+    target.aliases.addOne(name)
+    blackboard = name
+    Command(nicknaming, Array(target))
+  }
+
+  report(nicknaming) {
+    Say(s"$noun shall now be known as $blackboard")
+  }
+}
+
 object TestRoom extends Room  {
 
   override val name = "Test Room"
@@ -88,6 +106,8 @@ object TestRoom extends Room  {
   report(taking, gum) Say "You peel the gum from the table."
   report(putting, gum -> table) Say "You try to stick it back to the underside, but the gum has lost its adhesion. You just leave it on top."
 }
+
+
 
 
 object Tests extends App {
@@ -118,7 +138,7 @@ object Tests extends App {
   if !Parser.RunTest("empty inventory",  Array("i"), Array("In your possessionary you have nothing.")) then failureCount += 1
   if !Parser.RunTest("drop nothing",  Array("drop"), Array("You stop, drop, and roll.")) then failureCount += 1
   if !Parser.RunTest("take hat",  Array("take hat"), Array("You slip the hat into your backpack.")) then failureCount += 1
-  if !Parser.RunTest("going north",  Array("north"), Array("You went north to the Second Room.", "Even more tests!", "You can see a bucket, a hat hat, a horse, a juice, a moose, and a tomato.")) then failureCount += 1
+  if !Parser.RunTest("going north",  Array("north"), Array("You went north to the Second Room.", "Even more tests!", "You can see a bucket, a hat, a hat hat, a horse, a juice, a moose, and a tomato.")) then failureCount += 1
   if !Parser.RunTest("non-ambiguous hat drop",  Array("drop hat"), Array("You abandon the hat to its fate.")) then failureCount += 1
   if !Parser.RunTest("dry bucket 1", Array("dry bucket"), Array("You dry the bucket.")) then failureCount += 1
   if !Parser.RunTest("dry bucket 2", Array("dry bucket"), Array("You dry the bucket.")) then failureCount += 1
@@ -128,7 +148,9 @@ object Tests extends App {
   if !Parser.RunTest("bless dry bucket and invisible thing", Array("bless dry bucket and gum"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
   if !Parser.RunTest("bless dry bucket and hat hat", Array("bless dry bucket and hat hat"), Array("You bless the dry bucket, the hat hat.")) then failureCount += 1
   if !Parser.RunTest("bless dry bucket and other stuff", Array("bless dry bucket and hat hat and horse and tomato and juice and moose"), Array("You bless the dry bucket, the hat hat, the horse, the tomato, the juice, the moose.")) then failureCount += 1
-
+  if !Parser.RunTest("take too much stuff", Array("take moose and juice"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
+  if !Parser.RunTest("custom nickname", Array("nickname moose Kelly"), Array("The moose shall now be known as Kelly.")) then failureCount += 1
+  if !Parser.RunTest("use nickname", Array("x kelly"), Array("Moostical.")) then failureCount += 1
 
 
   println("=================================")

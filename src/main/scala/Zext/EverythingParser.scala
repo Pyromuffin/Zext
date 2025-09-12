@@ -1,6 +1,7 @@
 package Zext
 
-import Zext.Parser.{BuildUnderstandables, Parsable, ParsableType, understandables}
+import Zext.Parser.PartOfSpeech.{noun, verb}
+import Zext.Parser.{BuildUnderstandables, CustomWord, Parsable, ParsableType, understandableEverything, understandableNouns, understandableVerbs}
 import fastparse.*
 import fastparse.NoWhitespace.*
 import fastparse.Parsed.{Failure, Success}
@@ -42,93 +43,76 @@ object EverythingParser {
     }
 
 
-  type ParseResultType = Option[ (Array[ParsableType] /*verb*/,
-    Array[Array[ParsableType]]  /* targets */
-    )]
+  case class ParseResult(verbs : Array[ParsableType], verbString : String, nouns : Array[Array[ParsableType]], nounStrings : Array[String] )
 
 
-  def parse(input: String) : (ParseResultType, ParseResultType, ParseResultType, ParseResultType) = {
+  def parse(input: String) : (Option[ParseResult], Option[ParseResult]) = {
 
-    val (allWords, allParsables) = time("build understandables") {
-      BuildUnderstandables()
-      understandables.map(PossibleWord).filter(_.isDefined).map(_.get).toArray.sortBy(_._1.length).reverse.unzip
-    }
+    BuildUnderstandables()
+    val (verbWords, verbParsables) = understandableVerbs.map(PossibleWord).filter(_.isDefined).map(_.get).toArray.sortBy(_._1.length).reverse.unzip
+    val (everythingWords, everythingParsables) = understandableEverything.map(PossibleWord).filter(_.isDefined).map(_.get).toArray.sortBy(_._1.length).reverse.unzip
 
     def space[$: P] = P( CharIn(" \t\n\r").rep(1))
     def anySpace[$: P] = P(CharIn(" \t\n\r").rep)
     def prepositionParser[$: P] = StringIn("on top of", "about", "on to", "with", "from", "into", "in", "at", "to", "on")
     def ignored[$: P] = StringIn("some", "the", "a", "an", "and")
 
-    def indexResultParserNext[$: P](t : (String, Int)) = () => P( (ignored ~ space).? ~ t._1 ~ &(space) ).map(_ => t._2)
-    def indexResultParser[$: P](t : (String, Int)) = () => P( (ignored ~ space).? ~ t._1).map(_ => t._2)
+    def indexResultParser[$: P](t : (String, Int)) = () => P( (ignored ~ space).? ~ t._1).map(_ => (t._1, t._2))
 
-    val allWordsWithIndices = allWords.zipWithIndex
-    def parseEverything[$: P] = allWordsWithIndices.map(indexResultParser).foldLeft(Fail.map(_=> -1))((l, r) => l | r())
-    def parseEverythingRequireNext[$: P] = allWordsWithIndices.map(indexResultParserNext).foldLeft(Fail.map(_=> -1))( (l, r) => l | r())
+    val allVerbsWithIndices = verbWords.zipWithIndex
+    def parseVerbs[$: P] = allVerbsWithIndices.map(indexResultParser).foldLeft(Fail.map(_=> ("", -1) ))((l, r) => l | r())
 
-    def indexResultParserNextNext[ $: P](t : (String, Int)) = () => P(     (ignored ~ space).? ~ t._1 ~ &(space ~ parseEverythingRequireNext ~ &(spaceOrEnd))     ).map(_ => t._2)
-    def parseEverythingRequireNextNext[$: P] = allWordsWithIndices.map(indexResultParserNextNext).foldLeft(Fail.map(_=> -1))( (l, r) => l | r())
+    val everythingWithIndices = everythingWords.zipWithIndex
+    def parseEverything[$: P] = everythingWithIndices.map(indexResultParser).foldLeft(Fail.map(_ => ("", -1)))((l, r) => l | r())
+
+    def customWord[$ : P] = P(CharIn("a-z") | CharIn("A-Z")).rep(1).!
+    def customWordParser[$ : P] = customWord.map((_, -1))
+
     def spaceOrEnd[$: P] = P(space | End)
 
+    def everythingOrCustom[$: P] = P(parseEverything | customWordParser)
 
-    def command1Parser[$: P] = P( anySpace ~ parseEverything ~ (space ~ parseEverything ~ &(spaceOrEnd)).? ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).? ~ End)
-    def command2Parser[$: P] = P( anySpace ~ parseEverythingRequireNext ~ (space ~ parseEverything ~ &(spaceOrEnd)) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).? ~ End)
-    def command3Parser[$: P] = P( anySpace ~ parseEverythingRequireNextNext ~ (space ~ parseEverythingRequireNext ~ &(spaceOrEnd)) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ) ~ End)
-    // this is not really going to work for verb-ambiguous commands
-    def commandNParser[$: P] = P( anySpace ~ parseEverythingRequireNextNext ~ (space ~ parseEverythingRequireNext ~ &(spaceOrEnd)) ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).rep(2) ~ End)
+    def commandParser[$: P] = P( anySpace ~ parseVerbs ~ ( (space ~ prepositionParser).? ~ (space ~ parseEverything ~ &(spaceOrEnd)) ).rep ~ End)
+    def customParser[$: P] = P( anySpace ~ parseVerbs ~ ( (space ~ prepositionParser).? ~ (space ~ everythingOrCustom ~ &(spaceOrEnd)) ).rep ~ End)
 
 
-    val result1 = time("parse1") {
-      fastparse.parse(input, implicit p => command1Parser)
-      match {
-        case s: Success[(Int, Option[Int], Option[Int])] => {
-          val verb = allParsables(s.value._1)
-          val targets = Array[Array[ParsableType]]()
-          //Some(, s.value._2.map( allParsables(_)), s.value._3.map( allParsables(_)))
-          Some(verb,targets)
+    val customResult = {
+      fastparse.parse(input, implicit p => customParser) match {
+        case s: Success[(String, Int, Seq[(String,Int)])] => {
+          val verb = verbParsables(s.value._2)
+          val verbWord = s.value._1
+          for(av <- s.value._3){
+            //println(av)
+          }
+
+          val targets : Seq[ (String, Array[ParsableType]) ] = s.value._3.map { (s, i) =>
+            if(i == -1)
+              (s, Array())
+            else
+              (s, everythingParsables(i))
+          }
+
+          val (nounWords, nouns) = targets.unzip
+
+          Some( ParseResult(verb, verbWord, nouns.toArray, nounWords.toArray) )
         }
         //case f: Failure => println(f.trace().longMsg); None
         case _ => None
       }
+
     }
 
-    val result2 = time("parse2") {
-      fastparse.parse(input, implicit p => command2Parser)
-      match {
-        case s: Success[(Int, Int, Option[Int])] => {
-          val verb = allParsables(s.value._1)
-          val targets = Array[Array[ParsableType]](allParsables(s.value._2))
-          //Some(allParsables(s.value._1), Option(allParsables(s.value._2)), s.value._3.map(allParsables(_)))
-          Some(verb, targets)
-        }
-        //case f: Failure => println(f.trace().longMsg); None
-        case _ => None
-      }
-    }
 
-    val result3 = time("parse3") {
-      fastparse.parse(input, implicit p => command3Parser)
+    val result = time("parse4") {
+      fastparse.parse(input, implicit p => commandParser)
       match {
-        case s: Success[(Int, Int, Int)] => {
-            val verb = allParsables(s.value._1)
-            val targets = Array[Array[ParsableType]](allParsables(s.value._2), allParsables(s.value._3))
-            Some(verb, targets)
-          //Some(allParsables(s.value._1), Option(allParsables(s.value._2)), Option(allParsables(s.value._3)))
-        }
-        //case f: Failure => println(f.trace().longMsg); None
-        case _ => None
-      }
-    }
+        case s: Success[ (String, Int, Seq[(String,Int)]) ] =>  {
+          val verb = verbParsables(s.value._2)
+          val verbWord = s.value._1
+          val nouns = s.value._3.map(n => everythingParsables(n._2))
+          val nounWords = s.value._3.map(_._1)
 
-    val result4 = time("parse4") {
-      fastparse.parse(input, implicit p => commandNParser)
-      match {
-        case s: Success[(Int, Int, Seq[Int])] =>  {
-          val verb = allParsables(s.value._1)
-          val extras = s.value._3.map(allParsables(_))
-          val targets = Array[Array[ParsableType]](allParsables(s.value._2)).concat(extras)
-          Some(verb, targets)
-          //Some(allParsables(s.value._1), Option(allParsables(s.value._2)), s.value._3.map(allParsables(_)))
+          Some(ParseResult(verb, verbWord, nouns.toArray, nounWords.toArray))
         }
         //case f: Failure => println(f.trace().longMsg); None
         case _ => None
@@ -137,7 +121,6 @@ object EverythingParser {
 
     }
 
-    val ret = (result1, result2, result3, result4)
-    ret
+    (result, customResult)
   }
 }
