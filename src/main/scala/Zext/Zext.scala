@@ -15,6 +15,7 @@ import Condition.*
 import Zext.Actions.*
 import Zext.Idea.allIdeas
 import Zext.Relations.*
+import Zext.RuleControl.*
 import Zext.SetComprehension.AllOf
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
@@ -46,6 +47,7 @@ object exports{
     export Zext.RuleContext.*
     export Relations.*
     export Zext.Relations.RoomAdjacency.*
+    export Zext.Idea.*
 }
 
 
@@ -107,35 +109,35 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 
-object determiningAccessibility extends Action(2) {
+object determiningAccessibility extends Action(1) with Context[Action]{
 
  inflict(determiningAccessibility) {
 
-     // determining if noun is accessible to secondNoun
+     // determining if noun is accessible to subject
 
      val nounLocation = noun.resolve match {
          case t: Thing => t.location
          case _ => null
      }
 
-     val secondNounLocation = secondNoun.resolve match {
+     val secondNounLocation = subject.resolve match {
          case t: Thing => t.location
          case _ => null
      }
 
      // in the same room, or part of their inventory/contents
-     if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun) {
+     if (nounLocation == secondNounLocation || nounLocation == subject || secondNounLocation == noun || noun == subject) {
          continue
      }
 
      // if noun is composite, check if the composite object is accessible to secondNoun
      if (noun.isType[Thing] && noun[Thing].isComposite) {
-         result(execute(determiningAccessibility, noun[Thing].compositeObject, secondNoun))
+         result(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
      if (nounLocation != null && nounLocation.open) {
-         result(execute(determiningAccessibility, nounLocation, secondNoun))
+         result(ExecuteAction(determiningAccessibility, target = nounLocation))
      }
 
      // if not, fail
@@ -144,9 +146,9 @@ object determiningAccessibility extends Action(2) {
 
 }
 
-object determiningVisibility extends Action(2) {
+object determiningVisibility extends Action(1) with Context[Action]{
 
-    // determining if noun is visible to second noun
+    // determining if noun is visible to subject
     inflict(determiningVisibility){
 
         /*
@@ -163,12 +165,14 @@ object determiningVisibility extends Action(2) {
         10) a known idea
         */
 
-        val nounLocation = noun.resolve match {
+        // allow actions to control visibility rules for those particular actions.
+
+        val subjectLocation = subject.resolve match {
             case t: Thing => t.location
             case _ => null
         }
 
-        val secondNounLocation = secondNoun.resolve match {
+        val targetLocation = noun.resolve match {
             case t: Thing => t.location
             case _ => null
         }
@@ -178,24 +182,23 @@ object determiningVisibility extends Action(2) {
         }
 
         //@todo figure out if we want backdrops themsevles to be visible.
-        val room = secondNoun[Thing].room
+        val room = subject[Thing].room
         val regionBackdrops = World.currentWorld.regions.filter(region => region.rooms.contains(room)).flatMap(_.parents(Backdropping))
         val backdrops = regionBackdrops.addAll(room.parents(Backdropping)).addAll(everywhere.parents(Backdropping))
-        //val backdropContents = backdrops.flatMap(_.contents)
 
         // direct visibility for same container or inventory, or room, or self, or is in the set of visible backdrops
-        if (nounLocation == secondNounLocation || nounLocation == secondNoun || secondNounLocation == noun || noun == secondNoun || backdrops.contains(noun) ) {
+        if (subjectLocation == targetLocation || targetLocation == subject || subjectLocation == noun || subject == noun || backdrops.contains(noun) ) {
             continue
         }
 
-        // if noun is composite, check if the composite object is visible to secondNounbackdrops = {ArrayBuffer@3175} size = 2
+        // if noun is composite, check if the composite object is visible to subject
         if (noun.isType[Thing] && noun[Thing].isComposite) {
-            result(execute(determiningVisibility, noun[Thing].compositeObject, secondNoun))
+            result( subject.canSee(noun[Thing].compositeObject, GetActionContext()) )
         }
 
-        // if noun is in a container, and that container is open or transparent, check if the parent container is visible to secondNoun
-        if (nounLocation != null && (nounLocation.open || nounLocation.transparent)) {
-            result(execute(determiningVisibility, nounLocation, secondNoun))
+        // if noun is in a container, and that container is open or transparent, check if the parent container is visible to subject
+        if (targetLocation != null && (targetLocation.open || targetLocation.transparent)) {
+            result( subject.canSee(targetLocation, GetActionContext()) )
         }
 
         stop
@@ -220,6 +223,10 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var autoexplode = true
     var mass = false
 
+    def GetName() : String = {
+        ExecuteContextAction(printing_name(name.toString), subject = system, target = this).ret
+    }
+
     override def equals(obj: Any) = {
         obj match {
             case zextObjectProxy: ZextObjectProxy[?] => objectID == zextObjectProxy.resolve.objectID
@@ -229,7 +236,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
      def indefiniteArticle: String = {
-        val firstLetter = name.toString(0).toLower
+        val firstLetter = GetName()(0).toLower
         if(mass)
              "some"
         else if(firstLetter == 'a' || firstLetter == 'e' || firstLetter == 'i' || firstLetter == 'o' || firstLetter == 'u' )
@@ -240,16 +247,16 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     def definite: String = {
         if (properties.contains(proper))
-            return name.toString
+            return GetName()
 
-        definiteArticle + " " + name
+        definiteArticle + " " + GetName()
     }
 
     def indefinite: String = {
         if (properties.contains(proper))
-            return name.toString
+            return GetName()
 
-        indefiniteArticle + " " + name
+        indefiniteArticle + " " + GetName()
     }
 
     def be: String = {
@@ -265,13 +272,17 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         toString + " " + be + " " + rhs
     }
 
-    def isVisibleTo(other: ZextObject): Boolean = {
-        execute(determiningVisibility, this, other)
+
+    def location : ZContainer = nowhere
+
+    def canSee(other: ZextObject, forAction : Action): Boolean = {
+        ExecuteContextAction(determiningVisibility(forAction), subject = this, target = other).res
     }
 
-    def isAccessibleTo(other: ZextObject): Boolean = {
-        execute(determiningAccessibility, this, other)
+    def canAccess(other: ZextObject, forAction : Action): Boolean = {
+        ExecuteContextAction(determiningAccessibility(forAction), subject = this, target = other).res
     }
+
 
     override def toString: String = definite
 
@@ -375,7 +386,7 @@ abstract class Thing (using c : Container & ZextObject) extends ZextObject {
         }
     }
 
-    def location = parent(Containment).get
+    override def location = parent(Containment).get
 
     override val name = autoname
 
@@ -459,8 +470,8 @@ object Device {
 
     inflict(switching, of[Device]) {
         val d = noun[Device]
-        if (d.on) execute(turningOff, d)
-        else execute(turningOn, d)
+        if (d.on) ExecuteAction(turningOff, target = d)
+        else ExecuteAction(turningOn, target = d)
     }
 }
 
@@ -475,53 +486,3 @@ abstract class Device(using ZContainer) extends Thing {
     val description = s"${if (on) onDesc else offDesc}"
 }
 
-object Idea {
-    val allIdeas = ArrayBuffer[Idea]()
-
-    // known ideas are always visible.
-    // visibility in this sense means that they can be parsed.
-    inflict(determiningVisibility, noun[Idea].known) {
-        replace
-    }
-
-    // @todo figure out how to stop this from leaking information by thinking about things you haven't seen.
-    object thinking extends Action(1, "think", "think of", "imagine") {
-
-        requiresVisibility = false
-
-        before(thinking, noun[Idea].discoverable) {
-            noun[Idea].known = true
-            if(noun[Idea].discoverable) Say(s"A new thought about $noun occurs to you!")
-            noun[Idea].discoverable = false
-        }
-
-        report(thinking, noun[Idea].known) {
-            Say(s"Thinking of $noun reveals: ${noun.description}")
-        }
-    }
-
-    object ideating extends Action(0, "ideas", "thoughts", "knowledge") {
-
-        report(ideating) {
-            val knownIdeas = Idea.allIdeas.filterNot(_.properties.contains(built_in)).filter(_.known)
-            val ideasList = ListNamesNicely(knownIdeas.toSeq)
-            if(ideasList.isEmpty){
-                Say("Much is unknown.")
-            } else {
-                Say("The following ideas are known to you: " + ideasList.get)
-            }
-        }
-    }
-}
-
-// innate ideas are initially known.
-// discoverable ideas can be added to the ideas list just by thinking about them
-class Idea(override val name : StringExpression, innate : Boolean = true, var discoverable : Boolean = false) extends ZextObject {
-    override val description = "the idea of " + name
-    properties += proper
-
-    var known = innate
-    if(discoverable) known = false
-
-    allIdeas.addOne(this)
-}

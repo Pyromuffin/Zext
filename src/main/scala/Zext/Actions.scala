@@ -43,37 +43,42 @@ object Actions {
     Understand(starting, "start")(!started)
 
     inflict(starting) {
-      started = false
+      started = true
     }
 
     report(starting){
       println("------Zext--------")
     }
 
+    after(starting) {
+      ExecuteAction(examining, subject = player, target = player.location)
+    }
+
   }
 
 
-  object preprocessingInput extends Action(0){
-    var text : String = null
+  object preprocessingInput extends Action(0) with Context[String]{
 
     inflict(preprocessingInput) {
-      text = text.toLowerCase()
+      val text = GetActionContext()
+      SetActionContext(text.toLowerCase)
     }
 
   }
 
-  object postprocessingText extends Action(0) {
-    var text : String = null
+  object postprocessingText extends Action(0) with Context[String] {
 
     inflict(postprocessingText) {
-      text = MakeTextNice(text)
+      val text = GetActionContext()
+      SetActionContext( MakeTextNice(text) )
     }
 
   }
 
-  object saying extends Action(0) {
-    var text : String = null
+  // for hooking, call SetActionContext with the final name
+  object printing_name extends Action(1) with Context[String]
 
+  object saying extends Action(0) with Context[String] {
     check(saying) {
       if(location != player.location)
         stop
@@ -82,16 +87,16 @@ object Actions {
     inflict(saying) {
       if (silent) stop
 
+      val text = GetActionContext()
       if (text == "") stop // maybe an error
 
-      postprocessingText.text = text
-      execute(postprocessingText, noun, secondNoun, silent, location)
+      val postprocessed = ExecuteContextAction(postprocessingText(text)).ret
 
       if (testingOutput){
-        testOutput.addOne(postprocessingText.text)
+        testOutput.addOne(postprocessed)
       }
       else
-        println(postprocessingText.text)
+        println(postprocessed)
     }
 
   }
@@ -115,7 +120,7 @@ object Actions {
 
     report(entering, of[Room]){
       LineBreak()
-      result(execute(examining, noun))
+      result(ExecuteAction(examining, target = noun))
     }
 
   }
@@ -163,7 +168,7 @@ object Actions {
       val connected = player.room.connections(d).isDefined
 
       // this is so dumb but maybe it will work?
-      val leaveCtx = RuleContext(Array(player.location), false, player.location)
+      val leaveCtx = RuleContext(subject, Array(player.location), false, player.location)
       if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
       if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
@@ -174,7 +179,7 @@ object Actions {
       }
       val destination = player.room.connections(d).get
 
-      val enterCtx = RuleContext(Array(destination), false,  player.location)
+      val enterCtx = RuleContext(subject, Array(destination), false,  player.location)
       if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
       if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
@@ -192,22 +197,22 @@ object Actions {
       val d = noun[Direction]
       val room = player.room.connections(d).get
 
-      val leaveCtx = RuleContext(Array(player.location), false, player.location)
+      val leaveCtx = RuleContext(subject, Array(player.location), false, player.location)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
       RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
       blackboard = player.location
       player.Move(room)
 
-      val enterCtx = RuleContext(Array(player.location), false, player.location)
+      val enterCtx = RuleContext(subject, Array(player.location), false, player.location)
       RunRule(enterCtx, ruleSets(entering).reportRules)
       RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(Array(player.location), false, player.location), ruleSets(entering).afterRules)
+      RunRule(RuleContext(subject, Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(subject, Array(player.location), false, player.location), ruleSets(entering).afterRules)
     }
 
   }
@@ -256,7 +261,7 @@ object Actions {
     }
 
     check(taking){
-      if !noun.isAccessibleTo(player) then
+      if !subject.canAccess(noun, taking) then
         Say(noun is "inaccessible") // maybe say why?
         stop
     }
@@ -490,7 +495,7 @@ object Actions {
     inflict(loading) {
       Saving.LoadWorld()
       LineBreak()
-      execute(examining, player.location)
+      ExecuteAction(examining, target = player.location)
     }
   }
 
@@ -499,8 +504,8 @@ object Actions {
 
     report(debugging){
 
-      val visibleSet = ZextObject.allObjects.filter(execute(determiningVisibility, _, player))
-      val accessibleSet = ZextObject.allObjects.filter(execute(determiningAccessibility, _, player))
+      val visibleSet = ZextObject.allObjects.filter(player.canSee(_, debugging))
+      val accessibleSet = ZextObject.allObjects.filter(player.canAccess(_, debugging))
 
       Say("visible set: " + visibleSet.toString)
       Say("accessible set: " + accessibleSet.toString)
@@ -515,13 +520,13 @@ object Actions {
     }
 
     before(putting, !player holds noun?, !secondNoun holds noun?){
-      if( execute(taking, noun, silent = true) ){
+      if( ExecuteAction(taking, target = noun, silent = Some(true))) {
         Say(s"(First taking $noun)")
       }
     }
 
     before(putting, !secondNoun[Container].open) {
-      if (execute(opening, secondNoun, silent = true)) {
+      if (ExecuteAction(opening, target = secondNoun, silent = Some(true))) {
         Say(s"(First opening $secondNoun)")
       }
     }
@@ -542,7 +547,7 @@ object Actions {
         stop
       }
 
-      if(!secondNoun.isAccessibleTo(player)) {
+      if(!subject.canAccess(secondNoun, putting)) {
         Say(s"$secondNoun is inaccessible")
         stop
       }

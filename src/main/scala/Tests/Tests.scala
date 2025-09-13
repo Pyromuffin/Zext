@@ -108,7 +108,35 @@ object TestRoom extends Room  {
 }
 
 
+object idea_world {
 
+  val violence = new Idea("violence", obvious = true) {
+    override val description = "it occurs to you that guns could be anywhere."
+  }
+
+  val guns = new Idea("guns") {
+    override val description = "phantom guns are known to manifest when secrets are known"
+  }
+
+  val secret = new Idea("secrets", obvious = true) {
+    override val description = "This is a secret thought that must be revealed via some other means."
+  }
+
+  val kitties = new Idea("kitties", obvious = true) {
+    override val description = "that fluffy kitties are cuddly."
+  }
+
+  player can_discover (violence, kitties)
+
+  after(thinking, violence) {
+    subject can_discover guns
+  }
+
+  after(thinking, guns) {
+    subject can_discover secret
+  }
+
+}
 
 object Tests extends App {
 
@@ -151,7 +179,15 @@ object Tests extends App {
   if !Parser.RunTest("take too much stuff", Array("take moose and juice"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
   if !Parser.RunTest("custom nickname", Array("nickname moose Kelly"), Array("The moose shall now be known as Kelly.")) then failureCount += 1
   if !Parser.RunTest("use nickname", Array("x kelly"), Array("Moostical.")) then failureCount += 1
-
+  if !Parser.RunTest("going south with idea", Array("go south"), Array("You went south to the Test Room.")) then failureCount += 1
+  if !Parser.RunTest("list ideas", Array("ideas"), Array("The following ideas are known to you: violence and kitties.")) then failureCount += 1
+  if !Parser.RunTest("think about kitties", Array("think about kitties"), Array("A new thought about kitties occurs to you!", "Thinking of kitties reveals: that fluffy kitties are cuddly.")) then failureCount += 1
+  if !Parser.RunTest("think about guns failure", Array("think about guns"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
+  if !Parser.RunTest("think about violence", Array("think about violence"), Array("A new thought about violence occurs to you!", "Thinking of violence reveals: it occurs to you that guns could be anywhere.")) then failureCount += 1
+  if !Parser.RunTest("examine guns failure", Array("examine guns"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
+  if !Parser.RunTest("discover guns", Array("think about guns"), Array("A new thought about guns occurs to you!", "Thinking of guns reveals: phantom guns are known to manifest when secrets are known.")) then failureCount += 1
+  if !Parser.RunTest("examine guns success", Array("examine guns"), Array("Phantom guns are known to manifest when secrets are known.")) then failureCount += 1
+  if !Parser.RunTest("more thoughts inventory", Array("thoughts"), Array("The following ideas are known to you: secrets, violence, guns, and kitties.")) then failureCount += 1
 
   println("=================================")
   if(failureCount == 0){

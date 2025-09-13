@@ -4,11 +4,12 @@ import EverythingParser.{ParseResult, time}
 import Zext.*
 import Zext.Actions.*
 import Zext.Condition.canBecome
+import Zext.ControlCodes.{boldControlCode, normalControlCode, orange}
 import Zext.Interpreter.*
 import Zext.Parser.PartOfSpeech.verb
-import Zext.Parser.{PartOfSpeech, boldControlCode, unboldControlCode}
+import Zext.Parser.PartOfSpeech
 import Zext.Rule.*
-import Zext.RuleContext.{_noun, _nouns, location, silent}
+import Zext.RuleContext.{GetCurrentRuleContext, _noun, _nouns, location, silent}
 import Zext.Saving.*
 import Zext.StringExpression.str
 import Zext.World.*
@@ -215,18 +216,17 @@ object Interpreter{
   }
 
   def SystemMessage(str: StringExpression): Unit = {
-    saying.text = str.toString
-    execute(saying, noun, secondNoun, silent, location = player.location)
+    ExecuteContextAction(saying(str.toString), subject = system, location = player.location) // always say this at the player location.
   }
 
   def Say(str: StringExpression): Unit = {
-    saying.text = str.toString
-    execute(saying, noun, secondNoun, silent, location)
+    ExecuteContextAction(saying(str.toString))
   }
 
+
+
   def Title(str : StringExpression): Unit = {
-    val orange = "\u001b[38;5;214m"
-    println(orange + str.toString.split(" ").map(_.capitalize).reduce(_ + " " + _) + unboldControlCode)
+    println(orange + str.toString.split(" ").map(_.capitalize).reduce(_ + " " + _) + normalControlCode)
 
   }
 
@@ -236,21 +236,21 @@ object Interpreter{
 }
 
 
-
+object ControlCodes {
+  val orange = "\u001b[38;5;214m"
+  val boldControlCode = "\u001b[0;1m"
+  val normalControlCode = "\u001b[0;0m"
+}
 
 
 object Parser {
 
   var exit = false
-
-  val boldControlCode = "\u001b[0;1m"
-  val unboldControlCode = "\u001b[0;0m"
-
   var bolded = false
 
   def b = if(bolded) {
     bolded = false
-    unboldControlCode
+    normalControlCode
   } else  {
     bolded = true
     boldControlCode
@@ -364,8 +364,6 @@ object Parser {
 
   def Disambiguate(parsables : Seq[ParsableType], hint : ParsableType => Boolean = null) : ParsableType = {
 
-    val orange = "\u001b[38;5;214m"
-
     if(parsables.length == 1)
       return parsables.head
 
@@ -380,7 +378,7 @@ object Parser {
     var s = "Did you mean "
     var index = 1
     for(p <- parsables){
-      s += s"($orange$index$unboldControlCode) ${p.toString} or "
+      s += s"($orange$index$normalControlCode) ${p.toString} or "
       index += 1
     }
     s = s.stripSuffix(" or ")
@@ -421,7 +419,7 @@ object Parser {
 
       val set = action.implicitTargetSelector.getSet()
 
-      val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
+      val candidates = set.filter(player.canSee(_, action))
       if(candidates.nonEmpty){
         val first = Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Array(first)))
@@ -438,8 +436,8 @@ object Parser {
 
     val visible = firsts.get.filter {
       case z: ZextObject =>
-        if(action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
-        else z.isVisibleTo(player)
+        if(action.isInstanceOf[DebugAction]) true
+        else player.canSee(z, action)
 
       case _ => false
     }
@@ -461,7 +459,7 @@ object Parser {
       if (firsts.isEmpty && action.implicitSubjectSelector != null) {
 
         val set = action.implicitSubjectSelector.getSet()
-        val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
+        val candidates = set.filter(player.canSee(_, action))
 
         if (candidates.nonEmpty) {
           Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
@@ -479,8 +477,8 @@ object Parser {
 
         val visible = firsts.get.filter {
           case z: ZextObject =>
-            if (action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
-            else z.isVisibleTo(player)
+            if (action.isInstanceOf[DebugAction]) true
+            else player.canSee(z, action)
 
           case _ => false
         }
@@ -503,7 +501,7 @@ object Parser {
     if(seconds.isEmpty && action.implicitTargetSelector != null){
 
       val set = action.implicitTargetSelector.getSet()
-      val candidates = set.filter(!action.requiresVisibility || _.isVisibleTo(player))
+      val candidates = set.filter(player.canSee(_, action))
       if(candidates.nonEmpty){
         val second = Disambiguate(candidates, action.disambiguationHint).asInstanceOf[ZextObject]
         return Some(Command(action, Array(first,second)))
@@ -520,8 +518,8 @@ object Parser {
 
     val visible = seconds.get.filter {
       case z: ZextObject =>
-        if(action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
-        else z.isVisibleTo(player)
+        if(action.isInstanceOf[DebugAction]) true
+        else player.canSee(z, action)
 
       case _ => false
     }
@@ -543,8 +541,8 @@ object Parser {
     val disambiguated = targets.map { target =>
       val visible = target.filter {
         case z: ZextObject =>
-          if (action.isInstanceOf[DebugAction] || !action.requiresVisibility) true
-          else z.isVisibleTo(player)
+          if (action.isInstanceOf[DebugAction]) true
+          else player.canSee(z, action)
 
         case _ => false
       }
@@ -635,12 +633,12 @@ object Parser {
                 c.action match
                   case action: CustomAction =>
                     val customCommand = action.intercept(input, result.get)
-                    ExecuteAction(customCommand.action, customCommand.nouns)
+                    ExecuteAction(customCommand.action, RuleContext(player, customCommand.nouns, false, player.location))
                   case action: Action =>
-                    ExecuteAction(c.action, c.nouns)
+                    ExecuteAction(c.action, RuleContext(player, c.nouns, false, player.location))
               }
               RunApplyingRules(c)
-              execute(being, player.location)
+              ExecuteAction(being, RuleContext(player, Array(player.location), false, player.location))
               break()
             }
           }
@@ -665,21 +663,17 @@ object Parser {
 
     time("startup"){
       EverythingParser.parse("start")
-      execute(starting)
+      ExecuteAction(starting, subject = player, location = player.location)
     }
 
-    execute(examining, player.location)
 
     while(!exit) {
       print("> ")
-      var input = readLine()
+      var input : String = readLine()
 
-      preprocessingInput.text = input
-      ExecuteAction(preprocessingInput, Array())
-      input = preprocessingInput.text
+      input = ExecuteContextAction(preprocessingInput(input), subject = system).ret
 
       time("interpreter loop") {
-
         val results  = time("parsing") {
           val r = EverythingParser.parse(input)
           Array(r._1, r._2)
@@ -694,12 +688,12 @@ object Parser {
               c.action match
                 case action: CustomAction =>
                   val customCommand = action.intercept(input, result.get)
-                  ExecuteAction(customCommand.action, customCommand.nouns)
+                  ExecuteAction(customCommand.action, RuleContext(player, customCommand.nouns, false, player.location))
                 case action : Action =>
-                  ExecuteAction(c.action, c.nouns)
+                  ExecuteAction(c.action, RuleContext(player, c.nouns, false, player.location))
               }
               RunApplyingRules(c)
-              execute(being, player.location)
+              ExecuteAction(being, subject = player, target = player.location, location = player.location)
               break()
             }
           }

@@ -10,12 +10,19 @@ import Zext.Rule.*
 
 import scala.reflect.TypeTest
 
+// special object for actions that happen without subjects
 object nothing extends ZextObject {
   val name = "nothing"
-  val description = ""
+  val description = "subject for things that happen without agentic cause"
 
   ZextObject.globals.addOne(this)
 }
+
+object system extends ZextObject {
+  val name = "system"
+  val description = "subject for system actions"
+}
+
 
 class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ConditionHelper {
 
@@ -168,6 +175,7 @@ object World  {
   "Container$SecretHolder",
   "Relations$SecretHolder",
   "Zext$SecretHolder",
+  "Idea$SecretHolder",
   )
 
 

@@ -129,25 +129,34 @@ object phantom_gun extends Backdrop {
 
 object idea_world {
 
-  val violence = new Idea("violence") {
+  val violence = new Idea("violence", obvious = true) {
     override val description = "it occurs to you that guns could be anywhere."
   }
 
-  val guns = new Idea("guns", discoverable = true) {
+
+
+
+  val guns = new Idea("guns", obvious = true) {
     override val description = "phantom guns are known to manifest when secrets are known"
   }
 
-  val secret = new Idea("secrets", innate = false) {
+  after(thinking, violence) {
+    subject can_discover guns
+  }
+
+  val secret = new Idea("secrets") {
     override val description = "This is a secret thought that must be revealed via some other means."
   }
 
   after(thinking, guns) {
-    secret.discoverable = true
+    subject can_discover secret
   }
 
-  val kitties = new Idea("kitties") {
+  val kitties = new Idea("kitties", obvious = true) {
     override val description = "that fluffy kitties are cuddly."
   }
+
+  player can_discover (violence, kitties)
 }
 
 object Circus extends RoomRegion("Circus Region") {
@@ -213,9 +222,8 @@ object finding extends Action(1, "find") with DebugAction {
   }
 
   inflict(finding, of[Thing]) {
-    execute(finding, noun[Thing].room)
+    ExecuteAction(finding, target = noun[Thing].room)
   }
-
 
   inflict(finding, of[Room]) {
     val start = player.room
@@ -314,12 +322,14 @@ object screaming extends CustomAction(-1, "scream") {
   var screamCount = 0
 
   after(postprocessingText, screamingMode) {
-    postprocessingText.text = postprocessingText.text.toUpperCase
+    val text = postprocessingText.GetActionContext()
+    postprocessingText.SetActionContext(text.toUpperCase)
   }
 
 
   before(preprocessingInput){
-    if(preprocessingInput.text.toUpperCase == preprocessingInput.text){
+    val text = preprocessingInput.GetActionContext()
+    if(text.toUpperCase == text){
       screamingMode = true
       screamCount += 1
       if (screamCount == 3) {
@@ -328,15 +338,13 @@ object screaming extends CustomAction(-1, "scream") {
     } else {
       screamingMode = false
     }
-
   }
-
 
   override def intercept(rawInput: String, parseResult: ParseResult): Command = {
     val verb = parseResult.nouns(0)(0).asInstanceOf[Action]
     val target = Disambiguate(parseResult.nouns(1)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
     screamingMode = true
-    ExecuteAction(verb, Array(target))
+    ExecuteAction(verb, target = target)
     screamingMode = false
     Command(screaming, Array())
   }
@@ -351,7 +359,7 @@ object CrowsNest extends Room {
   val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
     "It looks like a barber pole, only it's orange and purple" is fixed
 
-  report(examining, trapeze, !trapeze.isAccessibleTo(player)) Say "A handlebar that seems to be hanging from something in the sky"
+  report(examining, trapeze, !player.canAccess(trapeze, examining) ) Say "A handlebar that seems to be hanging from something in the sky"
 
   instead(hanging, player -> trapeze, !player.insured) Say "You are not insured for that"
 

@@ -1,6 +1,6 @@
 package Zext
 
-import Zext.Actions.{UnderstandAlias, allActions, examining}
+import Zext.Actions.{UnderstandAlias, allActions, does, examining}
 import Zext.EverythingParser.ParseResult
 import Zext.Parser.*
 import Zext.Relation.RelationQuery
@@ -49,6 +49,10 @@ def GetNouns() : Array[ZextObject] = {
     RuleContext._nouns
 }
 
+object subject extends ZextObjectProxy[ZextObject]{
+    override def resolve = RuleContext._subject
+}
+
 object secondNoun extends ZextObjectProxy[ZextObject] {
     override def resolve = RuleContext._secondNoun
 }
@@ -58,25 +62,40 @@ object RuleContext {
     private[Zext] var _noun: ZextObject = null
     private[Zext] var _secondNoun: ZextObject = null
     private[Zext] var _nouns : Array[ZextObject] = Array()
+    private[Zext] var _subject : ZextObject = null
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
     private[Zext] var _location: ZContainer = nowhere
 
-    // @todo figure out if nouns need to be set here too.
     private[Zext] def SetContext(ctx : RuleContext) : Unit = {
         _noun = ctx.nouns.headOption.orNull
         _secondNoun = ctx.nouns.lift(1).orNull
         _nouns = ctx.nouns
         _silent = ctx.silent
         _location = ctx.location
+        _subject = ctx.subject
     }
+
+
+    def InheritContext(subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Option[Boolean] = None, location: ZContainer = null): RuleContext = {
+        val targets = ConsolidateTargets(target, target2)
+        val currentLocation = if (location == null) GetCurrentRuleContext().location else location
+        val currentSubject = if (subject == null) GetCurrentRuleContext().subject else subject
+        val currentSilence = if (silent.isDefined) silent.get else GetCurrentRuleContext().silent
+        assert(currentSubject != null, "you must specify a subject if there isn't a current rule context")
+        assert(currentLocation != null, "you need to specify a location if there isn't a current rule context")
+        RuleContext(currentSubject, targets, currentSilence, currentLocation)
+    }
+
+    def GetCurrentRuleContext() = RuleContext(_subject, _nouns, _silent, _location)
 
     def first : Boolean =  _first
     def silent : Boolean = _silent
     def location : ZContainer = _location
 }
 
-case class RuleContext(nouns : Array[ZextObject], silent: Boolean, location : ZContainer)
+
+case class RuleContext(subject : ZextObject, nouns : Array[ZextObject], silent: Boolean, location : ZContainer)
 
 object Rule {
 
@@ -100,68 +119,99 @@ object Rule {
     val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
 
 
-    inline def applying(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule({
-            body; Continue
-        }, conditions *)
+    inline def applying(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+        val rule = new ActionRule({body; Continue}, moreConditions *)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).applyingRules += rule
+        ruleSets(action).applyingRules += rule
         rule
     }
 
 
-    inline def check(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; Continue}, conditions *)
+    inline def check(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+
+        val rule = new ActionRule({body; Continue}, moreConditions *)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).checkRules += rule
+        ruleSets(action).checkRules += rule
         rule
     }
 
 
-    inline def before(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; Continue}, conditions*)
+    inline def before(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+
+        val rule = new ActionRule({body; Continue}, moreConditions*)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).beforeRules += rule
+        ruleSets(action).beforeRules += rule
         rule
     }
 
-    inline def instead(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; Stop}, conditions*)
+    inline def instead(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+
+        val rule = new ActionRule({body; Stop}, moreConditions*)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).insteadRules += rule
+        ruleSets(action).insteadRules += rule
         rule
     }
 
-    inline def inflict(r: Action, conditions: => Condition*)(inline body: => Unit) : ActionRule = {
-        val rule = new ActionRule({body; Continue}, conditions*)
+    inline def inflict(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit) : ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac : ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a : Action => (a, conditions)
+        }
+
+        val rule = new ActionRule({body; Continue}, moreConditions*)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).executeRules += rule
+        ruleSets(action).executeRules += rule
         rule
     }
 
-    inline def report(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule( {body; Replace}, conditions* )
+    inline def report(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+
+        val rule = new ActionRule( {body; Replace}, moreConditions* )
         rule.definitionPosition = CodePosition()
-        ruleSets(r).reportRules += rule
+        ruleSets(action).reportRules += rule
         rule
     }
 
-    inline def after(r: Action, conditions: => Condition*)(inline body: => Unit): ActionRule = {
-        val rule = new ActionRule({body; Continue}, conditions*)
+    inline def after(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
+        val (action, moreConditions) = r match {
+            case ac: ActionWithContext[?] => (ac.action.asInstanceOf[Action], conditions appended ac.toCondition)
+            case a: Action => (a, conditions)
+        }
+
+        val rule = new ActionRule({body; Continue}, moreConditions*)
         rule.definitionPosition = CodePosition()
-        ruleSets(r).afterRules += rule
+        ruleSets(action).afterRules += rule
         rule
     }
-
 
     // ultra terse syntax
-    class InsteadConsequence(r: Action, conditions: => Condition*) {
+    class InsteadConsequence(r: Action | ActionWithContext[?], conditions: => Condition*) {
         infix inline def Say(s: StringExpression): ActionRule = {
             instead(r, conditions *)(Interpreter.Say(s))
         }
     }
 
-    class ReportConsequence(r: Action, conditions: => Condition*) {
+    class ReportConsequence(r: Action | ActionWithContext[?], conditions: => Condition*) {
         infix inline def Say(s: StringExpression): ActionRule = {
             report(r, conditions *)(Interpreter.Say(s))
         }
@@ -174,11 +224,11 @@ object Rule {
         }
     }
 
-    def report(r: Action, conditions: => Condition*): ReportConsequence = {
+    def report(r: Action | ActionWithContext[?], conditions: => Condition*): ReportConsequence = {
         new ReportConsequence(r, conditions *)
     }
 
-    def instead(r: Action, conditions: => Condition*): InsteadConsequence = {
+    def instead(r: Action | ActionWithContext[?], conditions: => Condition*): InsteadConsequence = {
         new InsteadConsequence(r, conditions *)
     }
 
@@ -240,9 +290,12 @@ object Rule {
         true
     }
 
+
+
+
     def RunRule(context : RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        val previousContext = RuleContext(GetNouns(), silent, location)
+        val previousContext = GetCurrentRuleContext()
         SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
@@ -256,7 +309,7 @@ object Rule {
     // this is different because applying rules only run if possible, while normal rules only don't run if impossible.
     def RunApplyingRule(context: RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
 
-        val previousContext = RuleContext(GetNouns(), silent, location)
+        val previousContext = GetCurrentRuleContext()
         SetContext(context)
 
         val possibleRules = rules.filter(_.possible)
@@ -282,14 +335,40 @@ object Rule {
 
             for(thing <- allThings){
                 val thingLocation = thing.location
-                val ruleContext = new RuleContext(Array(thing), false, thingLocation)
+                val ruleContext = new RuleContext(nothing, Array(thing), false, thingLocation)
                 if(RunApplyingRule(ruleContext, applyingRules))
-                    execute(action, thing, location = thingLocation)
+                    ExecuteAction(action, RuleContext(nothing, Array(thing), false, thingLocation))
             }
         }
     }
 
-     def ExecuteAction(rule: Action, targets: Array[ZextObject], silent : Boolean = false, location : ZContainer = player.location): Boolean = {
+
+    case class ExecutionResult[T](res : Boolean, ret : T)
+
+    // convenience for not having to create an array.
+    def ExecuteAction(action: Action, subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Option[Boolean] = None, location: ZContainer = null): Boolean = {
+          ExecuteAction(action, InheritContext(subject, target, target2, silent, location))
+    }
+
+
+    def ExecuteContextAction[T](rule: ActionWithContext[T], subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Option[Boolean] = None, location: ZContainer = null): ExecutionResult[T] = {
+        val previous = rule.action.GetActionContext()
+        rule.action.SetActionContext(rule.context)
+        val result = ExecuteAction(rule.action.asInstanceOf[Action], InheritContext(subject, target, target2, silent, location))
+        val ctxValue = rule.action.GetActionContext()
+        rule.action.SetActionContext(previous)
+        ExecutionResult(result, ctxValue)
+    }
+
+
+    def ExecuteAction(rule: Action, context: RuleContext): Boolean = {
+
+        rule match {
+            case value: Context[?] =>
+                assert(value.GetActionContext() != null, "Call context actions with the version that takes a context")
+            case _ =>
+        }
+
         val set = ruleSets(rule)
 
          /*
@@ -306,7 +385,6 @@ object Rule {
             Report: by default, make no decision.
           */
 
-         val context = RuleContext(targets, silent, location)
          val previousBlackboard = blackboard
 
          for(rules <- set.GetAllRules()) {
@@ -319,6 +397,39 @@ object Rule {
          blackboard = previousBlackboard
          true
     }
+
+
+
+     // for running a ruleset in another rule
+     def ExecuteSubRules(rules : ArrayBuffer[ActionRule], ruleContext : RuleContext) : RuleControl = {
+
+         def runRules(sortedRules: Seq[ActionRule]): RuleControl = {
+             for (rule <- sortedRules) {
+                 val result = rule.exec
+                 result match {
+                     case Continue =>
+                     case Stop => return Stop
+                     case Replace => return Replace
+                 }
+             }
+             Continue
+         }
+
+
+         val previousContext = GetCurrentRuleContext()
+         val previousBlackboard = blackboard
+
+         SetContext(ruleContext)
+
+         val possibleRules = rules.filter(_.possible)
+         val sorted = SortByPrecedence(possibleRules)
+         val result = runRules(sorted)
+
+         SetContext(previousContext)
+         blackboard = previousBlackboard
+
+         result
+     }
 
 
     private[Zext] inline def ConsolidateTargets(target: ZextObject, target2: ZextObject) : Array[ZextObject] = {
@@ -334,12 +445,7 @@ object Rule {
             Array[ZextObject]()
     }
 
-    // convenience for not having to create an array.
-    inline def execute(rule: Action, target: ZextObject = null, target2: ZextObject = null, silent : Boolean = false, location : ZContainer = player.location): Boolean = {
-        // target2 must be null if target is null
-        val targets = ConsolidateTargets(target, target2)
-        ExecuteAction(rule, targets, silent, location)
-    }
+
 }
 
 abstract class Rule {
@@ -356,13 +462,7 @@ class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
     def evaluate = condition
     var specificity = 1
     def precedence = queryType.ordinal
-    /*
-    def unary_! : Condition = {
-        val c = new Condition(!condition, queryType)
-        c.specificity = specificity
-        c
-    }
-    */
+
 
     def &&(other: Condition): Condition = {
         // combine predicates
@@ -539,13 +639,26 @@ trait DebugAction {
     this : Action =>
 }
 
+case class ActionWithContext[T](action : Context[T], context : T) {
+    def toCondition: Condition = {
+        new Condition(action.GetActionContext() == context, QueryPrecedence.Object)
+    }
+}
+
+trait Context[T] {
+    this: Action =>
+
+    private var _ctx : T = null.asInstanceOf[T]
+    def GetActionContext(): T = _ctx
+    def SetActionContext(context: T): Unit = _ctx = context
+    def apply(context : T) = ActionWithContext(this, context)
+
+
+}
+
 class Action(val targets : Int, val verbs : String*) extends Rule with ParsableType(PartOfSpeech.verb) {
 
     allActions.addOne(this)
-
-    // because visibility is handled during command parsing, we can short circuit that here.
-    // be careful because this can quite possibly leak information about things if disabled.
-    var requiresVisibility = true
 
     def implicitTargetSelector : SetComprehension[ZextObject] = null
     def implicitSubjectSelector : SetComprehension[ZextObject] = null
@@ -554,7 +667,18 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
 
+    def execute(subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Boolean = false, location: ZContainer = null) : Boolean = {
+        val targets = ConsolidateTargets(target, target2)
+        val currentLocation = if (location == null) GetCurrentRuleContext().location else location
+        val currentSubject = if (subject == null) GetCurrentRuleContext().subject else subject
+        assert(currentSubject != null, "you must specify a subject if there isn't a current rule context")
+        assert(currentLocation != null, "you need to specify a location if there isn't a current rule context")
+        RuleContext(currentSubject, targets, silent, currentLocation)
+        ExecuteAction(this, RuleContext(currentSubject, targets, silent, currentLocation))
+    }
+
 }
+
 
 
 
