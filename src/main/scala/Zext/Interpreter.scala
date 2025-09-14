@@ -3,20 +3,13 @@ package Zext
 import EverythingParser.{ParseResult, time}
 import Zext.*
 import Zext.Actions.*
-import Zext.Condition.canBecome
-import Zext.ControlCodes.{TextControl, bold, normal, orange, orangeCode}
+import Zext.ControlCodes.{TextControl, bold, orange, orangeCode}
 import Zext.Interpreter.*
 import Zext.Parser.PartOfSpeech.verb
-import Zext.Parser.PartOfSpeech
 import Zext.Rule.*
 import Zext.RuleContext.{GetCurrentRuleContext, _noun, _nouns, location, silent}
-import Zext.Saving.*
-import Zext.StringExpression.str
 import Zext.World.*
 
-import java.io.{FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
-import scala.annotation.targetName
-import scala.io.StdIn.readLine
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.StdIn.readLine
@@ -24,12 +17,6 @@ import scala.language.postfixOps
 import scala.util.boundary
 import boundary.break
 import zobjectifier.Macros
-
-import scala.util.matching.Regex
-
-
-// this maybe has to be the last import?
-//import scala.reflect.TypeTest
 
 
 
@@ -189,6 +176,19 @@ object Interpreter{
     ret
   }
 
+  def WordPrompt(prompt: StringExpression) : String = {
+    Say(prompt)
+    print("> ")
+    var input = readLine().strip().split(" ")
+    while(input.length != 1) {
+      Say("Enter a single word.")
+      Say(prompt)
+      print("> ")
+      input = readLine().strip().split(" ")
+    }
+    input(0)
+  }
+
   def NumberPrompt(str: StringExpression) : Int = {
     Say(str)
     print("> ")
@@ -197,7 +197,8 @@ object Interpreter{
 
     while(parsed.isEmpty) {
       Say("That's not a number.")
-
+      Say(str)
+      print("> ")
       number = readLine().toLowerCase
       parsed = scala.util.control.Exception.allCatch.opt( Integer.parseInt(number) )
     }
@@ -227,30 +228,40 @@ object Interpreter{
 }
 
 
+
+//@todo figure out how to mix control codes. we will need some kind of stack structure.
 object ControlCodes {
 
   enum TextControl {
     case bold, italic, underline, normal,
-    black, red, green, yellow, blue, purple, teal, grey, orange
+    black, red, green, yellow, blue, purple, cyan, grey, orange
   }
 
-  private val boldCode = "\u001b[0;1m"
-  private val italicCode = "\u001b[0;3m"
-  private val underlineCode = "\u001b[0;4m"
+  private val boldCode = "\u001b[1m"
+  private val italicCode = "\u001b[3m"
+  private val underlineCode = "\u001b[4m"
+
+  private val unboldCode = "\u001b[22m"
+  private val unitalicCode = "\u001b[23m"
+  private val ununderlineCode = "\u001b[24m"
+
+
   private val normalCode = "\u001b[0;0m"
 
-  private val blackCode = "\u001b[0;30m"
-  private val redCode = "\u001b[0;31m"
-  private val greenCode = "\u001b[0;32m"
-  private val yellowCode = "\u001b[0;33m"
-  private val blueCode = "\u001b[0;34m"
-  private val purpleCode = "\u001b[0;35m"
-  private val tealCode = "\u001b[0;36m"
-  private val greyCode = "\u001b[0;37m"
+  private val blackCode = "\u001b[30m"
+  private val redCode = "\u001b[31m"
+  private val greenCode = "\u001b[32m"
+  private val yellowCode = "\u001b[33m"
+  private val blueCode = "\u001b[34m"
+  private val purpleCode = "\u001b[35m"
+  private val cyanCode = "\u001b[36m"
+  private val greyCode = "\u001b[37m"
+  private val normalColorCode = "\u001b[39m"
   private val orangeCode = "\u001b[38;5;214m"
 
+
   private val codes = Array(boldCode, italicCode, underlineCode, normalCode,
-    blackCode, redCode, greenCode, yellowCode, blueCode, purpleCode, tealCode, greyCode, orangeCode)
+    blackCode, redCode, greenCode, yellowCode, blueCode, purpleCode, cyanCode, greyCode, orangeCode)
 
   def MakePlain(s : String) = {
     val ansiEscapeRegex = "\\x1B\\[[0-?]*[ -/]*[@-~]".r
@@ -258,24 +269,26 @@ object ControlCodes {
   }
 
   extension(s : String) {
-    private def control(code : TextControl) : String = {
+    private def control(code : TextControl, uncontrol : String) : String = {
         codes(code.ordinal) + s + normalCode
     }
+    private def controlColor(code: TextControl): String = {
+      codes(code.ordinal) + s + normalColorCode
+    }
 
-    def bold = s.control(TextControl.bold)
-    def italic = s.control(TextControl.italic)
-    def underline = s.control(TextControl.underline)
-    def normal = s.control(TextControl.normal)
+    def bold = s.control(TextControl.bold, unboldCode)
+    def italic = s.control(TextControl.italic, unitalicCode)
+    def underline = s.control(TextControl.underline, ununderlineCode)
 
-    def black = s.control(TextControl.black)
-    def red = s.control(TextControl.red)
-    def green = s.control(TextControl.green)
-    def yellow = s.control(TextControl.yellow)
-    def blue = s.control(TextControl.blue)
-    def purple = s.control(TextControl.purple)
-    def teal = s.control(TextControl.teal)
-    def grey = s.control(TextControl.grey)
-    def orange = s.control(TextControl.orange)
+    def black = s.controlColor(TextControl.black)
+    def red = s.controlColor(TextControl.red)
+    def green = s.controlColor(TextControl.green)
+    def yellow = s.controlColor(TextControl.yellow)
+    def blue = s.controlColor(TextControl.blue)
+    def purple = s.controlColor(TextControl.purple)
+    def teal = s.controlColor(TextControl.cyan)
+    def grey = s.controlColor(TextControl.grey)
+    def orange = s.controlColor(TextControl.orange)
 
 
     def RGB(rgb : (Int, Int, Int)): String = {
@@ -287,7 +300,7 @@ object ControlCodes {
       require(b < 256 && b >= 0)
 
       val colorCode = s"\u001b[38;2;$r;$g;${b}m"
-      colorCode + s + normal
+      colorCode + s + normalColorCode
     }
   }
 
@@ -297,16 +310,6 @@ object ControlCodes {
 object Parser {
 
   var exit = false
-  var bolded = false
-
-  def b = if(bolded) {
-    bolded = false
-    normal
-  } else  {
-    bolded = true
-    bold
-  }
-
 
   def GetWords(z : ZextObject) : Seq[String] = {
     var names = Seq(z.name).concat(z.aliases).map(_.toString.toLowerCase)
