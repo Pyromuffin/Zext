@@ -4,7 +4,7 @@ import EverythingParser.{ParseResult, time}
 import Zext.*
 import Zext.Actions.*
 import Zext.Condition.canBecome
-import Zext.ControlCodes.{boldControlCode, normalControlCode, orange}
+import Zext.ControlCodes.{TextControl, bold, normal, orange, orangeCode}
 import Zext.Interpreter.*
 import Zext.Parser.PartOfSpeech.verb
 import Zext.Parser.PartOfSpeech
@@ -24,6 +24,8 @@ import scala.language.postfixOps
 import scala.util.boundary
 import boundary.break
 import zobjectifier.Macros
+
+import scala.util.matching.Regex
 
 
 // this maybe has to be the last import?
@@ -139,18 +141,6 @@ class StringExpression(lazyStr : => String) extends Serializable{
 
 object Interpreter{
 
-
-  def CapitalizeStringWithControls(str : String): String = {
-    if(str.startsWith(boldControlCode)){
-      var s = str.stripPrefix(boldControlCode)
-      s = s.capitalize
-      s = boldControlCode + s
-      s
-    } else {
-      str.capitalize
-    }
-  }
-
   def MakeTextNice(str : String): String = {
 
     val endingPunctuation = Seq('.', '?', '!')
@@ -216,7 +206,7 @@ object Interpreter{
   }
 
   def SystemMessage(str: StringExpression): Unit = {
-    ExecuteContextAction(saying(str.toString), subject = system, location = player.location) // always say this at the player location.
+    ExecuteContextAction(saying(str.toString), subject = system) // always say this at the player location.
   }
 
   def Say(str: StringExpression): Unit = {
@@ -226,7 +216,8 @@ object Interpreter{
 
 
   def Title(str : StringExpression): Unit = {
-    println(orange + str.toString.split(" ").map(_.capitalize).reduce(_ + " " + _) + normalControlCode)
+    val titleStr =str.toString.split(" ").map(_.capitalize).reduce(_ + " " + _)
+    println(titleStr.orange)
 
   }
 
@@ -237,9 +228,69 @@ object Interpreter{
 
 
 object ControlCodes {
-  val orange = "\u001b[38;5;214m"
-  val boldControlCode = "\u001b[0;1m"
-  val normalControlCode = "\u001b[0;0m"
+
+  enum TextControl {
+    case bold, italic, underline, normal,
+    black, red, green, yellow, blue, purple, teal, grey, orange
+  }
+
+  private val boldCode = "\u001b[0;1m"
+  private val italicCode = "\u001b[0;3m"
+  private val underlineCode = "\u001b[0;4m"
+  private val normalCode = "\u001b[0;0m"
+
+  private val blackCode = "\u001b[0;30m"
+  private val redCode = "\u001b[0;31m"
+  private val greenCode = "\u001b[0;32m"
+  private val yellowCode = "\u001b[0;33m"
+  private val blueCode = "\u001b[0;34m"
+  private val purpleCode = "\u001b[0;35m"
+  private val tealCode = "\u001b[0;36m"
+  private val greyCode = "\u001b[0;37m"
+  private val orangeCode = "\u001b[38;5;214m"
+
+  private val codes = Array(boldCode, italicCode, underlineCode, normalCode,
+    blackCode, redCode, greenCode, yellowCode, blueCode, purpleCode, tealCode, greyCode, orangeCode)
+
+  def MakePlain(s : String) = {
+    val ansiEscapeRegex = "\\x1B\\[[0-?]*[ -/]*[@-~]".r
+    ansiEscapeRegex.replaceAllIn(s, "")
+  }
+
+  extension(s : String) {
+    private def control(code : TextControl) : String = {
+        codes(code.ordinal) + s + normalCode
+    }
+
+    def bold = s.control(TextControl.bold)
+    def italic = s.control(TextControl.italic)
+    def underline = s.control(TextControl.underline)
+    def normal = s.control(TextControl.normal)
+
+    def black = s.control(TextControl.black)
+    def red = s.control(TextControl.red)
+    def green = s.control(TextControl.green)
+    def yellow = s.control(TextControl.yellow)
+    def blue = s.control(TextControl.blue)
+    def purple = s.control(TextControl.purple)
+    def teal = s.control(TextControl.teal)
+    def grey = s.control(TextControl.grey)
+    def orange = s.control(TextControl.orange)
+
+
+    def RGB(rgb : (Int, Int, Int)): String = {
+      val r = rgb._1
+      val g = rgb._2
+      val b = rgb._3
+      require(r < 256 && r >= 0)
+      require(g < 256 && g >= 0)
+      require(b < 256 && b >= 0)
+
+      val colorCode = s"\u001b[38;2;$r;$g;${b}m"
+      colorCode + s + normal
+    }
+  }
+
 }
 
 
@@ -250,10 +301,10 @@ object Parser {
 
   def b = if(bolded) {
     bolded = false
-    normalControlCode
+    normal
   } else  {
     bolded = true
-    boldControlCode
+    bold
   }
 
 
@@ -378,7 +429,7 @@ object Parser {
     var s = "Did you mean "
     var index = 1
     for(p <- parsables){
-      s += s"($orange$index$normalControlCode) ${p.toString} or "
+      s += s"(${index.toString.orange}) ${p.toString} or "
       index += 1
     }
     s = s.stripSuffix(" or ")

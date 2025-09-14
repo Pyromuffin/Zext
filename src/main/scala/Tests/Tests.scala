@@ -5,6 +5,8 @@ import Zext.EverythingParser.ParseResult
 import Zext.Parser.{Command, Disambiguate}
 import Zext.exports.*
 
+import scala.language.postfixOps
+
 
 object TestPlayer extends PlayerClass(TestRoom) {
   override val name = "Test Player"
@@ -110,23 +112,28 @@ object TestRoom extends Room  {
 
 object idea_world {
 
-  val violence = new Idea("violence", obvious = true) {
+  val violence = new Idea("violence") {
     override val description = "it occurs to you that guns could be anywhere."
-  }
+  } is innate
 
   val guns = new Idea("guns") {
     override val description = "phantom guns are known to manifest when secrets are known"
   }
 
-  val secret = new Idea("secrets", obvious = true) {
+  val secret = new Idea("secrets") {
     override val description = "This is a secret thought that must be revealed via some other means."
-  }
+  } is obvious
 
-  val kitties = new Idea("kitties", obvious = true) {
+  val kitties = new Idea("kitties") {
     override val description = "that fluffy kitties are cuddly."
-  }
+  } is innate
 
-  player can_discover (violence, kitties)
+  val unlisted_idea = new Idea("unlisted") {
+    override val description = "Hard to think about this."
+  } is obvious is unlisted
+
+
+  player can_discover (violence, kitties, unlisted_idea)
 
   after(thinking, violence) {
     subject can_discover guns
@@ -180,14 +187,17 @@ object Tests extends App {
   if !Parser.RunTest("custom nickname", Array("nickname moose Kelly"), Array("The moose shall now be known as Kelly.")) then failureCount += 1
   if !Parser.RunTest("use nickname", Array("x kelly"), Array("Moostical.")) then failureCount += 1
   if !Parser.RunTest("going south with idea", Array("go south"), Array("You went south to the Test Room.")) then failureCount += 1
-  if !Parser.RunTest("list ideas", Array("ideas"), Array("The following ideas are known to you: violence and kitties.")) then failureCount += 1
+  if !Parser.RunTest("list ideas", Array("ideas"), Array("The following ideas are known to you: kitties and violence.")) then failureCount += 1
   if !Parser.RunTest("think about kitties", Array("think about kitties"), Array("A new thought about kitties occurs to you!", "Thinking of kitties reveals: that fluffy kitties are cuddly.")) then failureCount += 1
   if !Parser.RunTest("think about guns failure", Array("think about guns"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
   if !Parser.RunTest("think about violence", Array("think about violence"), Array("A new thought about violence occurs to you!", "Thinking of violence reveals: it occurs to you that guns could be anywhere.")) then failureCount += 1
   if !Parser.RunTest("examine guns failure", Array("examine guns"), Array("Input couldn't be interpreted as a command.")) then failureCount += 1
   if !Parser.RunTest("discover guns", Array("think about guns"), Array("A new thought about guns occurs to you!", "Thinking of guns reveals: phantom guns are known to manifest when secrets are known.")) then failureCount += 1
   if !Parser.RunTest("examine guns success", Array("examine guns"), Array("Phantom guns are known to manifest when secrets are known.")) then failureCount += 1
-  if !Parser.RunTest("more thoughts inventory", Array("thoughts"), Array("The following ideas are known to you: secrets, violence, guns, and kitties.")) then failureCount += 1
+  if !Parser.RunTest("more thoughts inventory", Array("thoughts"), Array("The following ideas are known to you: guns, kitties, secrets, and violence.")) then failureCount += 1
+  if !Parser.RunTest("think of unlisted", Array("think of unlisted"), Array("A new thought about unlisted occurs to you!", "Thinking of unlisted reveals: Hard to think about this.")) then failureCount += 1
+  if !Parser.RunTest("no unlisted in inventory", Array("thoughts"), Array("The following ideas are known to you: guns, kitties, secrets, and violence.")) then failureCount += 1
+
 
   println("=================================")
   if(failureCount == 0){

@@ -31,7 +31,7 @@ object Graph {
     visited.add(start)
     traversalOrder.addOne((start, -1))
 
-    val children = start.getRelated(relation).filter(!visited.contains(_))
+    val children = start.getRelatedSet(relation).filter(!visited.contains(_))
     traversalOrder.addAll(children.map((_,0)))
     visited.addAll(children)
 
@@ -44,7 +44,7 @@ object Graph {
         return unwind(traversalOrder, childIndex)
       }
 
-      val children = next.getRelated(relation).filter(!visited.contains(_))
+      val children = next.getRelatedSet(relation).filter(!visited.contains(_))
       traversalOrder.addAll(children.map((_, childIndex)))
       visited.addAll(children)
 

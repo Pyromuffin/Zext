@@ -209,6 +209,10 @@ object Rule {
         infix inline def Say(s: StringExpression): ActionRule = {
             instead(r, conditions *)(Interpreter.Say(s))
         }
+
+        infix inline def Stop: ActionRule = {
+            instead(r, conditions *)(stop)
+        }
     }
 
     class ReportConsequence(r: Action | ActionWithContext[?], conditions: => Condition*) {
@@ -291,16 +295,31 @@ object Rule {
     }
 
 
+    def GetPossibleRules(context : RuleContext, rules: ArrayBuffer[ActionRule]) : Seq[ActionRule] = {
+        val previousContext = GetCurrentRuleContext()
+        val previousFirst = _first
+        SetContext(context)
 
+
+        val possibleRules = rules.filter{ rule =>
+            _first = rule.first
+            rule.possible
+        }
+        val sorted = SortByPrecedence(possibleRules)
+
+        _first = previousFirst
+        SetContext(previousContext)
+
+        sorted
+    }
 
     def RunRule(context : RuleContext, rules: ArrayBuffer[ActionRule]): Boolean = {
+        val possibleRules = GetPossibleRules(context, rules)
 
         val previousContext = GetCurrentRuleContext()
         SetContext(context)
 
-        val possibleRules = rules.filter(_.possible)
-        val sorted = SortByPrecedence(possibleRules)
-        val result = ExecuteRules(sorted)
+        val result = ExecuteRules(possibleRules)
 
         SetContext(previousContext)
         result
@@ -449,13 +468,13 @@ object Rule {
 }
 
 abstract class Rule {
-    val disabled = false
+    var disabled = false
     var definitionPosition : String = null
 }
 
 
 enum QueryPrecedence:
-    case Generic, Class, SecondClass, Property, SecondProperty, Content, Object, SecondObject, Location
+    case Generic, Class, SecondClass, Property, SecondProperty, Content, Object, SecondObject, Location, Context
 
 
 class Condition(condition: => Boolean, var queryType: QueryPrecedence) {
@@ -503,7 +522,7 @@ object Condition {
     implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
     implicit def fromQuery(query: => RelationQuery[?,?]) : Condition = new Condition(query.evaluate(), query.relation.precedence)
 
-    type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper
+    type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper | Property
 
     implicit def fromTuple(t: => (ConditionTypes, ConditionTypes)): Condition = {
 
@@ -514,6 +533,7 @@ object Condition {
             case zextObjectProxy: ZextObjectProxy[?] => fromObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
             case zextObject: ZextObject => fromObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
+            case property: Property => fromProperty(property)
         }
 
         val secondPredicate: Condition = t._2 match {
@@ -523,6 +543,7 @@ object Condition {
             case zextObjectProxy: ZextObjectProxy[?] => fromSecondObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
             case zextObject: ZextObject => fromSecondObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
+            case property: Property => fromProperty(property)
         }
 
         firstPredicate && secondPredicate
@@ -583,11 +604,11 @@ enum RuleControl {
 }
 
 
-def result(res : Boolean) : Unit = {
+def ruleReturn(res : Boolean) : Unit = {
     if(res) continue else stop
 }
 
-class ActionRule(body : => RuleControl, conditions : Condition*) extends Rule{
+class ActionRule(body : => RuleControl, val conditions : Condition*) extends Rule{
     var first = true
 
     def specificity = {
@@ -641,7 +662,7 @@ trait DebugAction {
 
 case class ActionWithContext[T](action : Context[T], context : T) {
     def toCondition: Condition = {
-        new Condition(action.GetActionContext() == context, QueryPrecedence.Object)
+        new Condition(action.GetActionContext() == context, QueryPrecedence.Context)
     }
 }
 

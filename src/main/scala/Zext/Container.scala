@@ -20,14 +20,13 @@ trait Container {
 
   given c: ZContainer = this
 
-  def contents: Seq[Thing] = relations(Containment).toSeq.sortBy(_.name.toString)
+  def contents: Seq[Thing] = relations(Containment).toSeq
   var preposition = "inside"
   var openable = true
   var open = true
   var transparent = true
   var automaticallyListContents = true
   var enterable = false
-
 
   def ContentsString: Option[String] = {
     ListNamesNicely(contents)

@@ -31,7 +31,8 @@ object fixed extends Property
 object scenery extends Property
 object wet extends Property
 object proper extends Property
-object built_in extends Property // for built in ideas we dont really want to put in the idea list
+object unlisted extends Property // for things we dont want listed
+
 
 object exports{
     export Interpreter.*
@@ -51,23 +52,31 @@ object exports{
 }
 
 
+object listing extends Action(1) {
+    instead(listing, unlisted) Stop
+}
+
 def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
-    if (stuff.isEmpty)
+
+    val filtered = stuff.filter(n => ExecuteAction(listing, subject = system, target = n))
+    val sorted = filtered.sortBy(_.name.toString)
+
+    if (sorted.isEmpty)
         return None
 
-    if (stuff.length == 1) {
-        return Some(stuff.head.indefinite)
+    if (sorted.length == 1) {
+        return Some(sorted.head.indefinite)
     }
 
-    if (stuff.length == 2) {
-        return Some(stuff.head.indefinite + " and " + stuff(1).indefinite)
+    if (sorted.length == 2) {
+        return Some(sorted.head.indefinite + " and " + sorted(1).indefinite)
     }
 
     var s = ""
-    for (i <- 0 until stuff.length - 1)
-        s += stuff(i).indefinite + ", "
+    for (i <- 0 until sorted.length - 1)
+        s += sorted(i).indefinite + ", "
 
-    Some(s + "and " + stuff.last.indefinite)
+    Some(s + "and " + sorted.last.indefinite)
 }
 
 
@@ -99,6 +108,11 @@ object ZextObject{
         AllOf(x)
     }
 
+    
+    implicit def setToComprehension[X <: Relatable](set: Set[X]): SetComprehension[X] = {
+        AllOf(set.toSeq*)
+    }
+    
 }
 
 
@@ -132,12 +146,12 @@ object determiningAccessibility extends Action(1) with Context[Action]{
 
      // if noun is composite, check if the composite object is accessible to secondNoun
      if (noun.isType[Thing] && noun[Thing].isComposite) {
-         result(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
+         ruleReturn(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
      if (nounLocation != null && nounLocation.open) {
-         result(ExecuteAction(determiningAccessibility, target = nounLocation))
+         ruleReturn(ExecuteAction(determiningAccessibility, target = nounLocation))
      }
 
      // if not, fail
@@ -193,12 +207,12 @@ object determiningVisibility extends Action(1) with Context[Action]{
 
         // if noun is composite, check if the composite object is visible to subject
         if (noun.isType[Thing] && noun[Thing].isComposite) {
-            result( subject.canSee(noun[Thing].compositeObject, GetActionContext()) )
+            ruleReturn( subject.canSee(noun[Thing].compositeObject, GetActionContext()) )
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to subject
         if (targetLocation != null && (targetLocation.open || targetLocation.transparent)) {
-            result( subject.canSee(targetLocation, GetActionContext()) )
+            ruleReturn( subject.canSee(targetLocation, GetActionContext()) )
         }
 
         stop
@@ -222,6 +236,10 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var pluralized : Option[Boolean] = None
     var autoexplode = true
     var mass = false
+
+    infix def hasProp(p : Property) : Boolean = {
+        properties.contains(p)
+    }
 
     def GetName() : String = {
         ExecuteContextAction(printing_name(name.toString), subject = system, target = this).ret
@@ -268,10 +286,29 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             "is"
     }
 
-    infix def is(rhs : String): String = {
+    infix def iz(rhs : String): String = {
         toString + " " + be + " " + rhs
     }
 
+    infix def is(prop: Property): this.type = {
+        properties += prop
+        this
+    }
+
+    infix def and(prop: Property): this.type = {
+        properties += prop
+        this
+    }
+
+    infix def are(prop: Property): this.type = {
+        properties += prop
+        this
+    }
+
+    infix def aka(s: String): this.type = {
+        aliases.addOne(s)
+        this
+    }
 
     def location : ZContainer = nowhere
 
@@ -296,6 +333,8 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         if (maybe.isDefined) maybe.get
         else this.asInstanceOf[T]
     }
+
+
 
     def isType[T](using TypeTest[ZextObject, T]) = canBecome[ZextObject, T](this)
 
@@ -394,25 +433,7 @@ abstract class Thing (using c : Container & ZextObject) extends ZextObject {
         Inflector.pluralize(name.toString) == name.toString
     }
 
-    infix def is(prop: Property) : this.type = {
-        properties += prop
-        this
-    }
 
-    infix def and(prop: Property): this.type = {
-        properties += prop
-        this
-    }
-
-    infix def are(prop: Property) : this.type = {
-        properties += prop
-        this
-    }
-
-    infix def aka(s : String) : this.type  = {
-        aliases.addOne(s)
-        this
-    }
 
     infix def amount(nounAmount: NounAmount):  this.type ={
         if (nounAmount == NounAmount.plural) {

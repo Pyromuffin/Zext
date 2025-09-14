@@ -12,6 +12,7 @@ import scala.collection.mutable
 import scala.reflect.TypeTest
 import Condition.*
 import Zext.Relations.*
+import Zext.ControlCodes.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
@@ -80,20 +81,27 @@ object Actions {
 
   object saying extends Action(0) with Context[String] {
     check(saying) {
+      if(subject == system)
+        continue
+
       if(location != player.location)
+        stop
+
+      if (silent)
         stop
     }
 
     inflict(saying) {
-      if (silent) stop
-
       val text = GetActionContext()
       if (text == "") stop // maybe an error
 
-      val postprocessed = ExecuteContextAction(postprocessingText(text)).ret
+      var postprocessed = ExecuteContextAction(postprocessingText(text)).ret
+      if(subject == system){
+        postprocessed = postprocessed.bold
+      }
 
       if (testingOutput){
-        testOutput.addOne(postprocessed)
+        testOutput.addOne(MakePlain(postprocessed))
       }
       else
         println(postprocessed)
@@ -120,7 +128,7 @@ object Actions {
 
     report(entering, of[Room]){
       LineBreak()
-      result(ExecuteAction(examining, target = noun))
+      ruleReturn(ExecuteAction(examining, target = noun))
     }
 
   }
@@ -262,7 +270,7 @@ object Actions {
 
     check(taking){
       if !subject.canAccess(noun, taking) then
-        Say(noun is "inaccessible") // maybe say why?
+        Say(noun iz "inaccessible") // maybe say why?
         stop
     }
 
@@ -277,7 +285,7 @@ object Actions {
     }
 
     instead(taking, fixed) {
-      Say(noun is "shoracle")
+      Say(noun iz "shoracle")
     }
 
     report(taking) {

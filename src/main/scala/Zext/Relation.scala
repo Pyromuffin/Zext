@@ -1,6 +1,7 @@
 package Zext
 
 import Zext.*
+import Zext.QueryPrecedence.Context
 import Zext.Relation.*
 import Zext.SetComprehension.{AllOf, AnyOf, CombinedComprehension}
 import Zext.exports.*
@@ -214,34 +215,28 @@ object Relatable {
       false
     }
   }
+}
 
-  /*
-  implicit def tupleToComp2[LUB, A <: LUB, B <: LUB, T <: (A, B)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
-  }
+object determiningRelation extends Action(1) with Context[Relation[?, ?]] {
 
-  implicit def tupleToComp3[LUB, A <: LUB, B <: LUB, C <: LUB, T <: (A, B, C)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
+  inflict(determiningRelation) {
+    val relation = GetActionContext()
+    val related = subject.getRelatedSetFromDictionaries(relation).asInstanceOf[Set[Relatable]]
+    ruleReturn(related.contains(noun))
   }
-
-  implicit def tupleToComp4[LUB, A <: LUB, B <: LUB, C <: LUB, D <: LUB, T <: (A, B, C, D)](t: T): SetComprehension[LUB] = {
-    () => t.toArray.toSeq.map(_.asInstanceOf[LUB])
-  }
-  */
 }
 
 
-
 trait Relatable {
+  this : ZextObject =>
 
   extension(h : mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]) {
     def defaulted(r : Relation[?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
   }
 
-
   // removes relation and all related from relatable
   def removeRelation(r: Relation[?, ?]): Unit = {
-    val buddies = getRelated(r).iterator.toSeq
+    val buddies = getRelatedSetFromDictionaries(r).iterator.toSeq
     removeRelated(r, buddies*)
 
     r match {
@@ -306,8 +301,6 @@ trait Relatable {
 
     r match {
       // please dont call this with a conditional relation
-      case c : ConditionalRelation[?,?] => return
-
       case reciprocal: ReciprocalRelation[?,?] =>
         for(relatable <- relatables){
           relatable.innerRemove(reciprocal.getReciprocal, this)
@@ -323,11 +316,11 @@ trait Relatable {
   def addRelated(r: Relation[?, ?], _relatables: Relatable*) = {
 
     // filter out already related
-    val currentlyRelated = getRelated(r).asInstanceOf[Set[Relatable]]
+    val currentlyRelated = getRelatedSetFromDictionaries(r).asInstanceOf[Set[Relatable]]
     val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
 
 
-    if (!relatables.isEmpty)
+    if (relatables.nonEmpty)
     r match {
       // containment, we have to unparent the children and make it this
       // we also need to unchild the previous parent
@@ -430,10 +423,8 @@ trait Relatable {
 
 
 
-
-  def getRelated[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
+   private[Zext] def getRelatedSetFromDictionaries[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
     relation match {
-      case conditional : ConditionalRelation[?,T] => conditional.calculateRelated(this)
       case r : OneToMany => children(r)
       case r : ManyToMany => children(r)
       case r : Equivalence => groups(r)
@@ -445,21 +436,24 @@ trait Relatable {
   }
 
 
-  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
-    relation match {
-      case r : OneToOne => child(r)
-      case r : ManyToOne => child(r)
-      case r : SingleSymmetric => partner(r)
+   def getRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
+    // short circuit this for relations without rules.
+    if(!relation.isConditional) {
+      this.getRelatedSetFromDictionaries(relation)
+    } else {
+      val candidates = ZextObject.GetAll[B](using relation.ttTarget)
+      candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this.asInstanceOf[ZextObject], c.asInstanceOf[ZextObject]).res).toSet
     }
   }
 
+  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
+    val set = getRelatedSet(relation)
+    assert(set.isEmpty || set.size == 1)
+    set.headOption
+  }
+
   def relations[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T] & V)(using DummyImplicit) : Set[T] = {
-    relation match {
-      case r : OneToMany => children(r)
-      case r : ManyToMany => children(r)
-      case r : Equivalence => groups(r)
-      case r : ManySymmetric => partners(r)
-    }
+    getRelatedSet(relation)
   }
 
   def listRelations(): Seq[Relation[?,?]] = {
@@ -534,32 +528,28 @@ object Relation {
 
       val success = if(firstAll && secondAll) {
          a_set.forall { first =>
-          val related = first.getRelated(relation)
           b_set.forall { second =>
-            related.contains(second)
+              relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
           }
         }
 
       } else if (firstAny && secondAll) {
         a_set.exists { first =>
-          val related = first.getRelated(relation)
           b_set.forall { second =>
-            related.contains(second)
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
           }
         }
 
       } else if (firstAny && secondAny) {
         a_set.exists { first =>
-          val related = first.getRelated(relation)
           b_set.exists { second =>
-            related.contains(second)
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
           }
         }
       } else if (firstAll && secondAny) {
         a_set.forall { first =>
-          val related = first.getRelated(relation)
           b_set.exists { second =>
-            related.contains(second)
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
           }
         }
       } else false
@@ -577,7 +567,35 @@ implicit object NotAQuery extends RelationQueryContext {
 }
 
 
-class Relation[S <: Relatable : TT, T <: Relatable : TT]  {
+class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
+
+  val ttSource = _ttS
+  val ttTarget = _ttT
+
+  def checkTypes(s : Relatable, t : Relatable) : Boolean = {
+    ttSource.unapply(s).isDefined && ttTarget.unapply(t).isDefined
+  }
+
+  def isConditional : Boolean = {
+    // a relation is conditional if there is a determiningRelation rule with this relation set as context.
+    val previous = determiningRelation.GetActionContext()
+    determiningRelation.SetActionContext(this)
+
+    val ruleSet = ruleSets(determiningRelation).GetAllRules()
+    for(rules <- ruleSet) {
+      for(rule <- rules.filterNot(_.disabled)){
+        for(condition <- rule.conditions.filter(_.queryType == Context)){
+          if(condition.evaluate) {
+            determiningRelation.SetActionContext(previous)
+            return true
+          }
+        }
+      }
+    }
+
+    determiningRelation.SetActionContext(previous)
+    false
+  }
 
   val precedence = QueryPrecedence.Generic
 
@@ -679,24 +697,24 @@ abstract class ReciprocalRelation[S <: Relatable : TT, T <: Relatable : TT] exte
 }
 
 
+
 abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S, T] {
 
-  def calculateRelated(source : Relatable) : Set[T] =
-    source match {
-      case s : S =>
-        val candidates = ZextObject.GetAll[T]
-        candidates.filter(condition(s, _)).toSet
-      case _ => Set()
-    }
+  override def isConditional = true
 
   def condition(source: S, target: T): Boolean
+
+  inflict(determiningRelation(this)) {
+    if (condition(subject[S](using this.ttSource), noun[T](using this.ttTarget))) replace
+    stop
+  }
+
 }
 
 
 
+
 object RelationsTest extends App {
-
-
 
   object House extends Room {
 

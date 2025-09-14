@@ -2,7 +2,9 @@ package Zext
 
 import Relation.*
 import Zext.Actions.{UnderstandAlias, going}
+import Zext.Idea.innate
 import Zext.Relations.Direction.*
+import Zext.Rule.inflict
 
 import scala.annotation.targetName
 import scala.collection.mutable.ArrayBuffer
@@ -76,10 +78,12 @@ object Relations {
   case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends Idea(name) {
     Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
-    properties += proper
-    properties += built_in
+    properties += innate
+    properties += unlisted
   }
-  
+
+
+
   implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location

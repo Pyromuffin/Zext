@@ -50,8 +50,8 @@ class Backdrop(val name : StringExpression = getClass.getName) extends ZextObjec
   val description = ""
 }
 
-class RoomRegion(val name : StringExpression = getClass.getName) extends Relatable {
-  override def toString = name.toString
+class RoomRegion(val name : StringExpression = getClass.getName) extends ZextObject {
+  override val description = "room region: " + name
 
   World.currentWorld.regions.append(this)
 
