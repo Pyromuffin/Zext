@@ -64,7 +64,7 @@ object Idea {
 
     before(ideating, first) {
       // make all innate ideas discoverable
-      val known = subject.relations(idea_knowing)
+      val known = subject.relations(idea_knowing).filter(_.hasProp(innate))
       subject can_discover known
     }
 

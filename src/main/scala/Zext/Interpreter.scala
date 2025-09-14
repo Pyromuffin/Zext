@@ -229,7 +229,6 @@ object Interpreter{
 
 
 
-//@todo figure out how to mix control codes. we will need some kind of stack structure.
 object ControlCodes {
 
   enum TextControl {

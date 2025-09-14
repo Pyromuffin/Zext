@@ -77,11 +77,19 @@ object RuleContext {
     }
 
 
+    def Redirect(t1 : ZextObject, t2 : ZextObject = null) : RuleContext = {
+        InheritContext(target = t1, target2 = t2)
+    }
+
     def InheritContext(subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Option[Boolean] = None, location: ZContainer = null): RuleContext = {
+        val currentContext = GetCurrentRuleContext()
+        //val t1 = target.getOrElse(currentContext.nouns(0))
+        //val t2 = target2.getOrElse(currentContext.nouns(1))
+
         val targets = ConsolidateTargets(target, target2)
-        val currentLocation = if (location == null) GetCurrentRuleContext().location else location
-        val currentSubject = if (subject == null) GetCurrentRuleContext().subject else subject
-        val currentSilence = if (silent.isDefined) silent.get else GetCurrentRuleContext().silent
+        val currentLocation = if (location == null) currentContext.location else location
+        val currentSubject = if (subject == null) currentContext.subject else subject
+        val currentSilence = if (silent.isDefined) silent.get else currentContext.silent
         assert(currentSubject != null, "you must specify a subject if there isn't a current rule context")
         assert(currentLocation != null, "you need to specify a location if there isn't a current rule context")
         RuleContext(currentSubject, targets, currentSilence, currentLocation)
@@ -362,6 +370,7 @@ object Rule {
     }
 
 
+
     case class ExecutionResult[T](res : Boolean, ret : T)
 
     // convenience for not having to create an array.
@@ -369,6 +378,10 @@ object Rule {
           ExecuteAction(action, InheritContext(subject, target, target2, silent, location))
     }
 
+    def ReplaceAction(action: Action, ruleContext: RuleContext = GetCurrentRuleContext()): Unit = {
+        val result = ExecuteAction(action, ruleContext)
+        if(result) replace else stop
+    }
 
     def ExecuteContextAction[T](rule: ActionWithContext[T], subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Option[Boolean] = None, location: ZContainer = null): ExecutionResult[T] = {
         val previous = rule.action.GetActionContext()
@@ -688,6 +701,7 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
     ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
 
+    /*
     def execute(subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Boolean = false, location: ZContainer = null) : Boolean = {
         val targets = ConsolidateTargets(target, target2)
         val currentLocation = if (location == null) GetCurrentRuleContext().location else location
@@ -697,6 +711,7 @@ class Action(val targets : Int, val verbs : String*) extends Rule with ParsableT
         RuleContext(currentSubject, targets, silent, currentLocation)
         ExecuteAction(this, RuleContext(currentSubject, targets, silent, currentLocation))
     }
+    */
 
 }
 

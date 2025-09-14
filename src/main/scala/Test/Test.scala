@@ -132,7 +132,7 @@ object idea_world {
   val violence = new Idea("violence") {
     override val description = "it occurs to you that guns could be anywhere."
   } is innate
-  
+
   val guns = new Idea("guns") {
     override val description = "phantom guns are known to manifest when secrets are known"
   } is obvious
@@ -158,7 +158,7 @@ object idea_world {
 object Circus extends RoomRegion("Circus Region") {
 
   this designates (BigTop, CrowsNest)
-  
+
   val circusStuff = new Backdrop {
     val circus = ~"The Sleemo Brothers Ring-a-Ding Circus Extravaganza"
     val tent = ~"A spiral candystripe towering overhead" aka "roof"
@@ -202,6 +202,7 @@ object dryingWith extends Action(2, "dry") {
 }
 
 
+
 object finding extends Action(1, "find") with DebugAction {
 
   def getConnectedDirection(start : Room, next : Room): Option[Direction] = {
@@ -216,7 +217,7 @@ object finding extends Action(1, "find") with DebugAction {
   }
 
   inflict(finding, of[Thing]) {
-    ExecuteAction(finding, target = noun[Thing].room)
+    ReplaceAction(finding, Redirect(noun[Thing].room))
   }
 
   inflict(finding, of[Room]) {

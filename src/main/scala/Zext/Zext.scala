@@ -49,6 +49,7 @@ object exports{
     export Relations.*
     export Zext.Relations.RoomAdjacency.*
     export Zext.Idea.*
+    export Zext.ControlCodes.*
 }
 
 
@@ -108,11 +109,11 @@ object ZextObject{
         AllOf(x)
     }
 
-    
+
     implicit def setToComprehension[X <: Relatable](set: Set[X]): SetComprehension[X] = {
         AllOf(set.toSeq*)
     }
-    
+
 }
 
 
