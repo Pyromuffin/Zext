@@ -21,7 +21,7 @@ object guy extends PlayerClass(BigTop) {
 }
 
 
-extension(z : ZextObjectProxy[PlayerClass]) {
+extension(z : RelatableProxy[PlayerClass]) {
   implicit def toGuy : guy.type = z.resolve.asInstanceOf[guy.type]
 }
 

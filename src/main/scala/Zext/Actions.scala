@@ -16,7 +16,7 @@ import Zext.ControlCodes.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
-import ZextObjectProxy.*
+import RelatableProxy.*
 
 
 object Actions {

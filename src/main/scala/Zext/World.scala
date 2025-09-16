@@ -131,7 +131,7 @@ class WorldState{
   var time = 0
 }
 
-object player extends ZextObjectProxy[PlayerClass] {
+object player extends RelatableProxy[PlayerClass] {
   override def resolve = World.currentWorld.player
 }
 

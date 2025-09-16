@@ -2,6 +2,7 @@ package Zext
 
 import Zext.*
 import Zext.QueryPrecedence.Context
+import Zext.Relatable.allRelatables
 import Zext.Relation.*
 import Zext.SetComprehension.{AllOf, AnyOf, CombinedComprehension}
 import Zext.exports.*
@@ -195,6 +196,7 @@ class ReverseRelationHolder[RequiredValence <: AllValence] {
 
 object Relatable {
 
+  val allRelatables : ArrayBuffer[Relatable] = ArrayBuffer[Relatable]()
 
   extension (queryBlock: => Relatable) {
     def ? : RelationQuery[?,?] = {
@@ -231,7 +233,7 @@ object addingRelated extends Action(-1) with Context[Relation[?,?]] {
 
   inflict(addingRelated){
     val r = GetActionContext()
-    val relatables = GetNouns()
+    val relatables = GetTargets()
     subject.addRelatedInner(r, relatables)
   }
 
@@ -241,7 +243,7 @@ object removingRelated extends Action(-1) with Context[Relation[?, ?]] {
 
   inflict(removingRelated) {
     val r = GetActionContext()
-    val relatables = GetNouns()
+    val relatables = GetTargets()
     subject.innerRemove(r, relatables)
   }
 
@@ -250,7 +252,18 @@ object removingRelated extends Action(-1) with Context[Relation[?, ?]] {
 
 trait Relatable {
 
-  this : ZextObject =>
+  allRelatables.addOne(this)
+  val objectID = allRelatables.length
+
+  def location : ZContainer = nowhere
+
+  override def equals(obj: Any) = {
+    obj match {
+      case relatableProxy: RelatableProxy[?] => objectID == relatableProxy.resolve.objectID
+      case relatable: Relatable => objectID == relatable.objectID
+      case null => false
+    }
+  }
 
   extension(h : mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]) {
     def defaulted(r : Relation[?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
@@ -272,7 +285,7 @@ trait Relatable {
     }
   }
 
-  private[Zext] def innerRemove(r: Relation[?, ?], relatables: Array[ZextObject]): Unit = {
+  private[Zext] def innerRemove(r: Relation[?, ?], relatables: Seq[Relatable]): Unit = {
     r match {
       case oneToMany: OneToMany =>
         for (child <- relatables) {
@@ -318,7 +331,6 @@ trait Relatable {
     }
   }
 
-
   def removeRelated(r: Relation[?, ?], relatables: Relatable*): Unit = {
 
     r match {
@@ -334,7 +346,6 @@ trait Relatable {
 
     ExecuteContextAction(removingRelated(r), RuleContext(this, relatables.map(_.asInstanceOf[ZextObject]).toArray, false, this.location))
   }
-
 
   private[Zext] def addRelatedInner(r: Relation[?, ?], relatables: Seq[Relatable]) : Unit = {
 
@@ -436,7 +447,6 @@ trait Relatable {
     }
   }
 
-
   def addRelated(r: Relation[?, ?], _relatables: Relatable*) = {
 
     // filter out already related
@@ -450,9 +460,7 @@ trait Relatable {
     this
   }
 
-
-
-   private[Zext] def getRelatedSetFromDictionaries[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
+  private[Zext] def getRelatedSetFromDictionaries[T <: Relatable](relation: Relation[?,T]) : Set[T] = {
     relation match {
       case r : OneToMany => children(r)
       case r : ManyToMany => children(r)
@@ -464,8 +472,7 @@ trait Relatable {
     }
   }
 
-
-   def getRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
+  def getRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
     // short circuit this for relations without rules.
     if(!relation.isConditional) {
       this.getRelatedSetFromDictionaries(relation)

@@ -34,7 +34,7 @@ object drying extends Action(1, "dry") {
 object blessing extends Action(-1, "bless") {
 
   report(blessing) {
-    val nouns = GetNouns()
+    val nouns = GetTargets()
     Say("You bless " + nouns.mkString(", "))
   }
 

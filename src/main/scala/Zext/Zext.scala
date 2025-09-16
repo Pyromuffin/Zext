@@ -24,7 +24,7 @@ import zobjectifier.Macros
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 import scala.reflect.TypeTest
 
-trait Property
+trait Property extends Relatable
 
 object fixed extends Property
 object scenery extends Property
@@ -225,7 +225,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     val dynamic = false
 
-    var objectID = allObjects.length
     allObjects.addOne(this)
 
     var definiteArticle: String = "the"
@@ -245,6 +244,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         ExecuteContextAction(printing_name(name.toString), subject = system, target = this).ret
     }
 
+    /*
     override def equals(obj: Any) = {
         obj match {
             case zextObjectProxy: ZextObjectProxy[?] => objectID == zextObjectProxy.resolve.objectID
@@ -252,6 +252,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
             case null => false
         }
     }
+    */
 
      def indefiniteArticle: String = {
         val firstLetter = GetName()(0).toLower
@@ -310,7 +311,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         this
     }
 
-    def location : ZContainer = nowhere
+    override def location : ZContainer = nowhere
 
     def canSee(other: ZextObject, forAction : Action): Boolean = {
         ExecuteContextAction(determiningVisibility(forAction), subject = this, target = other).res

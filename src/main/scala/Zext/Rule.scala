@@ -1,7 +1,8 @@
 package Zext
 
-import Zext.Actions.{UnderstandAlias, allActions, does, examining}
+import Zext.Actions.{UnderstandAlias, allActions, allMetaActions, does, examining}
 import Zext.EverythingParser.ParseResult
+import Zext.Interpreter.Say
 import Zext.Parser.*
 import Zext.Relation.RelationQuery
 import Zext.Rule.*
@@ -18,51 +19,54 @@ import zobjectifier.Macros
 import zobjectifier.Macros.CodePosition
 
 
-object ZextObjectProxy {
-    implicit def toZext[T <: ZextObject](z : ZextObjectProxy[T]): T = z.resolve
-
+object RelatableProxy {
+    implicit def toRelatable[T <: Relatable](r : RelatableProxy[T]): T = r.resolve
 }
 
-abstract class ZextObjectProxy[+T <: ZextObject] extends SetComprehension[Nothing]{
+abstract class RelatableProxy[+T <: Relatable] extends SetComprehension[Nothing]{
 
     override def getSet() = Seq(resolve).asInstanceOf[Seq[Nothing]]
 
     override def toString = resolve.toString
     def resolve : T
 
+    //@todo: superstition
     override def equals(obj: Any) = {
-
          obj match {
-             case zextObjectProxy: ZextObjectProxy[?] => this.objectID == zextObjectProxy.objectID
-             case zextObject: ZextObject => this.objectID == zextObject.objectID
+             case relatableProxy: RelatableProxy[?] => this.objectID == relatableProxy.objectID
+             case relatable: Relatable => this.objectID == relatable.objectID
              case null => false
         }
     }
-
 }
 
-object noun extends ZextObjectProxy[ZextObject] {
-    override def resolve = RuleContext._noun
+object noun extends RelatableProxy[ZextObject] {
+    override def resolve = RuleContext._noun.asInstanceOf[ZextObject]
 }
 
-def GetNouns() : Array[ZextObject] = {
+def GetTargets() : Seq[Relatable] = {
     RuleContext._nouns
 }
 
-object subject extends ZextObjectProxy[ZextObject]{
-    override def resolve = RuleContext._subject
+object subject extends RelatableProxy[ZextObject]{
+    override def resolve = RuleContext._subject.asInstanceOf[ZextObject]
 }
 
-object secondNoun extends ZextObjectProxy[ZextObject] {
-    override def resolve = RuleContext._secondNoun
+object secondNoun extends RelatableProxy[ZextObject] {
+    override def resolve = RuleContext._secondNoun.asInstanceOf[ZextObject]
+}
+
+object act extends RelatableProxy[Action] {
+    override def resolve = RuleContext._noun.asInstanceOf[Action]
 }
 
 object RuleContext {
 
-    private[Zext] var _noun: ZextObject = null
-    private[Zext] var _secondNoun: ZextObject = null
-    private[Zext] var _nouns : Array[ZextObject] = Array()
-    private[Zext] var _subject : ZextObject = null
+    private[Zext] var _currentAction : MetaAction[?] = null
+    private[Zext] var _noun: Relatable = null
+    private[Zext] var _secondNoun: Relatable = null
+    private[Zext] var _nouns : Seq[Relatable] = Array[Relatable]()
+    private[Zext] var _subject : Relatable = null
     private[Zext] var _first: Boolean = false
     private[Zext] var _silent: Boolean = false
     private[Zext] var _location: ZContainer = nowhere
@@ -103,7 +107,7 @@ object RuleContext {
 }
 
 
-case class RuleContext(subject : ZextObject, nouns : Array[ZextObject], silent: Boolean, location : ZContainer)
+case class RuleContext(subject : Relatable, nouns : Seq[Relatable], silent: Boolean, location : ZContainer)
 
 object Rule {
 
@@ -124,7 +128,7 @@ object Rule {
         }
     }
 
-    val ruleSets = new mutable.HashMap[Action, ActionRuleSet]()
+    val ruleSets = new mutable.HashMap[MetaAction[?], ActionRuleSet]()
 
 
     inline def applying(r: Action | ActionWithContext[?], conditions: Condition*)(inline body: => Unit): ActionRule = {
@@ -533,8 +537,8 @@ object Condition {
     // location > object > property > class > generic
 
     implicit def fromBoolean(b: => Boolean): Condition = new Condition(b, QueryPrecedence.Generic)
-    implicit def fromObject(z: => ZextObject): Condition = new Condition(z == noun, QueryPrecedence.Object)
-    def fromSecondObject(z: => ZextObject): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
+    implicit def fromObject(z: => Relatable): Condition = new Condition(z == noun, QueryPrecedence.Object)
+    def fromSecondObject(z: => Relatable): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     implicit def fromObjectArray(az: => Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     implicit def fromProperty(p: => Property): Condition = new Condition(noun.properties.contains(p), QueryPrecedence.Property)
     implicit def fromLocation(r: => Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
@@ -544,7 +548,7 @@ object Condition {
     implicit def fromConditionHelper(helper: => ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
     implicit def fromQuery(query: => RelationQuery[?,?]) : Condition = new Condition(query.evaluate(), query.relation.precedence)
 
-    type ConditionTypes = ZextObject | ZextObjectProxy[?] | ConditionHelper | Property
+    type ConditionTypes = Relatable | RelatableProxy[?] | ConditionHelper
 
     implicit def fromTuple(t: => (ConditionTypes, ConditionTypes)): Condition = {
 
@@ -552,7 +556,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case zextObjectProxy: ZextObjectProxy[?] => fromObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
+            case relatableProxy: RelatableProxy[?] => fromObject(relatableProxy.resolve.asInstanceOf[Relatable])
             case zextObject: ZextObject => fromObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
             case property: Property => fromProperty(property)
@@ -562,7 +566,7 @@ object Condition {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case zextObjectProxy: ZextObjectProxy[?] => fromSecondObject(zextObjectProxy.resolve.asInstanceOf[ZextObject])
+            case relatableProxy: RelatableProxy[?] => fromSecondObject(relatableProxy.resolve.asInstanceOf[Relatable])
             case zextObject: ZextObject => fromSecondObject(zextObject)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
             case property: Property => fromProperty(property)
@@ -695,36 +699,35 @@ trait Context[T] {
     def GetActionContext(): T = _ctx
     def SetActionContext(context: T): Unit = _ctx = context
     def apply(context : T) = ActionWithContext(this, context)
+}
 
+
+object loud extends Property
+
+object executing extends Action(1) with Context[Action]{
+
+
+    before(executing){
+        Say("Quiet, the baby is sleeping.")
+    }
 
 }
 
 
-class MetaAction[NounType <: Relatable] extends Rule
+class MetaAction[NounType <: Relatable : TT as _tt] extends Rule with Relatable {
+    val nounTypeTest = _tt
+
+    def implicitTargetSelector: SetComprehension[NounType] = null
+    def implicitSubjectSelector: SetComprehension[NounType] = null
+    var disambiguationHint: ParsableType => Boolean = null
+    ruleSets(this) = new ActionRuleSet
+    allMetaActions.addOne(this)
+
+}
 
 class Action(val targets : Int, val verbs : String*) extends MetaAction[ZextObject] with ParsableType(PartOfSpeech.verb) {
-
     allActions.addOne(this)
-
-    def implicitTargetSelector : SetComprehension[ZextObject] = null
-    def implicitSubjectSelector : SetComprehension[ZextObject] = null
-    var disambiguationHint : ParsableType => Boolean = null
-
-    ruleSets(this) = new ActionRuleSet
     override def toString = verbs(0)
-
-    /*
-    def execute(subject: ZextObject = null, target: ZextObject = null, target2: ZextObject = null, silent: Boolean = false, location: ZContainer = null) : Boolean = {
-        val targets = ConsolidateTargets(target, target2)
-        val currentLocation = if (location == null) GetCurrentRuleContext().location else location
-        val currentSubject = if (subject == null) GetCurrentRuleContext().subject else subject
-        assert(currentSubject != null, "you must specify a subject if there isn't a current rule context")
-        assert(currentLocation != null, "you need to specify a location if there isn't a current rule context")
-        RuleContext(currentSubject, targets, silent, currentLocation)
-        ExecuteAction(this, RuleContext(currentSubject, targets, silent, currentLocation))
-    }
-    */
-
 }
 
 
