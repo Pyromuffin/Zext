@@ -227,7 +227,29 @@ object determiningRelation extends Action(1) with Context[Relation[?, ?]] {
 }
 
 
+object addingRelated extends Action(-1) with Context[Relation[?,?]] {
+
+  inflict(addingRelated){
+    val r = GetActionContext()
+    val relatables = GetNouns()
+    subject.addRelatedInner(r, relatables)
+  }
+
+}
+
+object removingRelated extends Action(-1) with Context[Relation[?, ?]] {
+
+  inflict(removingRelated) {
+    val r = GetActionContext()
+    val relatables = GetNouns()
+    subject.innerRemove(r, relatables)
+  }
+
+}
+
+
 trait Relatable {
+
   this : ZextObject =>
 
   extension(h : mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]) {
@@ -250,7 +272,7 @@ trait Relatable {
     }
   }
 
-  private def innerRemove(r: Relation[?, ?], relatables: Relatable*): Unit = {
+  private[Zext] def innerRemove(r: Relation[?, ?], relatables: Array[ZextObject]): Unit = {
     r match {
       case oneToMany: OneToMany =>
         for (child <- relatables) {
@@ -301,26 +323,21 @@ trait Relatable {
 
     r match {
       // please dont call this with a conditional relation
+      case conditional: ConditionalRelation[?,?] => ???
       case reciprocal: ReciprocalRelation[?,?] =>
         for(relatable <- relatables){
-          relatable.innerRemove(reciprocal.getReciprocal, this)
+          val subject = relatable.asInstanceOf[ZextObject]
+          ExecuteContextAction(removingRelated(r), RuleContext(subject, Array(this), false, subject.location))
         }
       case _ =>
     }
 
-    innerRemove(r, relatables*)
+    ExecuteContextAction(removingRelated(r), RuleContext(this, relatables.map(_.asInstanceOf[ZextObject]).toArray, false, this.location))
   }
 
 
+  private[Zext] def addRelatedInner(r: Relation[?, ?], relatables: Seq[Relatable]) : Unit = {
 
-  def addRelated(r: Relation[?, ?], _relatables: Relatable*) = {
-
-    // filter out already related
-    val currentlyRelated = getRelatedSetFromDictionaries(r).asInstanceOf[Set[Relatable]]
-    val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
-
-
-    if (relatables.nonEmpty)
     r match {
       // containment, we have to unparent the children and make it this
       // we also need to unchild the previous parent
@@ -328,11 +345,11 @@ trait Relatable {
         children.nodes.defaulted(oneToMany).addAll(relatables)
         for (child <- relatables) {
           val childsPreviousParent = child.parent.nodes.get(oneToMany)
-          childsPreviousParent.does( _.children.nodes(oneToMany).remove(child))
+          childsPreviousParent.does(_.children.nodes(oneToMany).remove(child))
           child.parent.nodes(oneToMany) = this
         }
 
-        // anything goes.
+      // anything goes.
       case manyToMany: ManyToMany =>
         children.nodes.defaulted(manyToMany).addAll(relatables)
         for (child <- relatables) {
@@ -346,7 +363,7 @@ trait Relatable {
         }
 
 
-        //  maybe like wearing a hat? Can't wear more than one hat.
+      //  maybe like wearing a hat? Can't wear more than one hat.
       case oneToOne: OneToOne =>
         // we have to do 6 things.
         require(relatables.length == 1)
@@ -360,7 +377,7 @@ trait Relatable {
         child.nodes(oneToOne) = nextChild
 
         // 3) remove next child's previous parent's children
-        for(childsPreviousParent <- nextChild.parent.nodes.get(oneToOne)) {
+        for (childsPreviousParent <- nextChild.parent.nodes.get(oneToOne)) {
           childsPreviousParent.child.nodes.remove(oneToOne)
         }
 
@@ -369,13 +386,13 @@ trait Relatable {
 
 
 
-        // composition, many things can compose only one object
-        // on change we nead to clear out current children to make sure we don't compose more than one object
+      // composition, many things can compose only one object
+      // on change we nead to clear out current children to make sure we don't compose more than one object
       case manyToOne: ManyToOne =>
         require(relatables.length == 1)
         val nextChild = relatables.head
         // go to the previous child and unparent this from it
-        for(previousChild <- child.nodes.get(manyToOne)){
+        for (previousChild <- child.nodes.get(manyToOne)) {
           previousChild.parents.nodes(manyToOne).remove(this)
         }
 
@@ -385,7 +402,7 @@ trait Relatable {
         nextChild.parents.nodes.defaulted(manyToOne).add(this)
 
 
-        // almost the same as one to one
+      // almost the same as one to one
       case symmetric: SingleSymmetric =>
         require(relatables.length == 1)
         val newPartner = relatables.head
@@ -393,12 +410,12 @@ trait Relatable {
         // 3) add new partner and 4) new partner's partner
         // 5) remove new partner's old partner's partner
         // 6) remove new partner's old partner
-        for(oldPartner <- partner.nodes.get(symmetric)){
+        for (oldPartner <- partner.nodes.get(symmetric)) {
           oldPartner.partner.nodes.remove(symmetric) // 1
         }
         partner.nodes(symmetric) = newPartner // 2 and 3
 
-        for(newPartnersOldPartner <- newPartner.partner.nodes.get(symmetric)) {
+        for (newPartnersOldPartner <- newPartner.partner.nodes.get(symmetric)) {
           newPartnersOldPartner.partner.nodes.remove(symmetric) // 5
         }
         newPartner.partner.nodes(symmetric) = this // 6 and 4
@@ -413,9 +430,21 @@ trait Relatable {
           .sortBy(_.size)
           .foldLeft(mutable.HashSet[Relatable]())(_ addAll _)
 
-        for(node <- nodes){
+        for (node <- nodes) {
           node.groups.nodes(equivalent) = set
         }
+    }
+  }
+
+
+  def addRelated(r: Relation[?, ?], _relatables: Relatable*) = {
+
+    // filter out already related
+    val currentlyRelated = getRelatedSetFromDictionaries(r).asInstanceOf[Set[Relatable]]
+    val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
+
+    if (relatables.nonEmpty) {
+      ExecuteContextAction(addingRelated(r), RuleContext(this, relatables.map(_.asInstanceOf[ZextObject]).toArray, false, this.location ))
     }
 
     this

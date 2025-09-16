@@ -392,6 +392,15 @@ object Rule {
         ExecutionResult(result, ctxValue)
     }
 
+    def ExecuteContextAction[T](rule: ActionWithContext[T], context: RuleContext): ExecutionResult[T] = {
+        val previous = rule.action.GetActionContext()
+        rule.action.SetActionContext(rule.context)
+        val result = ExecuteAction(rule.action.asInstanceOf[Action], context)
+        val ctxValue = rule.action.GetActionContext()
+        rule.action.SetActionContext(previous)
+        ExecutionResult(result, ctxValue)
+    }
+
 
     def ExecuteAction(rule: Action, context: RuleContext): Boolean = {
 
@@ -690,7 +699,10 @@ trait Context[T] {
 
 }
 
-class Action(val targets : Int, val verbs : String*) extends Rule with ParsableType(PartOfSpeech.verb) {
+
+class MetaAction[NounType <: Relatable] extends Rule
+
+class Action(val targets : Int, val verbs : String*) extends MetaAction[ZextObject] with ParsableType(PartOfSpeech.verb) {
 
     allActions.addOne(this)
 

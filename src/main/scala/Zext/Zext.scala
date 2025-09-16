@@ -26,7 +26,6 @@ import scala.reflect.TypeTest
 
 trait Property
 
-
 object fixed extends Property
 object scenery extends Property
 object wet extends Property

@@ -126,6 +126,8 @@ class StringExpression(lazyStr : => String) extends Serializable{
 
 
 
+//@todo ending punctuation is kind of messed up eg you chant "zebra!" -> you chant "zebra! "
+
 object Interpreter{
 
   def MakeTextNice(str : String): String = {
@@ -177,13 +179,13 @@ object Interpreter{
   }
 
   def WordPrompt(prompt: StringExpression) : String = {
-    Say(prompt)
-    print("> ")
+    print(prompt)
+    print(" > ")
     var input = readLine().strip().split(" ")
     while(input.length != 1) {
       Say("Enter a single word.")
-      Say(prompt)
-      print("> ")
+      print(prompt)
+      print(" > ")
       input = readLine().strip().split(" ")
     }
     input(0)
@@ -267,6 +269,20 @@ object ControlCodes {
     ansiEscapeRegex.replaceAllIn(s, "")
   }
 
+  def Bold(s : String) = s.control(TextControl.bold, unboldCode)
+  def Italic(s : String) = s.control(TextControl.italic, unitalicCode)
+  def Underline(s : String) = s.control(TextControl.underline, ununderlineCode)
+  def Black(s : String) = s.controlColor(TextControl.black)
+  def Red(s : String) = s.controlColor(TextControl.red)
+  def Green(s : String) = s.controlColor(TextControl.green)
+  def Yellow(s : String) = s.controlColor(TextControl.yellow)
+  def Blue(s : String) = s.controlColor(TextControl.blue)
+  def Purple(s : String) = s.controlColor(TextControl.purple)
+  def Cyan(s : String) = s.controlColor(TextControl.cyan)
+  def Grey(s : String) = s.controlColor(TextControl.grey)
+  def Orange(s : String) = s.controlColor(TextControl.orange)
+
+
   extension(s : String) {
     private def control(code : TextControl, uncontrol : String) : String = {
         codes(code.ordinal) + s + normalCode
@@ -285,7 +301,7 @@ object ControlCodes {
     def yellow = s.controlColor(TextControl.yellow)
     def blue = s.controlColor(TextControl.blue)
     def purple = s.controlColor(TextControl.purple)
-    def teal = s.controlColor(TextControl.cyan)
+    def cyan = s.controlColor(TextControl.cyan)
     def grey = s.controlColor(TextControl.grey)
     def orange = s.controlColor(TextControl.orange)
 

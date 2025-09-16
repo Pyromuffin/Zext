@@ -23,6 +23,7 @@ object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
   val allActions = ArrayBuffer[Action]()
+  val allMetaActions = ArrayBuffer[MetaAction[?]]()
 
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
     val targets = ConsolidateTargets(zextObject1, zextObject2)

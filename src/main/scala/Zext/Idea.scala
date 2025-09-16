@@ -64,15 +64,14 @@ object Idea {
 
     before(ideating, first) {
       // make all innate ideas discoverable
-      val known = subject.relations(idea_knowing).filter(_.hasProp(innate))
+      val known = subject.relations(idea_knowing).filter(i => i.hasProp(innate))
       subject can_discover known
     }
 
 
     inflict(printing_name, player can_discover noun?) {
       val name = printing_name.GetActionContext()
-      printing_name.SetActionContext(name.orange)
-      replace
+      printing_name.SetActionContext(name.bold)
     }
 
 
@@ -92,7 +91,7 @@ object Idea {
 
 // obvious ideas appear in the idea list as soon as they are discoverable.
 // discoverable ideas can be added to the ideas list by thinking about them
-// ideas with the property built_in don't appear in the idea list.
+// ideas with the property unlisted don't appear in the idea list.
 class Idea(override val name : StringExpression) extends ZextObject {
   override val description = "the idea of " + name
   properties += proper
