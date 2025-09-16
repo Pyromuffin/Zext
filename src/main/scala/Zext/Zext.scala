@@ -97,13 +97,7 @@ object ZextObject{
     val allObjects = ArrayBuffer[ZextObject]()
     val globals = ArrayBuffer[ZextObject]() // always visible and accessible.
 
-    def GetAll[T <: Relatable : TT as tt] : Seq[T] = {
 
-        allObjects.filter { z =>
-           tt.unapply(z).isDefined
-        }.map(_.asInstanceOf[T]).toSeq
-
-    }
 
     implicit def toComprehension[X <: ZextObject](x : X) : SetComprehension[X] = {
         AllOf(x)
@@ -124,7 +118,7 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 
-object determiningAccessibility extends Action(1) with Context[Action]{
+object determiningAccessibility extends Action(1) with Context[Action] with SystemAction {
 
  inflict(determiningAccessibility) {
 
@@ -156,12 +150,12 @@ object determiningAccessibility extends Action(1) with Context[Action]{
      }
 
      // if not, fail
-     stop
+     fail
  }
 
 }
 
-object determiningVisibility extends Action(1) with Context[Action]{
+object determiningVisibility extends Action(1) with Context[Action] with SystemAction {
 
     // determining if noun is visible to subject
     inflict(determiningVisibility){
@@ -208,15 +202,15 @@ object determiningVisibility extends Action(1) with Context[Action]{
 
         // if noun is composite, check if the composite object is visible to subject
         if (noun.isType[Thing] && noun[Thing].isComposite) {
-            ruleReturn( subject.canSee(noun[Thing].compositeObject, GetActionContext()) )
+            ruleReturn( subject[Thing].canSee(noun[Thing].compositeObject, GetActionContext()) )
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to subject
         if (targetLocation != null && (targetLocation.open || targetLocation.transparent)) {
-            ruleReturn( subject.canSee(targetLocation, GetActionContext()) )
+            ruleReturn( subject[Thing].canSee(targetLocation, GetActionContext()) )
         }
 
-        stop
+        fail
     }
 
 }
@@ -298,7 +292,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         this
     }
 
-    override def location : ZContainer = nowhere
+    def location : ZContainer = nowhere
 
     def canSee(other: ZextObject, forAction : Action): Boolean = {
         ExecuteContextAction(determiningVisibility(forAction), subject = this, target = other).res
@@ -311,17 +305,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     override def toString: String = definite
 
-    def get[T](using TypeTest[Property, T]): Option[T] = {
-        // if a zextobject has more than one property of the same "type" then it will give ?? one
-        val properties = relations(property_having)
-        properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
-    }
-
-    def apply[T](using TypeTest[Property, T]): T = {
-        val maybe = this.get[T]
-        if (maybe.isDefined) maybe.get
-        else this.asInstanceOf[T]
-    }
 
 
 
@@ -454,7 +437,7 @@ object Device {
         val d = noun[Device]
         if (d.on) {
             Say(s"$noun is already on")
-            stop
+            fail
         }
 
         d.on = true
@@ -468,7 +451,7 @@ object Device {
         val d = noun[Device]
         if (d.off) {
             Say(s"$noun is already off")
-            stop
+            fail
         }
 
         d.on = false

@@ -59,7 +59,7 @@ object Actions {
   }
 
 
-  object preprocessingInput extends Action(0) with Context[String]{
+  object preprocessingInput extends Action(0) with Context[String] with SystemAction {
 
     inflict(preprocessingInput) {
       val text = GetActionContext()
@@ -68,7 +68,7 @@ object Actions {
 
   }
 
-  object postprocessingText extends Action(0) with Context[String] {
+  object postprocessingText extends Action(0) with Context[String] with SystemAction {
 
     inflict(postprocessingText) {
       val text = GetActionContext()
@@ -78,7 +78,7 @@ object Actions {
   }
 
   // for hooking, call SetActionContext with the final name
-  object printing_name extends Action(1) with Context[String]
+  object printing_name extends Action(1) with Context[String] with SystemAction
 
   object saying extends Action(0) with Context[String] {
     check(saying) {
@@ -86,15 +86,15 @@ object Actions {
         continue
 
       if(location != player.location)
-        stop
+        fail
 
       if (silent)
-        stop
+        fail
     }
 
     inflict(saying) {
       val text = GetActionContext()
-      if (text == "") stop // maybe an error
+      if (text == "") fail // maybe an error
 
       var postprocessed = ExecuteContextAction(postprocessingText(text)).ret
       if(subject == system){
@@ -177,21 +177,21 @@ object Actions {
       val connected = player.room.connections(d).isDefined
 
       // this is so dumb but maybe it will work?
-      val leaveCtx = RuleContext(subject, Array(player.location), false, player.location)
-      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then stop
-      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then stop
-      if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then stop
+      val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
+      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then fail
 
       if (!connected) {
         Say(s"You can't go $d")
-        stop
+        fail
       }
       val destination = player.room.connections(d).get
 
-      val enterCtx = RuleContext(subject, Array(destination), false,  player.location)
-      if !RunRule(enterCtx, ruleSets(entering).beforeRules) then stop
-      if !RunRule(enterCtx, ruleSets(entering).insteadRules) then stop
-      if !RunRule(enterCtx, ruleSets(entering).checkRules) then stop
+      val enterCtx = RuleContext(act, subject, Array(destination), false,  player.location)
+      if !RunRule(enterCtx, ruleSets(entering).beforeRules) then fail
+      if !RunRule(enterCtx, ruleSets(entering).insteadRules) then fail
+      if !RunRule(enterCtx, ruleSets(entering).checkRules) then fail
 
     }
 
@@ -206,22 +206,22 @@ object Actions {
       val d = noun[Direction]
       val room = player.room.connections(d).get
 
-      val leaveCtx = RuleContext(subject, Array(player.location), false, player.location)
+      val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
       RunRule(leaveCtx, ruleSets(leaving).reportRules)
       RunRule(leaveCtx, ruleSets(leaving).executeRules)
 
       blackboard = player.location
       player.Move(room)
 
-      val enterCtx = RuleContext(subject, Array(player.location), false, player.location)
+      val enterCtx = RuleContext(act, subject, Array(player.location), false, player.location)
       RunRule(enterCtx, ruleSets(entering).reportRules)
       RunRule(enterCtx, ruleSets(entering).executeRules)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(subject, Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(subject, Array(player.location), false, player.location), ruleSets(entering).afterRules)
+      RunRule(RuleContext(act, subject, Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
+      RunRule(RuleContext(act, subject, Array(player.location), false, player.location), ruleSets(entering).afterRules)
     }
 
   }
@@ -245,7 +245,7 @@ object Actions {
     check(dropping, of[Thing]) {
       if(noun != nothing && noun[Thing].location != player) {
         Say("Can't drop what you don't have.")
-        stop
+        fail
       }
     }
 
@@ -270,9 +270,9 @@ object Actions {
     }
 
     check(taking){
-      if !subject.canAccess(noun, taking) then
+      if !subject[Thing].canAccess(noun, taking) then
         Say(noun iz "inaccessible") // maybe say why?
-        stop
+        fail
     }
 
     instead(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
@@ -352,7 +352,7 @@ object Actions {
         Say(s + " " + be + " here.")
       }
 
-      stop
+      fail
     }
 
     after(examining, ofDebug[Container]("after examining container")) {
@@ -414,11 +414,11 @@ object Actions {
     check(closing, of[Container]){
       if !noun[Container].openable then
         Say(s"$noun can't be closed.")
-        stop
+        fail
 
       if !noun[Container].open then
         Say(s"$noun is already closed")
-        stop
+        fail
     }
 
     inflict(closing, of[Container]) {
@@ -437,11 +437,11 @@ object Actions {
 
       if !noun[Container].openable then
         Say(s"$noun can't be opened.")
-        stop
+        fail
 
       if noun[Container].open then
         Say(s"$noun is already open")
-        stop
+        fail
     }
 
     inflict(opening, of[Container]){
@@ -525,7 +525,7 @@ object Actions {
 
     before(putting, secondNoun holds noun?) {
       Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")
-      stop
+      fail
     }
 
     before(putting, !player holds noun?, !secondNoun holds noun?){
@@ -548,17 +548,17 @@ object Actions {
 
       if(noun == secondNoun){
         Say(s"Stepping into the fourth dimension, you put $noun into itself.")
-        stop
+        fail
       }
 
       if (!secondNoun[Container].open) {
         Say(s"Grandpa's ghost isn't around at the moment, so you'll have to open $secondNoun before you put $noun inside it.")
-        stop
+        fail
       }
 
-      if(!subject.canAccess(secondNoun, putting)) {
+      if(!subject[Thing].canAccess(secondNoun, putting)) {
         Say(s"$secondNoun is inaccessible")
-        stop
+        fail
       }
     }
 

@@ -702,12 +702,12 @@ object Parser {
                 c.action match
                   case action: CustomAction =>
                     val customCommand = action.intercept(input, result.get)
-                    ExecuteAction(customCommand.action, RuleContext(player, customCommand.nouns, false, player.location))
+                    ExecuteAction(RuleContext(customCommand.action, player, customCommand.nouns, false, player.location))
                   case action: Action =>
-                    ExecuteAction(c.action, RuleContext(player, c.nouns, false, player.location))
+                    ExecuteAction(RuleContext(c.action, player, c.nouns, false, player.location))
               }
               RunApplyingRules(c)
-              ExecuteAction(being, RuleContext(player, Array(player.location), false, player.location))
+              ExecuteAction(RuleContext(being, player, Array(player.location), false, player.location))
               break()
             }
           }
@@ -757,9 +757,9 @@ object Parser {
               c.action match
                 case action: CustomAction =>
                   val customCommand = action.intercept(input, result.get)
-                  ExecuteAction(customCommand.action, RuleContext(player, customCommand.nouns, false, player.location))
+                  ExecuteAction(RuleContext(customCommand.action, player, customCommand.nouns, false, player.location))
                 case action : Action =>
-                  ExecuteAction(c.action, RuleContext(player, c.nouns, false, player.location))
+                  ExecuteAction(RuleContext(c.action, player, c.nouns, false, player.location))
               }
               RunApplyingRules(c)
               ExecuteAction(being, subject = player, target = player.location, location = player.location)

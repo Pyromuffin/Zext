@@ -57,8 +57,6 @@ class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int,
   }
 }
 
-
-
 class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ConditionHelper {
 
   var not = false

@@ -175,7 +175,7 @@ object drying extends Action(1, "dry") {
   applying(drying, of[wet]) {
     if (noun[wet].wetness > 0 && scala.util.Random.nextInt(4) == 0){
       continue
-    } else stop
+    } else fail
   }
 
   inflict(drying, of[wet]) {
@@ -309,8 +309,28 @@ object BigTop extends Room {
 
 }
 
+// figure out conditional propertys/ Something like loud -> Loudness > 5
+case class Loudness(amount : Int) extends Property
+object loud extends Property
+
+object clapping extends Action(0, "clap") {
+  this is Loudness(2)
+  waiting is Loudness(5)
+
+  inflict(clapping) {
+    Say("You clap!")
+  }
+
+  after(act is loud?) {
+    Say("That was loud!")
+  }
+
+
+}
+
 
 object screaming extends CustomAction(-1, "scream") {
+
 
   var screamingMode = false
 
@@ -339,7 +359,7 @@ object screaming extends CustomAction(-1, "scream") {
     val verb = parseResult.nouns(0)(0).asInstanceOf[Action]
     val target = Disambiguate(parseResult.nouns(1)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
     screamingMode = true
-    ExecuteAction(verb, target = target)
+    ExecuteAction(verb, subject = player, target = target)
     screamingMode = false
     Command(screaming, Array())
   }
@@ -365,7 +385,7 @@ object CrowsNest extends Room {
   }
 
   inflict(determiningVisibility, trapeze, Circus.here){
-    replace
+    succeed
   }
 
 

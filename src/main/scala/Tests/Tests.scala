@@ -20,7 +20,7 @@ object drying extends Action(1, "dry") {
   check(drying, of[wet]) {
     if(noun[wet].wetness == 0){
       Say(s"$noun is bone dry")
-      stop
+      fail
     }
   }
 
@@ -72,6 +72,31 @@ object SecondRoom extends Room {
 
   this southward TestRoom
 }
+
+object loud extends Property
+
+object clapping extends Action(0, "clap") {
+  this is loud
+
+  report(clapping) {
+    Say("You clap.")
+  }
+
+  after(act is loud?) {
+    Say("That was loud!")
+  }
+}
+
+
+object shouting extends Action(0, "shout") {
+  this is loud
+
+  report(shouting) Say "You yell something indistinguishable."
+
+}
+
+
+
 
 object nicknaming extends CustomAction(2, "nickname") {
 
@@ -197,6 +222,8 @@ object Tests extends App {
   if !Parser.RunTest("more thoughts inventory", Array("thoughts"), Array("The following ideas are known to you: guns, kitties, secrets, and violence.")) then failureCount += 1
   if !Parser.RunTest("think of unlisted", Array("think of unlisted"), Array("A new thought about unlisted occurs to you!", "Thinking of unlisted reveals: Hard to think about this.")) then failureCount += 1
   if !Parser.RunTest("no unlisted in inventory", Array("thoughts"), Array("The following ideas are known to you: guns, kitties, secrets, and violence.")) then failureCount += 1
+  if !Parser.RunTest("loud clapping", Array("clap"), Array("You clap.", "That was loud!")) then failureCount += 1
+  if !Parser.RunTest("loud shouting", Array("shout"), Array("You yell something indistinguishable.", "That was loud!")) then failureCount += 1
 
 
   println("=================================")

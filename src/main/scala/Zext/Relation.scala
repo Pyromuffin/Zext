@@ -198,6 +198,14 @@ object Relatable {
 
   val allRelatables : ArrayBuffer[Relatable] = ArrayBuffer[Relatable]()
 
+  def GetAll[T <: Relatable : TT as tt]: Seq[T] = {
+
+    allRelatables.filter { z =>
+      tt.unapply(z).isDefined
+    }.map(_.asInstanceOf[T]).toSeq
+
+  }
+
   extension (queryBlock: => Relatable) {
     def ? : RelationQuery[?,?] = {
       NotAQuery.stack.push(ArrayBuffer())
@@ -219,17 +227,18 @@ object Relatable {
   }
 }
 
-object determiningRelation extends Action(1) with Context[Relation[?, ?]] {
+object determiningRelation extends Action(1) with Context[Relation[?, ?]] with SystemAction {
 
   inflict(determiningRelation) {
     val relation = GetActionContext()
     val related = subject.getRelatedSetFromDictionaries(relation).asInstanceOf[Set[Relatable]]
     ruleReturn(related.contains(arg1))
   }
+
 }
 
 
-object addingRelated extends Action(-1) with Context[Relation[?,?]] {
+object addingRelated extends Action(-1) with Context[Relation[?,?]] with SystemAction {
 
   inflict(addingRelated){
     val r = GetActionContext()
@@ -239,7 +248,7 @@ object addingRelated extends Action(-1) with Context[Relation[?,?]] {
 
 }
 
-object removingRelated extends Action(-1) with Context[Relation[?, ?]] {
+object removingRelated extends Action(-1) with Context[Relation[?, ?]] with SystemAction {
 
   inflict(removingRelated) {
     val r = GetActionContext()
@@ -255,7 +264,20 @@ trait Relatable {
   allRelatables.addOne(this)
   val objectID = allRelatables.length
 
-  def location : ZContainer = nowhere
+  override def toString = this.getClass.toString
+
+  def get[T](using TypeTest[Property, T]): Option[T] = {
+    // if a zextobject has more than one property of the same "type" then it will give ?? one
+    val properties = relations(property_having)
+    properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
+  }
+
+  def apply[T](using TypeTest[Property, T]): T = {
+    val maybe = this.get[T]
+    if (maybe.isDefined) maybe.get
+    else this.asInstanceOf[T]
+  }
+
 
   override def equals(obj: Any) = {
     obj match {
@@ -339,12 +361,17 @@ trait Relatable {
       case reciprocal: ReciprocalRelation[?,?] =>
         for(relatable <- relatables){
           val subject = relatable.asInstanceOf[ZextObject]
-          ExecuteContextAction(removingRelated(r), RuleContext(subject, Array(this), false, subject.location))
+          ExecuteContextAction(removingRelated(r), RuleContext(removingRelated, subject, Array(this), false, subject.location))
         }
       case _ =>
     }
 
-    ExecuteContextAction(removingRelated(r), RuleContext(this, relatables, false, this.location))
+    val location = this match {
+      case zextObject: ZextObject => zextObject.location
+      case _ => nowhere
+    }
+
+    ExecuteContextAction(removingRelated(r), RuleContext(removingRelated, this, relatables, false, location))
   }
 
   private[Zext] def addRelatedInner(r: Relation[?, ?], relatables: Seq[Relatable]) : Unit = {
@@ -454,7 +481,13 @@ trait Relatable {
     val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
 
     if (relatables.nonEmpty) {
-      ExecuteContextAction(addingRelated(r), RuleContext(this, relatables, false, this.location ))
+
+      val location = this match {
+        case zextObject: ZextObject => zextObject.location
+        case _ => nowhere
+      }
+
+      ExecuteContextAction(addingRelated(r), RuleContext(addingRelated, this, relatables, false, location ))
     }
 
     this
@@ -477,8 +510,8 @@ trait Relatable {
     if(!relation.isConditional) {
       this.getRelatedSetFromDictionaries(relation)
     } else {
-      val candidates = ZextObject.GetAll[B](using relation.ttTarget)
-      candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this.asInstanceOf[ZextObject], c.asInstanceOf[ZextObject]).res).toSet
+      val candidates = Relatable.GetAll[B](using relation.ttTarget)
+      candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this, c).res).toSet
     }
   }
 
@@ -518,6 +551,8 @@ trait Relatable {
 
 object Relation {
 
+  val relations = ArrayBuffer[Relation[?,?]]()
+
   trait AllValence {
     this: Relation[?,?] =>
   }
@@ -543,8 +578,6 @@ object Relation {
     this: Relation[?,?] =>
   }
 
-
-
   object RelationQuery {
     implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
   }
@@ -568,7 +601,6 @@ object Relation {
               relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
           }
         }
-
       } else if (firstAny && secondAll) {
         a_set.exists { first =>
           b_set.forall { second =>
@@ -594,8 +626,6 @@ object Relation {
     }
 
   }
-
-  val relations = ArrayBuffer[Relation[?,?]]()
 }
 
 implicit object NotAQuery extends RelationQueryContext {
@@ -741,8 +771,8 @@ abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] ext
   def condition(source: S, target: T): Boolean
 
   inflict(determiningRelation(this)) {
-    if (condition(subject[S](using this.ttSource), noun[T](using this.ttTarget))) replace
-    stop
+    if (condition(subject[S](using this.ttSource), noun[T](using this.ttTarget))) succeed
+    fail
   }
 
 }
@@ -768,16 +798,17 @@ object RelationsTest extends App {
       println("he got arms")
     }
 
-    if( (statue made_from legs?) && (!feet makes statue?) ){
+    /*
+    if( (statue made_from legs?) && !(feet makes statue?) ){
       println("and legs, but no feet")
     }
 
     feet makes statue
 
-    if ((statue made_from legs?) && (!feet makes statue?)) {
+    if ((statue made_from legs?) && !(feet makes statue?)) {
       println("and legs, but no feet")
     }
-
+  */
 
     val box = Box("may conceal something hidden")
 

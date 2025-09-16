@@ -53,7 +53,7 @@ object SetComprehension {
 
   case class FilterComprehension[T <: Relatable : TT](filter: T => Boolean) extends SetComprehension[T]{
     def getSet(): Seq[T] = {
-      ZextObject.GetAll[T].filter(filter)
+      Relatable.GetAll[T].filter(filter)
     }
   }
 

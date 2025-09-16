@@ -32,18 +32,18 @@ object Idea {
   // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
   inflict(determiningVisibility, subject knows noun?) {
-    replace
+    succeed
   }
 
   inflict(determiningRelation(idea_knowing), innate) {
-    replace
+    succeed
   }
 
   object thinking extends Action(1, "think", "think of", "imagine", "think about") {
 
     // allow discoverable ideas to be thought of, but are otherwise not interactable.
     inflict(determiningVisibility(thinking), subject can_discover noun?) {
-      replace
+      succeed
     }
 
     before(thinking, subject can_discover noun? ) {
