@@ -14,6 +14,7 @@ import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
 import Zext.Idea.allIdeas
+import Zext.Relation.{ManyToMany, OneToMany}
 import Zext.Relations.*
 import Zext.RuleControl.*
 import Zext.SetComprehension.AllOf
@@ -220,6 +221,13 @@ object determiningVisibility extends Action(1) with Context[Action]{
 
 }
 
+
+implicit object property_having extends Relation[Relatable, Property] with ManyToMany {
+    extension [X <: Source](subject: X)
+        infix def is[Y <: Target](target: Y*): X = relates(subject, target)
+}
+
+
 @SerialVersionUID(100L)
 abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable with Relatable {
 
@@ -231,28 +239,14 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     val name: StringExpression
     val aliases = ArrayBuffer[StringExpression]()
     val description: StringExpression
-    var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
+    //var properties: ArrayBuffer[Property] = ArrayBuffer[Property]()
     var pluralized : Option[Boolean] = None
     var autoexplode = true
     var mass = false
 
-    infix def hasProp(p : Property) : Boolean = {
-        properties.contains(p)
-    }
-
     def GetName() : String = {
         ExecuteContextAction(printing_name(name.toString), subject = system, target = this).ret
     }
-
-    /*
-    override def equals(obj: Any) = {
-        obj match {
-            case zextObjectProxy: ZextObjectProxy[?] => objectID == zextObjectProxy.resolve.objectID
-            case zextObject: ZextObject => objectID == zextObject.objectID
-            case null => false
-        }
-    }
-    */
 
      def indefiniteArticle: String = {
         val firstLetter = GetName()(0).toLower
@@ -265,14 +259,14 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     def definite: String = {
-        if (properties.contains(proper))
+        if (this is proper?)
             return GetName()
 
         definiteArticle + " " + GetName()
     }
 
     def indefinite: String = {
-        if (properties.contains(proper))
+        if (this is proper?)
             return GetName()
 
         indefiniteArticle + " " + GetName()
@@ -291,19 +285,12 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
         toString + " " + be + " " + rhs
     }
 
-    infix def is(prop: Property): this.type = {
-        properties += prop
-        this
-    }
-
     infix def and(prop: Property): this.type = {
-        properties += prop
-        this
+        this is prop
     }
 
     infix def are(prop: Property): this.type = {
-        properties += prop
-        this
+        this is prop
     }
 
     infix def aka(s: String): this.type = {
@@ -326,6 +313,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     def get[T](using TypeTest[Property, T]): Option[T] = {
         // if a zextobject has more than one property of the same "type" then it will give ?? one
+        val properties = relations(property_having)
         properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
     }
 

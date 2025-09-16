@@ -26,12 +26,12 @@ object Actions {
   val allMetaActions = ArrayBuffer[MetaAction[?]]()
 
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
-    val targets = ConsolidateTargets(zextObject1, zextObject2)
+    val targets = ConsolidateTargets(zextObject1, zextObject2).map(_.asInstanceOf[ZextObject]) //@todo hack
     commandAliases.addOne(str -> Command(action, targets))
   }
 
   def UnderstandAlias(strs: Seq[String], action: Action, zextObject1: ZextObject, zextObject2: ZextObject) : Unit = {
-    val targets = ConsolidateTargets(zextObject1, zextObject2)
+    val targets = ConsolidateTargets(zextObject1, zextObject2).map(_.asInstanceOf[ZextObject])  //@todo hack
     commandAliases.addAll(strs.map( _ -> Command(action, targets)))
   }
 
@@ -327,7 +327,7 @@ object Actions {
 
     after(examining, ofDebug[Room]("after room examining")) {
       val r = noun[Room]
-      var nonscenery = r.contents.filterNot(_.properties.contains(scenery)).filterNot( _.isType[Person]).toSeq
+      var nonscenery = r.contents.filterNot(_ is scenery?).filterNot( _.isType[Person]).toSeq
       val people = r.contents.filter(_.isType[Person]).toSeq
 
       val roomDescribed = nonscenery.filter{ z =>

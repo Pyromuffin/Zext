@@ -7,7 +7,7 @@ import Zext.exports.*
 
 abstract class Person(using Container) extends ZextObject with Container {
 
-  properties += proper
+  this is proper
 
   // uhh should people be containers?
   automaticallyListContents = false

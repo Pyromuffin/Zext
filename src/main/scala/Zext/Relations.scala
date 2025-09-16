@@ -78,8 +78,7 @@ object Relations {
   case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends Idea(name) {
     Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
-    properties += innate
-    properties += unlisted
+    this is (innate, unlisted)
   }
 
 

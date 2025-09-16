@@ -424,7 +424,7 @@ object MazeEntrance extends Room {
       val y = i / 10
       override val name: StringExpression = s"Maze Room ($x,$y)"
       override val description: StringExpression = "A nondescript room in the maze."
-      this.properties.addOne(ListExits())
+      this is ListExits()
     }
   }
 

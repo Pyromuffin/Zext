@@ -3,7 +3,7 @@ package Zext
 import Zext.Actions.printing_name
 import Zext.Idea.allIdeas
 import Zext.Interpreter.Say
-import Zext.Relation.OneToMany
+import Zext.Relation.{ManyToMany, OneToMany}
 import Zext.Rule.{ExecuteAction, before, inflict, instead, report}
 import Zext.ControlCodes.*
 
@@ -12,17 +12,15 @@ import scala.language.postfixOps
 import Zext.Condition.*
 import Zext.RuleContext.first
 
-implicit object idea_knowing extends Relation[Thing, Idea] with OneToMany {
+implicit object idea_knowing extends Relation[Thing, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def knows[Y <: Target](target: Y*): X = relates(subject, target)
 }
 
-implicit object idea_discovering extends Relation[Thing, Idea] with OneToMany {
+implicit object idea_discovering extends Relation[Thing, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def can_discover[Y <: Target](target: Y*): X = relates(subject, target)
 }
-
-
 
 
 object Idea {
@@ -64,7 +62,7 @@ object Idea {
 
     before(ideating, first) {
       // make all innate ideas discoverable
-      val known = subject.relations(idea_knowing).filter(i => i.hasProp(innate))
+      val known = subject.relations(idea_knowing).filter(_ is innate?)
       subject can_discover known
     }
 
@@ -77,7 +75,7 @@ object Idea {
 
     report(ideating) {
       val knownIdeas = subject.relations(idea_knowing)
-      val obviousIdeas = subject.relations(idea_discovering).filter(_.hasProp(obvious))
+      val obviousIdeas = subject.relations(idea_discovering).filter(_ is obvious?)
       val ideas = knownIdeas.concat(obviousIdeas)
       val ideasList = ListNamesNicely(ideas.toSeq)
       if(ideasList.isEmpty){
@@ -94,7 +92,7 @@ object Idea {
 // ideas with the property unlisted don't appear in the idea list.
 class Idea(override val name : StringExpression) extends ZextObject {
   override val description = "the idea of " + name
-  properties += proper
+  this is proper
   allIdeas.addOne(this)
 }
 

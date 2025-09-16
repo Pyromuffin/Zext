@@ -224,7 +224,7 @@ object determiningRelation extends Action(1) with Context[Relation[?, ?]] {
   inflict(determiningRelation) {
     val relation = GetActionContext()
     val related = subject.getRelatedSetFromDictionaries(relation).asInstanceOf[Set[Relatable]]
-    ruleReturn(related.contains(noun))
+    ruleReturn(related.contains(arg1))
   }
 }
 
@@ -344,7 +344,7 @@ trait Relatable {
       case _ =>
     }
 
-    ExecuteContextAction(removingRelated(r), RuleContext(this, relatables.map(_.asInstanceOf[ZextObject]).toArray, false, this.location))
+    ExecuteContextAction(removingRelated(r), RuleContext(this, relatables, false, this.location))
   }
 
   private[Zext] def addRelatedInner(r: Relation[?, ?], relatables: Seq[Relatable]) : Unit = {
@@ -454,7 +454,7 @@ trait Relatable {
     val relatables = _relatables.filterNot(a => currentlyRelated.contains(a))
 
     if (relatables.nonEmpty) {
-      ExecuteContextAction(addingRelated(r), RuleContext(this, relatables.map(_.asInstanceOf[ZextObject]).toArray, false, this.location ))
+      ExecuteContextAction(addingRelated(r), RuleContext(this, relatables, false, this.location ))
     }
 
     this
@@ -565,27 +565,27 @@ object Relation {
       val success = if(firstAll && secondAll) {
          a_set.forall { first =>
           b_set.forall { second =>
-              relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
+              relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
           }
         }
 
       } else if (firstAny && secondAll) {
         a_set.exists { first =>
           b_set.forall { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
           }
         }
 
       } else if (firstAny && secondAny) {
         a_set.exists { first =>
           b_set.exists { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
           }
         }
       } else if (firstAll && secondAny) {
         a_set.forall { first =>
           b_set.exists { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[ZextObject], target = second.asInstanceOf[ZextObject]).res
+            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
           }
         }
       } else false

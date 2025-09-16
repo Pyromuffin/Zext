@@ -86,7 +86,8 @@ class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : Str
   }
 
   def test(z: ZextObject): Boolean = {
-    z.properties.exists{ p =>
+    val properties = z.relations(property_having)
+    properties.exists{ p =>
       p match {
         case tt(p) => true
         case _ => false
@@ -104,13 +105,13 @@ object anything extends ZextObject {
 object nowhere extends Room {
   val name = "nowhere"
   val description = ""
-  properties += proper
+  this is proper
 }
 
 
 abstract class PlayerClass(startingLocation : ZContainer) extends Thing(using startingLocation) with Container {
 
-  properties += scenery
+  this is scenery
   automaticallyListContents = false
   open = false
   transparent = false
