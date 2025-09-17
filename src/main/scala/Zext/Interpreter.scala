@@ -705,6 +705,7 @@ object Parser {
                     ExecuteAction(RuleContext(customCommand.action, player, customCommand.nouns, false, player.location))
                   case action: Action =>
                     ExecuteAction(RuleContext(c.action, player, c.nouns, false, player.location))
+                    assert(NotAQuery.stack.isEmpty)
               }
               RunApplyingRules(c)
               ExecuteAction(RuleContext(being, player, Array(player.location), false, player.location))

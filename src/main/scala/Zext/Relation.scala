@@ -215,27 +215,26 @@ object Relatable {
       queries.head
     }
 
-
-    def question : Boolean = { //RelationQuery[?, ?] = {
-      NotAQuery.stack.push(ArrayBuffer())
-      queryBlock
-      val queries = NotAQuery.stack.pop()
-      assert(queries.length == 1)
-      queries.head
-      false
-    }
   }
 }
+
 
 object determiningRelation extends Action(1) with Context[Relation[?, ?]] with SystemAction {
 
   inflict(determiningRelation) {
     val relation = GetActionContext()
     val related = subject.getRelatedSetFromDictionaries(relation).asInstanceOf[Set[Relatable]]
-    ruleReturn(related.contains(arg1))
+    stop_unless(related.contains(arg1))
+  }
+
+
+  inflict(determiningRelation(property_having)) {
+    val result = ExecuteContextAction(determiningProperty(arg1.resolve.asInstanceOf[Property]) )
+    if(result.res) succeed
   }
 
 }
+
 
 
 object addingRelated extends Action(-1) with Context[Relation[?,?]] with SystemAction {
@@ -259,6 +258,9 @@ object removingRelated extends Action(-1) with Context[Relation[?, ?]] with Syst
 }
 
 
+
+
+
 trait Relatable {
 
   allRelatables.addOne(this)
@@ -266,16 +268,35 @@ trait Relatable {
 
   override def toString = this.getClass.toString
 
-  def get[T](using TypeTest[Property, T]): Option[T] = {
-    // if a zextobject has more than one property of the same "type" then it will give ?? one
-    val properties = relations(property_having)
-    properties.find(canBecome[Property, T]).map(_.asInstanceOf[T])
+
+  def getProperty[T : {TT as tt, CT}]: Option[T] = {
+    val storedProperties = getRelatedSetFromDictionaries(property_having)
+    var maybe = storedProperties.find(tt.test).map(_.asInstanceOf[T])
+    if(maybe.isEmpty) {
+      // get generated property
+      val generated = ExecuteContextAction(determiningProperty[T], InheritContext(action = determiningProperty, subject = this))
+      if(generated.res) maybe = Some(generated.ret.asInstanceOf[T])
+    }
+    maybe
   }
 
-  def apply[T](using TypeTest[Property, T]): T = {
-    val maybe = this.get[T]
+/*
+  def apply[T: {TT, CT}] : T = {
+    val maybe = this.getProperty[T]
     if (maybe.isDefined) maybe.get
     else this.asInstanceOf[T]
+  }
+  */
+
+
+  def apply[T: {TT, CT}] = {
+    this match {
+      case t: T => t
+      case _ =>
+        val maybe = this.getProperty[T]
+        if (maybe.isDefined) maybe.get
+        else throw new ClassCastException() // if we throw in the middle of a query then we never pop the query stack.
+    }
   }
 
 
@@ -357,7 +378,7 @@ trait Relatable {
 
     r match {
       // please dont call this with a conditional relation
-      case conditional: ConditionalRelation[?,?] => ???
+      //case conditional: ConditionalRelation[?,?] => ???
       case reciprocal: ReciprocalRelation[?,?] =>
         for(relatable <- relatables){
           val subject = relatable.asInstanceOf[ZextObject]
@@ -505,24 +526,20 @@ trait Relatable {
     }
   }
 
-  def getRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
-    // short circuit this for relations without rules.
-    if(!relation.isConditional) {
-      this.getRelatedSetFromDictionaries(relation)
-    } else {
-      val candidates = Relatable.GetAll[B](using relation.ttTarget)
-      candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this, c).res).toSet
-    }
+  // potentially costly, may iterate through all relatables.
+  def queryRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
+    val candidates = Relatable.GetAll[B](using relation.ttTarget)
+    candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this, c).res).toSet
   }
 
-  def relations[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
-    val set = getRelatedSet(relation)
+  def queryRelated[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
+    val set = queryRelatedSet(relation)
     assert(set.isEmpty || set.size == 1)
     set.headOption
   }
 
-  def relations[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T] & V)(using DummyImplicit) : Set[T] = {
-    getRelatedSet(relation)
+  def queryRelated[V <: OneToMany | ManyToMany | Equivalence | ManySymmetric, T <: Relatable](relation : Relation[?,T] & V)(using DummyImplicit) : Set[T] = {
+    queryRelatedSet(relation)
   }
 
   def listRelations(): Seq[Relation[?,?]] = {
@@ -633,35 +650,39 @@ implicit object NotAQuery extends RelationQueryContext {
 }
 
 
+abstract class ConditionalRelation[S <: Relatable, T <: Relatable] extends Relation[S,T] {
+  def condition(s : S, t : T) : Boolean
+
+  inflict(determiningRelation(this)) {
+    if condition(subject.resolve.asInstanceOf[S], arg1.resolve.asInstanceOf[T]) then succeed
+    fail
+  }
+
+}
+
 class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
   val ttSource = _ttS
   val ttTarget = _ttT
 
+
   def checkTypes(s : Relatable, t : Relatable) : Boolean = {
     ttSource.unapply(s).isDefined && ttTarget.unapply(t).isDefined
   }
 
-  def isConditional : Boolean = {
-    // a relation is conditional if there is a determiningRelation rule with this relation set as context.
-    val previous = determiningRelation.GetActionContext()
-    determiningRelation.SetActionContext(this)
 
-    val ruleSet = ruleSets(determiningRelation).GetAllRules()
-    for(rules <- ruleSet) {
-      for(rule <- rules.filterNot(_.disabled)){
-        for(condition <- rule.conditions.filter(_.queryType == Context)){
-          if(condition.evaluate) {
-            determiningRelation.SetActionContext(previous)
-            return true
-          }
-        }
-      }
-    }
+  /*
+  object gettingRelatedSet extends Action(1) with Context[mutable.HashSet[T]] with SystemAction
 
-    determiningRelation.SetActionContext(previous)
-    false
+  // lower priority to make sure that default inflict statements execute before this one.
+  inflict(gettingRelatedSet, Priority(-1)) {
+    val currentSet = gettingRelatedSet.GetActionContext()
+    currentSet.addAll(subject.getRelatedSetFromDictionaries(this))
   }
+
+  */
+
+
 
   val precedence = QueryPrecedence.Generic
 
@@ -763,23 +784,6 @@ abstract class ReciprocalRelation[S <: Relatable : TT, T <: Relatable : TT] exte
 }
 
 
-
-abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S, T] {
-
-  override def isConditional = true
-
-  def condition(source: S, target: T): Boolean
-
-  inflict(determiningRelation(this)) {
-    if (condition(subject[S](using this.ttSource), noun[T](using this.ttTarget))) succeed
-    fail
-  }
-
-}
-
-
-
-
 object RelationsTest extends App {
 
   object House extends Room {
@@ -832,7 +836,7 @@ object RelationsTest extends App {
 
 
 
-    println(statue.relations(Composition))
+    println(statue.queryRelated(Composition))
   }
 
   House

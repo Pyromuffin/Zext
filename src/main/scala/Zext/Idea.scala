@@ -62,7 +62,7 @@ object Idea {
 
     before(ideating, first) {
       // make all innate ideas discoverable
-      val known = subject.relations(idea_knowing).filter(_ is innate?)
+      val known = subject.queryRelated(idea_knowing).filter(_ is innate?)
       subject can_discover known
     }
 
@@ -74,8 +74,8 @@ object Idea {
 
 
     report(ideating) {
-      val knownIdeas = subject.relations(idea_knowing)
-      val obviousIdeas = subject.relations(idea_discovering).filter(_ is obvious?)
+      val knownIdeas = subject.queryRelated(idea_knowing)
+      val obviousIdeas = subject.queryRelated(idea_discovering).filter(_ is obvious?)
       val ideas = knownIdeas.concat(obviousIdeas)
       val ideasList = ListNamesNicely(ideas.toSeq)
       if(ideasList.isEmpty){

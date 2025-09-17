@@ -3,7 +3,6 @@ package Zext
 import scala.collection.mutable.ArrayBuffer
 import Zext.*
 import Zext.Actions.*
-import Zext.Condition.canBecome
 import Zext.Parser.BuildUnderstandables
 import Zext.Relations.Containment.holds
 import Zext.Rule.*
@@ -50,12 +49,12 @@ class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int,
   }
 
   def test(z : ZextObject) : Boolean = {
-    z match {
-      case tt(z) => true
-      case _ => false
-    }
+    tt.unapply(z).isDefined
   }
 }
+
+
+
 
 class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ConditionHelper {
 
@@ -84,14 +83,10 @@ class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : Str
   }
 
   def test(z: ZextObject): Boolean = {
-    val properties = z.relations(property_having)
-    properties.exists{ p =>
-      p match {
-        case tt(p) => true
-        case _ => false
-      }
-    }
+    val properties = z.queryRelated(property_having)
+    properties.exists(tt.unapply(_).isDefined)
   }
+
 }
 
 object anything extends ZextObject {

@@ -20,7 +20,7 @@ trait Container {
 
   given c: ZContainer = this
 
-  def contents: Seq[Thing] = relations(Containment).toSeq
+  def contents: Seq[Thing] = queryRelated(Containment).toSeq
   var preposition = "inside"
   var openable = true
   var open = true

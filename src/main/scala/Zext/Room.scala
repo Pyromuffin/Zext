@@ -55,7 +55,7 @@ class RoomRegion(val name : StringExpression = getClass.getName) extends ZextObj
 
   World.currentWorld.regions.append(this)
 
-  def rooms = relations(RoomRegioning)
+  def rooms = queryRelated(RoomRegioning)
   def here = Condition(rooms.contains(player.room), Location)
 
 }

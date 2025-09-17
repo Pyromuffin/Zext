@@ -208,7 +208,7 @@ object finding extends Action(1, "find") with DebugAction {
   def getConnectedDirection(start : Room, next : Room): Option[Direction] = {
 
     for (d <- Direction.directions) {
-      if( start.relations(d.relation).contains(next) ) {
+      if( start.queryRelated(d.relation).contains(next) ) {
         return Some(d)
       }
     }
@@ -253,7 +253,8 @@ object BigTop extends Room {
   val hat  = ~"a hat"
   val hat_hat  = ~"a hat hat"
 
-
+  val mr_super_duper_strong = ~"very strong"
+  val weginald = ~"a nice guy" is wet(100) is fixed
 
   val bucket = new Box {
     this is wet(3)
@@ -309,13 +310,17 @@ object BigTop extends Room {
 
 }
 
-// figure out conditional propertys/ Something like loud -> Loudness > 5
-case class Loudness(amount : Int) extends Property
+case class Loudness(volume : Int) extends Property
 object loud extends Property
 
 object clapping extends Action(0, "clap") {
   this is Loudness(2)
   waiting is Loudness(5)
+
+  inflict(determiningProperty(loud)) {
+    stop_return(subject[Loudness].volume > 3)
+  }
+
 
   inflict(clapping) {
     Say("You clap!")
@@ -418,14 +423,14 @@ object FairyFountain extends Room {
   this northward Dirt
 }
 
-case class ListExits() extends Property
+object listExits extends Property
 
 object MazeEntrance extends Room {
   override val name: StringExpression = "Maze Entrance"
   override val description: StringExpression = "A daunting door looms inside."
 
 
-  after(examining, of[ListExits]) {
+  after(examining, listExits) {
 
     for(dir <- Direction.directions) {
       for( connection <- noun[Room].connections(dir) )
@@ -444,7 +449,7 @@ object MazeEntrance extends Room {
       val y = i / 10
       override val name: StringExpression = s"Maze Room ($x,$y)"
       override val description: StringExpression = "A nondescript room in the maze."
-      this is ListExits()
+      this is listExits
     }
   }
 
@@ -485,6 +490,41 @@ object MazeEntrance extends Room {
   val maze_treasure = ~"the friends we made along the way" inside treasureRoom
 
   rooms(0) inward this
+}
+
+case class strength(power: Int) extends Property
+object nice extends Property
+
+object purporting extends Action(1, "purport") {
+
+  report(purporting) {
+    if(noun[strength].power > 1){
+      println("big")
+    }
+    val properties = noun.queryRelated(property_having)
+    Say(s"the properties of $noun are: " + properties.mkString(", "))
+  }
+
+}
+
+
+object strong_zone  {
+
+  inflict(determiningProperty(nice)) {
+    val name = subject.toString
+    if (name.startsWith("w")) succeed
+  }
+
+  inflict(determiningProperty[strength]) {
+    val name = subject.toString
+    if (name.length > 0) {
+      // this cant work like this, a new strength property is created each time.
+      determiningProperty.SetActionContext(strength(name.length))
+      succeed
+    }
+
+    fail
+  }
 }
 
 

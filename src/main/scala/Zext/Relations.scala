@@ -1,7 +1,7 @@
 package Zext
 
 import Relation.*
-import Zext.Actions.{UnderstandAlias, going}
+import Zext.Actions.{UnderstandAlias, does, going}
 import Zext.Idea.innate
 import Zext.Relations.Direction.*
 import Zext.Rule.inflict
@@ -17,8 +17,8 @@ object Relations {
     override val precedence = QueryPrecedence.Content
 
     extension [X <: Thing](s: X) {
-      def isComposite = s.relations(Composition).nonEmpty
-      def compositeObject = s.relations(Composition).get
+      def isComposite = s.queryRelated(Composition).nonEmpty
+      def compositeObject = s.queryRelated(Composition).get
     }
 
     extension [X <: Source](s: X)
@@ -86,18 +86,19 @@ object Relations {
   implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location
-
+    
     override def condition(source: Room, target: Room): Boolean = {
       for (direction <- Direction.directions) {
-        val adjacent = source.relations(direction.relation)
+        val adjacent = source.queryRelated(direction.relation)
         if (adjacent.contains(target)) return true
       }
       false
     }
 
+
     extension (room: Room) {
       def connections(direction: Direction) : Option[Room] = {
-        room.relations(direction.relation)
+        room.queryRelated(direction.relation)
       }
     }
 

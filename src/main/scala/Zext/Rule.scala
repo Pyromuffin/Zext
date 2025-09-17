@@ -412,6 +412,17 @@ object Rule {
         ExecutionResult(result, ctxValue)
     }
 
+    def ExecuteContextAction[T](rule: ActionWithClass[T], context: RuleContext): ExecutionResult[T] = {
+        require(rule.action == context.action)
+        val previous = rule.action.GetActionClass()
+        rule.action.SetActionClass(rule.tag)
+        val result = ExecuteAction(context)
+        val ctxValue = rule.action.GetActionContext()
+        rule.action.SetActionClass(previous)
+        ExecutionResult(result, ctxValue)
+    }
+
+
     def ExecuteContextAction[T](rule: ActionWithContext[T], context: RuleContext): ExecutionResult[T] = {
         require(rule.action == context.action)
         val previous = rule.action.GetActionContext()
@@ -426,12 +437,15 @@ object Rule {
     def ExecuteAction(context: RuleContext): Boolean = {
 
         val rule = context.action
+        val queryDepth = NotAQuery.stack.size
 
+        /*
         rule match {
             case value: Context[?] =>
                 assert(value.GetActionContext() != null, "Call context actions with the version that takes a context")
             case _ =>
         }
+        */
 
         val set = ruleSets(rule)
         val allRules = if(!rule.isInstanceOf[SystemAction]) {
@@ -462,11 +476,13 @@ object Rule {
          for(rules <- allRules) {
              if (!RunRule(context, rules)) {
                  blackboard = previousBlackboard
+                 assert(NotAQuery.stack.size == queryDepth)
                  return false
              }
          }
 
          blackboard = previousBlackboard
+         assert(NotAQuery.stack.size == queryDepth)
          true
     }
 
@@ -567,7 +583,7 @@ object Condition {
     inline implicit def fromObject(inline z:  Relatable): Condition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  Relatable): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    inline implicit def fromProperty(inline p:  Property): Condition = new Condition(noun is p?, QueryPrecedence.Property)
+    inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun is p?, QueryPrecedence.Property)
     inline implicit def fromLocation(inline r:  Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
@@ -577,6 +593,7 @@ object Condition {
 
     inline implicit def fromAction(inline action: Action): Condition = new ConditionWithAction(action, ???, QueryPrecedence.Action)
     inline implicit def fromActionWithContext(inline ac: ActionWithContext[?]): Condition = new ConditionWithAction(ac.action.asInstanceOf[Action],  ac.action.GetActionContext() == ac.context, QueryPrecedence.Context)
+    inline implicit def fromActionWithClass(inline ac: ActionWithClass[?]): Condition = new ConditionWithAction(ac.action.asInstanceOf[Action],  ac.action.GetActionClass() == ac.tag, QueryPrecedence.Context)
 
 
     type ConditionTypes = Relatable | RelatableProxy[?] | ConditionHelper
@@ -607,6 +624,7 @@ object Condition {
     }
 
 
+
     // these have to be macros to get the proper depth for T
      inline def of[T <: ZextObject | Container](using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
          val depth = Macros.depth[T, ZextObject, Container]
@@ -614,10 +632,13 @@ object Condition {
          new ZextObjectClassHolder(tt, depth, typeName)
     }
 
+
+    // for specifying actions on classes of properties
     inline def of[T <: Property](using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
         val typeName = Macros.typeName[T]
         new ZextObjectPropHolder(tt, 1, typeName)
     }
+
 
     inline def ofDebug[T <: ZextObject | Container](name : String)(using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder = {
         val depth = Macros.depth[T, ZextObject, Container] // depth of container is -1, which is maybe not expected
@@ -626,26 +647,24 @@ object Condition {
         new ZextObjectClassHolder(tt, depth, name)
     }
 
+    /*
     inline def ofDebug[T <: Property](name : String)(using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
         val typeName = Macros.typeName[T]
         //println(s"making of $typeName with name $name with depth $depth")
         new ZextObjectPropHolder(tt, 1, name)
     }
+    */
 
     // this is for querying whether a specific object has a type
-    def isZextObjectOf[T](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class)(using TypeTest[ZextObject, T]): Condition = {
+    def isZextObjectOf[T : TT as tt](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class): Condition = {
         val condition = new Condition(
             {
-                val success = canBecome[ZextObject, T](target)
+                val success = tt.test(target)
                 success
             }
             , queryType)
         condition.specificity = Macros.depth[T, ZextObject, Container]
         condition
-    }
-
-    def canBecome[X, Y](x: X)(using tt: TypeTest[X, Y]): Boolean = {
-        tt.unapply(x).isDefined
     }
 }
 
@@ -654,6 +673,7 @@ class ContinueException extends ControlThrowable
 class StopException extends ControlThrowable
 def continue: Unit = throw new ContinueException
 def fail: Unit = throw new StopException
+def stop: Unit = throw new StopException
 def succeed: Unit = throw new ReplaceException
 
 
@@ -662,8 +682,10 @@ enum RuleControl {
     case Stop, Continue, Replace
 }
 
-
-def ruleReturn(res : Boolean) : Unit = {
+def stop_return(res: Boolean): Unit = {
+    if (res) succeed else fail
+}
+def stop_unless(res : Boolean) : Unit = {
     if(res) continue else fail
 }
 
@@ -682,9 +704,8 @@ class ActionRule(body : => RuleControl, val conditions : Array[Condition]) exten
         try {
             conditions.forall( _.evaluate )
         } catch {
-            case cast : ClassCastException => {
-                //@todo because conditions can do arbitrarily complex things, this escape hatch has sometimes allowed actual errors to remain undetected.
-                // if we're trying to cast to something it's not, then that means it's not possible.
+            case stop : StopException  => {
+                // this can be thrown from Relatable.apply[T], and indicates that the condition fails.
                 false
             }
             case e: Throwable => {
@@ -699,7 +720,7 @@ class ActionRule(body : => RuleControl, val conditions : Array[Condition]) exten
         _first = this.first
         this.first = false
 
-        val ret = try{
+        val ret = try {
             body
         } catch {
             case ex : ContinueException => RuleControl.Continue
@@ -719,10 +740,12 @@ trait DebugAction {
     this : Action =>
 }
 
+
 case class ActionWithContext[T](action : Context[T], context : T)
+case class ActionWithClass[T](action : Context[T], tag: ClassTag[?])
 
 
-// this trait prevents checking of always rules, ie things that query the 'act' object
+// this trait prevents running of always rules, ie things that query the 'act' object
 trait SystemAction {
     this: Action =>
 }
@@ -731,9 +754,14 @@ trait Context[T] {
     this: Action =>
 
     private var _ctx : T = null.asInstanceOf[T]
+    private var _tag : ClassTag[?] = null
     def GetActionContext(): T = _ctx
     def SetActionContext(context: T): Unit = _ctx = context
+    def GetActionClass(): ClassTag[?] = _tag
+    def SetActionClass(tag: ClassTag[?]): Unit = _tag = tag
+
     def apply(context : T) = ActionWithContext(this, context)
+    def apply[subclass : CT as _tag] = ActionWithClass(this, _tag)
 }
 
 

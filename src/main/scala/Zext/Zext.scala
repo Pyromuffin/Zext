@@ -23,9 +23,24 @@ import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
-import scala.reflect.TypeTest
+import scala.reflect.{ClassTag, TypeTest}
 
-trait Property extends Relatable
+trait Property extends Relatable {
+
+
+
+
+}
+
+
+
+object determiningProperty extends Action(0) with Context[Property] with SystemAction {
+
+    inflict(determiningProperty, Priority(-1)){
+        fail
+    }
+
+}
 
 object fixed extends Property
 object scenery extends Property
@@ -82,6 +97,7 @@ def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
 
 
 type TT[X] = TypeTest[Any, X]
+type CT[X] = ClassTag[X]
 
 
 object ZextObject{
@@ -141,12 +157,12 @@ object determiningAccessibility extends Action(1) with Context[Action] with Syst
 
      // if noun is composite, check if the composite object is accessible to secondNoun
      if (noun.isType[Thing] && noun[Thing].isComposite) {
-         ruleReturn(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
+         stop_unless(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
      if (nounLocation != null && nounLocation.open) {
-         ruleReturn(ExecuteAction(determiningAccessibility, target = nounLocation))
+         stop_unless(ExecuteAction(determiningAccessibility, target = nounLocation))
      }
 
      // if not, fail
@@ -202,12 +218,12 @@ object determiningVisibility extends Action(1) with Context[Action] with SystemA
 
         // if noun is composite, check if the composite object is visible to subject
         if (noun.isType[Thing] && noun[Thing].isComposite) {
-            ruleReturn( subject[Thing].canSee(noun[Thing].compositeObject, GetActionContext()) )
+            stop_unless( subject[Thing].canSee(noun[Thing].compositeObject, GetActionContext()) )
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to subject
         if (targetLocation != null && (targetLocation.open || targetLocation.transparent)) {
-            ruleReturn( subject[Thing].canSee(targetLocation, GetActionContext()) )
+            stop_unless( subject[Thing].canSee(targetLocation, GetActionContext()) )
         }
 
         fail
@@ -219,6 +235,10 @@ object determiningVisibility extends Action(1) with Context[Action] with SystemA
 implicit object property_having extends Relation[Relatable, Property] with ManyToMany {
     extension [X <: Source](subject: X)
         infix def is[Y <: Target](target: Y*): X = relates(subject, target)
+}
+
+extension (tt: TypeTest[Any, ?]) {
+    inline def test(any: Any): Boolean = tt.unapply(any).isDefined
 }
 
 
@@ -308,7 +328,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
 
 
-    def isType[T](using TypeTest[ZextObject, T]) = canBecome[ZextObject, T](this)
+    def isType[T : TT as tt] = tt.test(this)
 
     def SerializeMembers(oos: ObjectOutputStream): Unit = {
         val fields = FieldUtils.getAllFields(getClass)
