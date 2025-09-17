@@ -500,8 +500,11 @@ object purporting extends Action(1, "purport") {
 
   report(purporting) {
 
-    if( noun(strength) > 3 )
-      println("Strong")
+    noun.get(strength) does { x =>
+      if(x > 10)
+      Say("Strong")  
+    } 
+      
 
     val properties = noun.queryRelated(property_having)
     Say(s"the properties of $noun are: " + properties.mkString(", "))

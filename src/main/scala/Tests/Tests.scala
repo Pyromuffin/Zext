@@ -132,6 +132,25 @@ object TestRoom extends Room  {
 
   report(taking, gum) Say "You peel the gum from the table."
   report(putting, gum -> table) Say "You try to stick it back to the underside, but the gum has lost its adhesion. You just leave it on top."
+
+  val weginald = ~"A nice guy." is unlisted
+
+}
+
+
+object nice_world {
+
+  object nice extends Property {
+    inflict(nice.determining, of[Thing]) {
+      val name = noun[Thing].name.toString
+      if (name.startsWith("w")) succeed
+    }
+  }
+
+  after(examining, nice) {
+    Say("that was nice")
+  }
+
 }
 
 
@@ -224,6 +243,7 @@ object Tests extends App {
   if !Parser.RunTest("no unlisted in inventory", Array("thoughts"), Array("The following ideas are known to you: guns, kitties, secrets, and violence.")) then failureCount += 1
   if !Parser.RunTest("loud clapping", Array("clap"), Array("You clap.", "That was loud!")) then failureCount += 1
   if !Parser.RunTest("loud shouting", Array("shout"), Array("You yell something indistinguishable.", "That was loud!")) then failureCount += 1
+  if !Parser.RunTest("weginald examining", Array("x weginald"), Array("A nice guy.", "That was nice.")) then failureCount += 1
 
 
   println("=================================")
