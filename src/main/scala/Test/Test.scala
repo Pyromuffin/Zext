@@ -512,17 +512,34 @@ object purporting extends Action(1, "purport") {
 
 object strong_zone  {
 
-  inflict(nice.determining) {
-    val name = subject.toString
+  after(examining, nice){
+    Say("that was nice")
+  }
+
+
+  inflict(nice.determining, of[Thing]) {
+    val name = noun[Thing].name.toString
     if (name.startsWith("w")) succeed
   }
 
+  inflict(strength.determining, of[Thing]) {
+    succeed
+  }
+
   inflict(strength.valuation) {
-    val name = subject.toString
+    val name = noun[Thing].name.toString
     strength.valuation.SetActionContext(Some(name.length))
   }
 }
 
+
+object measuring extends Action(1, "measure") {
+
+  report(measuring, strength) {
+    Say(s"$noun seems about ${noun(strength)} strong")
+  }
+
+}
 
 
 object Test extends App{

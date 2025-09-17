@@ -38,23 +38,23 @@ trait Value[T] {
 
     def apply(value : T) = PropertyAndValue(this, value)
 
-    val valuation = new Action(0) with Context[Option[T]] with SystemAction
+    val valuation = new Action(1) with Context[Option[T]] with SystemAction
 
     inflict(valuation, Priority(-1)) {
         val toSet = valuation.GetActionContext()
         if (toSet.isDefined) {
-            values(subject) = toSet.get
+            values(arg1) = toSet.get
         }
-        val value = values.get(subject)
+        val value = values.get(arg1)
         valuation.SetActionContext(value)
     }
 }
 
 trait Property extends Relatable {
 
-    val determining = new Action(0) with SystemAction
+    val determining = new Action(1) with SystemAction
     inflict(determining, Priority(-1)) {
-        if (subject.getRelatedSetFromDictionaries(property_having).contains(this)) succeed
+        if (arg1.getRelatedSetFromDictionaries(property_having).contains(this)) succeed
         else fail
     }
 

@@ -227,13 +227,11 @@ object determiningRelation extends Action(1) with Context[Relation[?, ?]] with S
     stop_unless(related.contains(arg1))
   }
 
-
-  /*
   inflict(determiningRelation(property_having)) {
-    val result = ExecuteContextAction(determiningProperty(arg1.resolve.asInstanceOf[Property]) )
-    if(result.res) succeed
+    val property = arg1.resolve.asInstanceOf[Property]
+    ReplaceAction(property.determining, InheritContext(subject = system, target = subject))
   }
-  */
+
 
 }
 
@@ -273,25 +271,25 @@ trait Relatable {
   override def toString = this.getClass.toString
 
   def get[T](propertyValue: Property & Value[T]) : Option[T] = {
-    val result = ExecuteContextAction(propertyValue.valuation(None), subject = this)
+    val result = ExecuteContextAction(propertyValue.valuation(None), subject = system, target = this)
     if(result._1)
       result._2
     else None
   }
 
   def apply[T](propertyValue: Property & Value[T]) : T = {
-    val result = ExecuteContextAction(propertyValue.valuation(None), subject = this)
+    val result = ExecuteContextAction(propertyValue.valuation(None), subject = system, target = this)
     if(result._1)
       result._2.get
     else throw ClassCastException()
   }
 
   def update[T](propertyValue: Property & Value[T], value : T) : Unit = {
-    ExecuteContextAction(propertyValue.valuation(Some(value)), subject = this)
+    ExecuteContextAction(propertyValue.valuation(Some(value)), subject = system, target = this)
   }
 
   def apply(property: Property): Boolean = {
-    ExecuteAction(property.determining, subject = this)
+    ExecuteAction(property.determining, subject = system, target = this)
   }
 
   def apply[T] : T = {
