@@ -23,24 +23,46 @@ import org.apache.commons.lang3.reflect.FieldUtils
 import zobjectifier.Macros
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
+import scala.collection.mutable
 import scala.reflect.{ClassTag, TypeTest}
+
+
+
+
+case class PropertyAndValue[T](property: Value[T], value : T)
+
+trait Value[T] {
+    this : Property =>
+
+    val values = mutable.HashMap[Relatable, T]()
+
+    def apply(value : T) = PropertyAndValue(this, value)
+
+    val valuation = new Action(0) with Context[Option[T]] with SystemAction
+
+    inflict(valuation, Priority(-1)) {
+        val toSet = valuation.GetActionContext()
+        if (toSet.isDefined) {
+            values(subject) = toSet.get
+        }
+        val value = values.get(subject)
+        valuation.SetActionContext(value)
+    }
+}
 
 trait Property extends Relatable {
 
-
-
-
-}
-
-
-
-object determiningProperty extends Action(0) with Context[Property] with SystemAction {
-
-    inflict(determiningProperty, Priority(-1)){
-        fail
+    val determining = new Action(0) with SystemAction
+    inflict(determining, Priority(-1)) {
+        if (subject.getRelatedSetFromDictionaries(property_having).contains(this)) succeed
+        else fail
     }
 
+
 }
+
+
+
 
 object fixed extends Property
 object scenery extends Property
@@ -235,6 +257,12 @@ object determiningVisibility extends Action(1) with Context[Action] with SystemA
 implicit object property_having extends Relation[Relatable, Property] with ManyToMany {
     extension [X <: Source](subject: X)
         infix def is[Y <: Target](target: Y*): X = relates(subject, target)
+
+        infix def is[ValueT](propertyAndValue: PropertyAndValue[ValueT]) : X = {
+            val ret = relates(subject, propertyAndValue.property.asInstanceOf[Property])
+            propertyAndValue.property.values.update(subject.asInstanceOf[Relatable], propertyAndValue.value)
+            ret
+        }
 }
 
 extension (tt: TypeTest[Any, ?]) {
@@ -297,14 +325,6 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     infix def iz(rhs : String): String = {
         toString + " " + be + " " + rhs
-    }
-
-    infix def and(prop: Property): this.type = {
-        this is prop
-    }
-
-    infix def are(prop: Property): this.type = {
-        this is prop
     }
 
     infix def aka(s: String): this.type = {
@@ -372,7 +392,7 @@ object Thing {
     extension(d: StringExpression)  {
 
         inline infix def initially(desc: StringExpression)(using c: ZContainer): Thing = {
-            SimpleThing(desc) and RoomDescription(d)
+            SimpleThing(desc) is RoomDescription(d)
         }
     }
 
@@ -388,9 +408,8 @@ object Thing {
 
 }
 
-case class RoomDescription(desc: StringExpression) extends Property {
-    var disturbed = false
-}
+object RoomDescription extends Property with Value[StringExpression]
+object disturbed extends Property
 
 case class SimpleThing(description: StringExpression)(using c : Container & ZextObject) extends Thing
 

@@ -13,19 +13,19 @@ object TestPlayer extends PlayerClass(TestRoom) {
   override val description = "Detestable"
 }
 
-case class wet(var wetness : Int) extends Property
+object wet extends Property with Value[Int]
 
 object drying extends Action(1, "dry") {
 
-  check(drying, of[wet]) {
-    if(noun[wet].wetness == 0){
+  check(drying, wet) {
+    if(noun(wet) == 0){
       Say(s"$noun is bone dry")
       fail
     }
   }
 
-  inflict(drying, of[wet]) {
-    noun[wet].wetness = scala.math.max(noun[wet].wetness -1, 0)
+  inflict(drying, wet) {
+    noun(wet) = scala.math.max(noun(wet) -1, 0)
   }
 
   report(drying) Say s"You dry $noun"
@@ -55,14 +55,14 @@ object SecondRoom extends Room {
     this is wet(2)
 
     override val name = str {
-      if(this[wet].wetness > 0)
+      if(this(wet) > 0)
         "bucket"
       else
         "dry bucket"
     }
 
     override val description: StringExpression = str {
-      if(this[wet].wetness > 0)
+      if(this(wet) > 0)
         "the bucket has some water in it."
       else
         "the bucket is dry."

@@ -1,7 +1,7 @@
 package Zext
 
 import Relation.*
-import Zext.Actions.{UnderstandAlias, does, going}
+import Zext.Actions.{UnderstandAlias, going}
 import Zext.Idea.innate
 import Zext.Relations.Direction.*
 import Zext.Rule.inflict
@@ -78,7 +78,7 @@ object Relations {
   case class Direction(override val name: StringExpression, relation : DirectionalRelation, opposite : DirectionalRelation) extends Idea(name) {
     Direction.directions.addOne(this)
     UnderstandAlias(name.toString, going, this)
-    this is (innate, unlisted)
+    this is innate is unlisted
   }
 
 

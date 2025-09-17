@@ -228,10 +228,12 @@ object determiningRelation extends Action(1) with Context[Relation[?, ?]] with S
   }
 
 
+  /*
   inflict(determiningRelation(property_having)) {
     val result = ExecuteContextAction(determiningProperty(arg1.resolve.asInstanceOf[Property]) )
     if(result.res) succeed
   }
+  */
 
 }
 
@@ -266,37 +268,34 @@ trait Relatable {
   allRelatables.addOne(this)
   val objectID = allRelatables.length
 
+  override def hashCode() = objectID
+
   override def toString = this.getClass.toString
 
-
-  def getProperty[T : {TT as tt, CT}]: Option[T] = {
-    val storedProperties = getRelatedSetFromDictionaries(property_having)
-    var maybe = storedProperties.find(tt.test).map(_.asInstanceOf[T])
-    if(maybe.isEmpty) {
-      // get generated property
-      val generated = ExecuteContextAction(determiningProperty[T], InheritContext(action = determiningProperty, subject = this))
-      if(generated.res) maybe = Some(generated.ret.asInstanceOf[T])
-    }
-    maybe
+  def get[T](propertyValue: Property & Value[T]) : Option[T] = {
+    val result = ExecuteContextAction(propertyValue.valuation(None), subject = this)
+    if(result._1)
+      result._2
+    else None
   }
 
-/*
-  def apply[T: {TT, CT}] : T = {
-    val maybe = this.getProperty[T]
-    if (maybe.isDefined) maybe.get
-    else this.asInstanceOf[T]
+  def apply[T](propertyValue: Property & Value[T]) : T = {
+    val result = ExecuteContextAction(propertyValue.valuation(None), subject = this)
+    if(result._1)
+      result._2.get
+    else throw ClassCastException()
   }
-  */
 
+  def update[T](propertyValue: Property & Value[T], value : T) : Unit = {
+    ExecuteContextAction(propertyValue.valuation(Some(value)), subject = this)
+  }
 
-  def apply[T: {TT, CT}] = {
-    this match {
-      case t: T => t
-      case _ =>
-        val maybe = this.getProperty[T]
-        if (maybe.isDefined) maybe.get
-        else throw new ClassCastException() // if we throw in the middle of a query then we never pop the query stack.
-    }
+  def apply(property: Property): Boolean = {
+    ExecuteAction(property.determining, subject = this)
+  }
+
+  def apply[T] : T = {
+    this.asInstanceOf[T]
   }
 
 
@@ -650,7 +649,7 @@ implicit object NotAQuery extends RelationQueryContext {
 }
 
 
-abstract class ConditionalRelation[S <: Relatable, T <: Relatable] extends Relation[S,T] {
+abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S,T] {
   def condition(s : S, t : T) : Boolean
 
   inflict(determiningRelation(this)) {

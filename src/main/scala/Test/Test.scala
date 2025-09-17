@@ -1,5 +1,6 @@
 package Test
 
+import Tests.wet
 import Zext.*
 import Zext.exports.*
 import Zext.Actions.*
@@ -57,11 +58,11 @@ object Dirt extends Room {
 
   val pebble = ~"the size of a small boulder"
   val mud = ~"dirt juice" amount some
-  val walls = ~"they're everywhere" are fixed
+  val walls = ~"they're everywhere" is fixed
 
   val bucket = new Box("pebble purgatory") {
     val sand = ~"paperless sandpaper" amount some
-    val pants = ~"rag ensemble" and RoomDescription("A pair of pants is tangled with bucket particles") amount some // add custom amountifiers like a pair
+    val pants = ~"rag ensemble" is RoomDescription("A pair of pants is tangled with bucket particles") amount some // add custom amountifiers like a pair
   }
 
   //val zebra = z"Striped, suited to camouflage $time times in this environment"
@@ -75,14 +76,14 @@ object Dirt extends Room {
   val hook = Supporter("hungry tines")
 
   object not_yours extends Property
-  val scarves = ~"An array of zebra patterned tactical scarves" is scenery and not_yours
-  val mantles = ~"How did they get all these fireplaces in here???" is scenery and not_yours
-  val sashes = ~"Second place winner in the number of sashes competition" is scenery and not_yours
+  val scarves = ~"An array of zebra patterned tactical scarves" is scenery is not_yours
+  val mantles = ~"How did they get all these fireplaces in here???" is scenery is not_yours
+  val sashes = ~"Second place winner in the number of sashes competition" is scenery is not_yours
 
 
   instead(taking, not_yours) Say "that would be uncouth"
 
-  val crumble_block = ~"It disintegrated." and RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
+  val crumble_block = ~"It disintegrated." is RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
 
   var time = 0
 
@@ -168,22 +169,22 @@ object Circus extends RoomRegion("Circus Region") {
 
 }
 
-case class wet(var wetness: Int) extends Property
+object wet extends Property with Value[Int]
 
 object drying extends Action(1, "dry") {
 
-  applying(drying, of[wet]) {
-    if (noun[wet].wetness > 0 && scala.util.Random.nextInt(4) == 0){
+  applying(drying, wet) {
+    if (noun(wet) > 0 && scala.util.Random.nextInt(4) == 0){
       continue
     } else fail
   }
 
-  inflict(drying, of[wet]) {
-    noun[wet].wetness -= 1
+  inflict(drying, wet) {
+    noun(wet) -= 1
   }
 
-  after(drying, of[wet]) {
-    val wetness = noun[wet].wetness
+  after(drying, wet) {
+    val wetness = noun(wet)
     if (wetness != 0)
       Say(s"$noun dries out a little. It looks like it has $wetness drops of water left.")
     else if (wetness == 0)
@@ -260,7 +261,7 @@ object BigTop extends Room {
     this is wet(3)
 
     override val name = str {
-      if (this[wet].wetness > 0) {
+      if (this(wet) > 0) {
         "bucket of water"
       } else {
         "dry bucket"
@@ -269,7 +270,7 @@ object BigTop extends Room {
 
 
     override val description = str {
-      if (this[wet].wetness > 0) {
+      if (this(wet) > 0) {
         "a bucket with an amount of quick-dry water"
       } else {
         "bone dry"
@@ -310,15 +311,15 @@ object BigTop extends Room {
 
 }
 
-case class Loudness(volume : Int) extends Property
+object loudness extends Property with Value[Int]
 object loud extends Property
 
 object clapping extends Action(0, "clap") {
-  this is Loudness(2)
-  waiting is Loudness(5)
+  this is loudness(2)
+  waiting is loudness(5)
 
-  inflict(determiningProperty(loud)) {
-    stop_return(subject[Loudness].volume > 3)
+  inflict(loud.determining) {
+
   }
 
 
@@ -433,7 +434,7 @@ object MazeEntrance extends Room {
   after(examining, listExits) {
 
     for(dir <- Direction.directions) {
-      for( connection <- noun[Room].connections(dir) )
+      for( connection <- noun[Room].connections(dir))
       Say(s"$connection is to $dir")
     }
 
@@ -492,15 +493,16 @@ object MazeEntrance extends Room {
   rooms(0) inward this
 }
 
-case class strength(power: Int) extends Property
+object strength extends Property with Value[Int]
 object nice extends Property
 
 object purporting extends Action(1, "purport") {
 
   report(purporting) {
-    if(noun[strength].power > 1){
-      println("big")
-    }
+
+    if( noun(strength) > 3 )
+      println("Strong")
+
     val properties = noun.queryRelated(property_having)
     Say(s"the properties of $noun are: " + properties.mkString(", "))
   }
@@ -510,20 +512,14 @@ object purporting extends Action(1, "purport") {
 
 object strong_zone  {
 
-  inflict(determiningProperty(nice)) {
+  inflict(nice.determining) {
     val name = subject.toString
     if (name.startsWith("w")) succeed
   }
 
-  inflict(determiningProperty[strength]) {
+  inflict(strength.valuation) {
     val name = subject.toString
-    if (name.length > 0) {
-      // this cant work like this, a new strength property is created each time.
-      determiningProperty.SetActionContext(strength(name.length))
-      succeed
-    }
-
-    fail
+    strength.valuation.SetActionContext(Some(name.length))
   }
 }
 

@@ -1,6 +1,6 @@
 package Zext
 
-import Zext.Actions.{UnderstandAlias, allActions, allMetaActions, does, examining}
+import Zext.Actions.{UnderstandAlias, allActions, allMetaActions, examining}
 import Zext.EverythingParser.ParseResult
 import Zext.Interpreter.Say
 import Zext.Parser.*
@@ -630,13 +630,6 @@ object Condition {
          val depth = Macros.depth[T, ZextObject, Container]
          val typeName = Macros.typeName[T]
          new ZextObjectClassHolder(tt, depth, typeName)
-    }
-
-
-    // for specifying actions on classes of properties
-    inline def of[T <: Property](using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
-        val typeName = Macros.typeName[T]
-        new ZextObjectPropHolder(tt, 1, typeName)
     }
 
 

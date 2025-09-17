@@ -18,6 +18,12 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import RelatableProxy.*
 
+extension[T] (o : Option[T]) {
+  inline infix def does(inline something : T => Unit): Unit = {
+    if(o.isDefined)
+      something(o.get)
+  }
+}
 
 object Actions {
 
@@ -295,21 +301,14 @@ object Actions {
 
     inflict(taking){
       player holds noun[Thing]
-      println("holdage")
     }
 
-    after(taking, of[RoomDescription]) {
-      noun[RoomDescription].disturbed = true
+    after(taking, RoomDescription) {
+      noun is disturbed
     }
 
   }
 
-  extension[T] (o : Option[T]) {
-    inline infix def does(inline something : T => Unit): Unit = {
-      if(o.isDefined)
-        something(o.get)
-    }
-  }
 
 
 
@@ -332,14 +331,14 @@ object Actions {
       val people = r.contents.filter(_.isType[Person]).toSeq
 
       val roomDescribed = nonscenery.filter{ z =>
-        val roomDesc = z.getProperty[RoomDescription]
-        roomDesc.isDefined && !roomDesc.get.disturbed
+        val roomDesc = z.get(RoomDescription)
+        roomDesc.isDefined && !z(disturbed)
       }
 
       nonscenery = nonscenery.diff(roomDescribed)
 
       for(rd <- roomDescribed) {
-        Say(rd.getProperty[RoomDescription].get.desc)
+        Say(rd(RoomDescription))
       }
 
       val nonsceneryString = ListNamesNicely(nonscenery)
@@ -364,8 +363,8 @@ object Actions {
         continue
 
       val roomDescribed = c.contents.filter { z =>
-        val roomDesc = z.getProperty[RoomDescription]
-        roomDesc.isDefined && !roomDesc.get.disturbed
+        val roomDesc = z.get(RoomDescription)
+        roomDesc.isDefined && !z(disturbed)
       }
 
       val nondescribed = c.contents.diff(roomDescribed)
@@ -376,7 +375,7 @@ object Actions {
 
         if (c.open || c.transparent) {
           for (rd <- roomDescribed) {
-            Say(rd.getProperty[RoomDescription].get.desc)
+            Say(rd(RoomDescription))
           }
           if(nondescribed.nonEmpty){
             Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed).get)
@@ -459,15 +458,15 @@ object Actions {
 
       if (c.contents.nonEmpty) {
         val roomDescribed = c.contents.filter { z =>
-          val roomDesc = z.getProperty[RoomDescription]
-          roomDesc.isDefined && !roomDesc.get.disturbed
+          val roomDesc = z.get(RoomDescription)
+          roomDesc.isDefined && !z(disturbed)
         }
 
         val nondescribed = c.contents.diff(roomDescribed)
         if (roomDescribed.nonEmpty) {
 
           for (rd <- roomDescribed) {
-            Say(rd.getProperty[RoomDescription].get.desc)
+            Say(rd(RoomDescription))
           }
           if (nondescribed.nonEmpty) {
             Say(s"${c.preposition} $noun you can also see " + ListNamesNicely(nondescribed.toSeq).get)
