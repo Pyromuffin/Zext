@@ -443,8 +443,8 @@ object Condition {
     inline implicit def fromObject(inline z:  Relatable): Condition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  Relatable): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun(p), QueryPrecedence.Property)
-    inline def fromSecondProperty(inline p: Property): Condition = new Condition(secondNoun(p), QueryPrecedence.SecondProperty)
+    inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun is p?, QueryPrecedence.Property)
+    inline def fromSecondProperty(inline p: Property): Condition = new Condition(secondNoun is p?, QueryPrecedence.SecondProperty)
     inline implicit def fromLocation(inline r:  Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
@@ -461,7 +461,7 @@ object Condition {
         val firstPredicate : Condition = t._1 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case relatableProxy: RelatableProxy[?] => fromObject(relatableProxy.resolve.asInstanceOf[Relatable])
+            case relatableProxy: RelatableProxy[?] => fromObject(relatableProxy.resolve)
             case property: Property => fromProperty(property)
             case relatable: Relatable => fromObject(relatable)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
@@ -470,7 +470,7 @@ object Condition {
         val secondPredicate: Condition = t._2 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case relatableProxy: RelatableProxy[?] => fromSecondObject(relatableProxy.resolve.asInstanceOf[Relatable])
+            case relatableProxy: RelatableProxy[?] => fromSecondObject(relatableProxy.resolve)
             case property: Property => fromSecondProperty(property)
             case relatable: Relatable => fromSecondObject(relatable)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
@@ -496,13 +496,6 @@ object Condition {
         new ZextObjectClassHolder(tt, depth, name)
     }
 
-    /*
-    inline def ofDebug[T <: Property](name : String)(using tt: TypeTest[Property, T], dummy: DummyImplicit): ZextObjectPropHolder = {
-        val typeName = Macros.typeName[T]
-        //println(s"making of $typeName with name $name with depth $depth")
-        new ZextObjectPropHolder(tt, 1, name)
-    }
-    */
 
     // this is for querying whether a specific object has a type
     def isZextObjectOf[T : TT as tt](target : => ZextObject, queryType: QueryPrecedence = QueryPrecedence.Class): Condition = {
@@ -624,7 +617,7 @@ class MetaAction[NounType <: Relatable : TT as _tt](val targets : Int) extends R
 
 class Action(targets : Int, val verbs : String*) extends MetaAction[ZextObject](targets) with ParsableType(PartOfSpeech.verb) {
     allActions.addOne(this)
-    override def toString = verbs(0)
+    override def toString = if(verbs.nonEmpty) verbs(0) else this.getClass.toString
 }
 
 
