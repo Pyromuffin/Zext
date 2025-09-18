@@ -54,46 +54,10 @@ class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int,
 }
 
 
-
-
-class ZextObjectPropHolder(tt : TypeTest[Property,?], depth: Int, propName : String) extends ConditionHelper {
-
-  var not = false
-
-  def unary_! = {
-    not = !not
-    this
-  }
-
-  def createCondition(queryPrecedence: QueryPrecedence) = {
-
-    val condition = new Condition(
-      {
-        val target = if (queryPrecedence == QueryPrecedence.Property) noun else secondNoun
-        var success = test(target)
-        if (not) success = !success
-
-        //println(s"testing if $target has property $propName: $success")
-        success
-      }
-      , queryPrecedence)
-
-    condition.specificity = depth
-    condition
-  }
-
-  def test(z: ZextObject): Boolean = {
-    val properties = z.queryRelated(property_having)
-    properties.exists(tt.unapply(_).isDefined)
-  }
-
-}
-
 object anything extends ZextObject {
   val name = "anything"
   val description = ""
 }
-
 
 object nowhere extends Room {
   val name = "nowhere"

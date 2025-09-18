@@ -443,17 +443,15 @@ object Condition {
     inline implicit def fromObject(inline z:  Relatable): Condition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  Relatable): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun is p?, QueryPrecedence.Property)
+    inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun(p), QueryPrecedence.Property)
+    inline def fromSecondProperty(inline p: Property): Condition = new Condition(secondNoun(p), QueryPrecedence.SecondProperty)
     inline implicit def fromLocation(inline r:  Room): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): Condition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder): Condition = ch.createCondition(QueryPrecedence.Class)
-    //inline implicit def fromPropHolder(inline ph:  ZextObjectPropHolder): Condition = ph.createCondition(QueryPrecedence.Property)
     inline implicit def fromConditionHelper(inline helper:  ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
     inline implicit def fromQuery(inline query:  RelationQuery[?,?]) : Condition = new Condition(query.evaluate(), query.relation.precedence)
 
     inline implicit def fromAction(inline action: Action): Condition = new ConditionWithAction(action, ???, QueryPrecedence.Action)
-  //  inline implicit def fromActionWithContext(inline ac: ActionWithContext[?]): Condition = new ConditionWithAction(ac.action.asInstanceOf[Action],  ac.action.GetActionContext() == ac.context, QueryPrecedence.Context)
-  //  inline implicit def fromActionWithClass(inline ac: ActionWithClass[?]): Condition = new ConditionWithAction(ac.action.asInstanceOf[Action],  ac.action.GetActionClass() == ac.tag, QueryPrecedence.Context)
 
 
     type ConditionTypes = Relatable | RelatableProxy[?] | ConditionHelper
@@ -462,7 +460,6 @@ object Condition {
 
         val firstPredicate : Condition = t._1 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
-            case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.Property)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
             case relatableProxy: RelatableProxy[?] => fromObject(relatableProxy.resolve.asInstanceOf[Relatable])
             case property: Property => fromProperty(property)
@@ -472,10 +469,9 @@ object Condition {
 
         val secondPredicate: Condition = t._2 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
-            case propHolder : ZextObjectPropHolder => propHolder.createCondition(QueryPrecedence.SecondProperty)
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
             case relatableProxy: RelatableProxy[?] => fromSecondObject(relatableProxy.resolve.asInstanceOf[Relatable])
-            case property: Property => fromProperty(property)
+            case property: Property => fromSecondProperty(property)
             case relatable: Relatable => fromSecondObject(relatable)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
