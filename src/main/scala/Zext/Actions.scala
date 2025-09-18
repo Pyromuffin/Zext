@@ -17,6 +17,7 @@ import Zext.ControlCodes.*
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import RelatableProxy.*
+import Zext.Infliction.*
 
 extension[T] (o : Option[T]) {
   inline infix def does(inline something : T => Unit): Unit = {
@@ -65,29 +66,33 @@ object Actions {
   }
 
 
-  object preprocessingInput extends Action(0) with Context[String] with SystemAction {
+  object preprocessingInput extends Action(0) with Returns[String, String] with Passthrough[String] with SystemAction {
 
-    inflict(preprocessingInput) {
-      val text = GetActionContext()
-      SetActionContext(text.toLowerCase)
+    inflict(preprocessingInput) { text =>
+      text.toLowerCase
     }
 
   }
 
-  object postprocessingText extends Action(0) with Context[String] with SystemAction {
+  object postprocessingText extends Action(0) with Returns[String, String] with Passthrough[String] with SystemAction {
 
-    inflict(postprocessingText) {
-      val text = GetActionContext()
-      SetActionContext( MakeTextNice(text) )
+    inflict(postprocessingText) { text =>
+       MakeTextNice(text)
     }
 
   }
 
   // for hooking, call SetActionContext with the final name
-  object printing_name extends Action(1) with Context[String] with SystemAction
+  object printing_name extends Action(1) with Returns[String, String] with Passthrough[String] with SystemAction
+  inflict(printing_name, Priority(-1)){ name =>
+    name
+  }
 
-  object saying extends Action(0) with Context[String] {
-    check(saying) {
+  // i suppose we will live with this weirdness for the moment. it seems somewhat unlikely we will have things that return Unit
+  // becuase we really dont have that many things that are purely for side effects i think.
+  object saying extends Action(0) with Returns[String, Unit] with SystemAction {
+
+    check(saying) { _ =>
       if(subject == system)
         continue
 
@@ -98,17 +103,18 @@ object Actions {
         fail
     }
 
-    inflict(saying) {
-      val text = GetActionContext()
+
+    inflict(saying) { text =>
       if (text == "") fail // maybe an error
 
-      var postprocessed = ExecuteContextAction(postprocessingText(text)).ret
+      var postprocessed = ExecuteReturnAction(postprocessingText)(text).ret
       if(subject == system){
         postprocessed = postprocessed.bold
       }
 
       if (testingOutput){
         testOutput.addOne(MakePlain(postprocessed))
+        () // highly strange, the return type actually has to be unit
       }
       else
         println(postprocessed)
@@ -184,9 +190,9 @@ object Actions {
 
       // this is so dumb but maybe it will work?
       val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules) then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules) then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).checkRules) then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules).res then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules).res then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).checkRules).res then fail
 
       if (!connected) {
         Say(s"You can't go $d")
@@ -195,9 +201,9 @@ object Actions {
       val destination = player.room.connections(d).get
 
       val enterCtx = RuleContext(act, subject, Array(destination), false,  player.location)
-      if !RunRule(enterCtx, ruleSets(entering).beforeRules) then fail
-      if !RunRule(enterCtx, ruleSets(entering).insteadRules) then fail
-      if !RunRule(enterCtx, ruleSets(entering).checkRules) then fail
+      if !RunRule(enterCtx, ruleSets(entering).beforeRules).res then fail
+      if !RunRule(enterCtx, ruleSets(entering).insteadRules).res then fail
+      if !RunRule(enterCtx, ruleSets(entering).checkRules).res then fail
 
     }
 

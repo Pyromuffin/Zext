@@ -342,15 +342,12 @@ object screaming extends CustomAction(-1, "scream") {
 
   var screamCount = 0
 
-  after(postprocessingText, screamingMode) {
-    val text = postprocessingText.GetActionContext()
-    postprocessingText.SetActionContext(text.toUpperCase)
+  after(postprocessingText, screamingMode) { text =>
+    text.toUpperCase
   }
 
-
-  before(preprocessingInput){
-    val text = preprocessingInput.GetActionContext()
-    if(text.toUpperCase == text){
+  before(preprocessingInput){ text =>
+    if(text.toUpperCase == text) {
       screamingMode = true
       screamCount += 1
       if (screamCount == 3) {
@@ -359,6 +356,8 @@ object screaming extends CustomAction(-1, "scream") {
     } else {
       screamingMode = false
     }
+
+    text
   }
 
   override def intercept(rawInput: String, parseResult: ParseResult): Command = {
@@ -390,7 +389,7 @@ object CrowsNest extends Room {
     player.insured = true
   }
 
-  inflict(determiningVisibility, trapeze, Circus.here){
+  inflict(determiningVisibility.base, trapeze, Circus.here){
     succeed
   }
 
@@ -502,9 +501,9 @@ object purporting extends Action(1, "purport") {
 
     noun.get(strength) does { x =>
       if(x > 10)
-      Say("Strong")  
-    } 
-      
+      Say("Strong")
+    }
+
 
     val properties = noun.queryRelated(property_having)
     Say(s"the properties of $noun are: " + properties.mkString(", "))
@@ -525,13 +524,9 @@ object strong_zone  {
     if (name.startsWith("w")) succeed
   }
 
-  inflict(strength.determining, of[Thing]) {
-    succeed
-  }
-
-  inflict(strength.valuation) {
+  inflict(strength.determining) { _ =>
     val name = noun[Thing].name.toString
-    strength.valuation.SetActionContext(Some(name.length))
+    Succeed -> Some(name.length)
   }
 }
 

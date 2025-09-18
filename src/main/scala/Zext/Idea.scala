@@ -4,12 +4,12 @@ import Zext.Actions.printing_name
 import Zext.Idea.allIdeas
 import Zext.Interpreter.Say
 import Zext.Relation.{ManyToMany, OneToMany}
-import Zext.Rule.{ExecuteAction, before, inflict, instead, report}
 import Zext.ControlCodes.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import Zext.Condition.*
+import Zext.Infliction.*
 import Zext.RuleContext.first
 
 implicit object idea_knowing extends Relation[Thing, Idea] with ManyToMany {
@@ -31,11 +31,11 @@ object Idea {
 
   // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
-  inflict(determiningVisibility, subject knows noun?) {
+  inflict(determiningVisibility.base, subject knows noun?) {
     succeed
   }
 
-  inflict(determiningRelation(idea_knowing), innate) {
+  inflict(idea_knowing.determining, innate) {
     succeed
   }
 
@@ -67,9 +67,8 @@ object Idea {
     }
 
 
-    inflict(printing_name, player can_discover noun?) {
-      val name = printing_name.GetActionContext()
-      printing_name.SetActionContext(name.bold)
+    inflict(printing_name, player can_discover noun?) { name =>
+      name.bold
     }
 
 

@@ -4,7 +4,6 @@ import Relation.*
 import Zext.Actions.{UnderstandAlias, going}
 import Zext.Idea.innate
 import Zext.Relations.Direction.*
-import Zext.Rule.inflict
 
 import scala.annotation.targetName
 import scala.collection.mutable.ArrayBuffer
@@ -86,7 +85,7 @@ object Relations {
   implicit object RoomAdjacency extends ConditionalRelation[Room, Room] with ManyToMany {
     // the adjacency relation defines how rooms are connected
     override val precedence = QueryPrecedence.Location
-    
+
     override def condition(source: Room, target: Room): Boolean = {
       for (direction <- Direction.directions) {
         val adjacent = source.queryRelated(direction.relation)

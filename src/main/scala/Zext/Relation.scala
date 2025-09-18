@@ -219,47 +219,6 @@ object Relatable {
 }
 
 
-object determiningRelation extends Action(1) with Context[Relation[?, ?]] with SystemAction {
-
-  inflict(determiningRelation) {
-    val relation = GetActionContext()
-    val related = subject.getRelatedSetFromDictionaries(relation).asInstanceOf[Set[Relatable]]
-    stop_unless(related.contains(arg1))
-  }
-
-  inflict(determiningRelation(property_having)) {
-    val property = arg1.resolve.asInstanceOf[Property]
-    ReplaceAction(property.determining, InheritContext(subject = system, target = subject))
-  }
-
-
-}
-
-
-
-object addingRelated extends Action(-1) with Context[Relation[?,?]] with SystemAction {
-
-  inflict(addingRelated){
-    val r = GetActionContext()
-    val relatables = GetTargets()
-    subject.addRelatedInner(r, relatables)
-  }
-
-}
-
-object removingRelated extends Action(-1) with Context[Relation[?, ?]] with SystemAction {
-
-  inflict(removingRelated) {
-    val r = GetActionContext()
-    val relatables = GetTargets()
-    subject.innerRemove(r, relatables)
-  }
-
-}
-
-
-
-
 
 trait Relatable {
 
@@ -271,21 +230,17 @@ trait Relatable {
   override def toString = this.getClass.toString
 
   def get[T](propertyValue: Property & Value[T]) : Option[T] = {
-    val result = ExecuteContextAction(propertyValue.valuation(None), subject = system, target = this)
-    if(result._1)
-      result._2
-    else None
+    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
+    result._2
   }
 
   def apply[T](propertyValue: Property & Value[T]) : T = {
-    val result = ExecuteContextAction(propertyValue.valuation(None), subject = system, target = this)
-    if(result._1)
-      result._2.get
-    else throw ClassCastException()
+    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
+    result._2.get
   }
 
   def update[T](propertyValue: Property & Value[T], value : T) : Unit = {
-    ExecuteContextAction(propertyValue.valuation(Some(value)), subject = system, target = this)
+    ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(Some(value))
   }
 
   def apply(property: Property): Boolean = {
@@ -295,6 +250,14 @@ trait Relatable {
   def apply[T] : T = {
     this.asInstanceOf[T]
   }
+
+  def get[T : TT]: Option[T] = {
+    this match {
+      case t: T => Some(t)
+      case _ => None
+    }
+  }
+
 
 
   override def equals(obj: Any) = {
@@ -373,23 +336,21 @@ trait Relatable {
 
   def removeRelated(r: Relation[?, ?], relatables: Relatable*): Unit = {
 
+
     r match {
       // please dont call this with a conditional relation
-      //case conditional: ConditionalRelation[?,?] => ???
+      case conditional: ConditionalRelation[?,?] => ???
       case reciprocal: ReciprocalRelation[?,?] =>
         for(relatable <- relatables){
-          val subject = relatable.asInstanceOf[ZextObject]
-          ExecuteContextAction(removingRelated(r), RuleContext(removingRelated, subject, Array(this), false, subject.location))
+          val subject = relatable
+          val location = subject.get[ZextObject].map(_.location).getOrElse(nowhere)
+          ExecuteAction(RuleContext(r.removing, subject, Array(this), false, location))
         }
       case _ =>
     }
 
-    val location = this match {
-      case zextObject: ZextObject => zextObject.location
-      case _ => nowhere
-    }
-
-    ExecuteContextAction(removingRelated(r), RuleContext(removingRelated, this, relatables, false, location))
+    val location = this.get[ZextObject].map(_.location).getOrElse(nowhere)
+    ExecuteAction(RuleContext(r.removing, this, relatables, false, location))
   }
 
   private[Zext] def addRelatedInner(r: Relation[?, ?], relatables: Seq[Relatable]) : Unit = {
@@ -505,7 +466,7 @@ trait Relatable {
         case _ => nowhere
       }
 
-      ExecuteContextAction(addingRelated(r), RuleContext(addingRelated, this, relatables, false, location ))
+      ExecuteAction(RuleContext(r.adding, this, relatables, false, location ))
     }
 
     this
@@ -526,7 +487,7 @@ trait Relatable {
   // potentially costly, may iterate through all relatables.
   def queryRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
     val candidates = Relatable.GetAll[B](using relation.ttTarget)
-    candidates.filter(c => ExecuteContextAction(determiningRelation(relation), subject = this, c).res).toSet
+    candidates.filter(candidate => ExecuteAction(relation.determining, subject = this, candidate)).toSet
   }
 
   def queryRelated[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
@@ -612,26 +573,26 @@ object Relation {
       val success = if(firstAll && secondAll) {
          a_set.forall { first =>
           b_set.forall { second =>
-              relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
+              relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
           }
         }
       } else if (firstAny && secondAll) {
         a_set.exists { first =>
           b_set.forall { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
+            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
           }
         }
 
       } else if (firstAny && secondAny) {
         a_set.exists { first =>
           b_set.exists { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
+            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
           }
         }
       } else if (firstAll && secondAny) {
         a_set.forall { first =>
           b_set.exists { second =>
-            relation.checkTypes(first,second) && ExecuteContextAction(determiningRelation(relation), subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable]).res
+            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
           }
         }
       } else false
@@ -650,9 +611,8 @@ implicit object NotAQuery extends RelationQueryContext {
 abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S,T] {
   def condition(s : S, t : T) : Boolean
 
-  inflict(determiningRelation(this)) {
-    if condition(subject.resolve.asInstanceOf[S], arg1.resolve.asInstanceOf[T]) then succeed
-    fail
+  inflict(this.determining) {
+    Break -> condition(subject.resolve.asInstanceOf[S], arg1.resolve.asInstanceOf[T])
   }
 
 }
@@ -662,6 +622,25 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   val ttSource = _ttS
   val ttTarget = _ttT
 
+  val removing = new Action(1) with SystemAction
+  val adding = new Action(1) with SystemAction
+  val determining = new Action(1) with SystemAction
+
+  // this is type checked in the relation query
+  inflict(determining, Priority(-1)) {
+    val related = subject.getRelatedSetFromDictionaries(this)
+    if !related.contains(arg1.resolve.asInstanceOf[T]) then fail
+  }
+
+  inflict(adding, Priority(-1)) {
+    val relatables = GetTargets()
+    subject.addRelatedInner(this, relatables)
+  }
+
+  inflict(removing, Priority(-1)) {
+    val relatables = GetTargets()
+    subject.innerRemove(this, relatables)
+  }
 
   def checkTypes(s : Relatable, t : Relatable) : Boolean = {
     ttSource.unapply(s).isDefined && ttTarget.unapply(t).isDefined

@@ -209,11 +209,11 @@ object Interpreter{
   }
 
   def SystemMessage(str: StringExpression): Unit = {
-    ExecuteContextAction(saying(str.toString), subject = system) // always say this at the player location.
+    ExecuteReturnAction(saying, subject = system)(str.toString)
   }
 
   def Say(str: StringExpression): Unit = {
-    ExecuteContextAction(saying(str.toString))
+    ExecuteReturnAction(saying)(str.toString)
   }
 
 
@@ -741,7 +741,7 @@ object Parser {
       print("> ")
       var input : String = readLine()
 
-      input = ExecuteContextAction(preprocessingInput(input), subject = system).ret
+      input = ExecuteReturnAction(preprocessingInput, subject = system)(input).ret
 
       time("interpreter loop") {
         val results  = time("parsing") {

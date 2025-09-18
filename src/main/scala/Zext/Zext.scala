@@ -2,27 +2,24 @@ package Zext
 
 import Zext.Interpreter.*
 import Zext.Parser.*
-import Zext.QueryPrecedence.*
 import Zext.Rule.*
-import Zext.World.*
 import Zext.Thing.NounAmount
 import Zext.RuleContext.*
+import Zext.Infliction.*
 
 import java.lang.reflect.{Constructor, Modifier}
 import scala.collection.mutable.ArrayBuffer
 import scala.language.{implicitConversions, postfixOps}
 import Condition.*
 import Zext.Actions.*
-import Zext.Idea.allIdeas
-import Zext.Relation.{ManyToMany, OneToMany}
+import Zext.Relation.{ManyToMany, OneToMany, relations}
 import Zext.Relations.*
-import Zext.RuleControl.*
 import Zext.SetComprehension.AllOf
 import Zext.ZextObject.allObjects
 import org.apache.commons.lang3.reflect.FieldUtils
-import zobjectifier.Macros
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
+import java.lang.management.ManagementFactory
 import scala.collection.mutable
 import scala.reflect.{ClassTag, TypeTest}
 
@@ -35,30 +32,31 @@ trait Value[T] {
     this : Property =>
 
     val values = mutable.HashMap[Relatable, T]()
-
-    def apply(value : T) = PropertyAndValue(this, value)
-
-    val valuation = new Action(1) with Context[Option[T]] with SystemAction
-
-    inflict(valuation, Priority(-1)) {
-        val toSet = valuation.GetActionContext()
-        if (toSet.isDefined) {
-            values(arg1) = toSet.get
-        }
-        val value = values.get(arg1)
-        valuation.SetActionContext(value)
+    def apply(value : T) = {
+        PropertyAndValue(this, value)
     }
+
+    override val determining = new Action(1, s"value determining $this") with SystemAction with Returns[Option[T], Option[T]]
+    determining.arg = None
+
+    inflict(determining, Priority(-1) ) { set =>
+        set does (values(arg1) = _)
+        values.get(arg1)
+    }
+
 }
 
 trait Property extends Relatable {
 
-    val determining = new Action(1) with SystemAction
-    inflict(determining, Priority(-1)) {
-        if (arg1.getRelatedSetFromDictionaries(property_having).contains(this)) succeed
-        else fail
+    val determining = new Action(1, s"normal determining $this") with SystemAction
+
+    //@todo hack
+    if(!this.isInstanceOf[Value[?]]) {
+        inflict(determining, Priority(-1)) {
+            Break -> arg1.getRelatedSetFromDictionaries(property_having).contains(this)
+        }
+
     }
-
-
 }
 
 
@@ -87,6 +85,7 @@ object exports{
     export Zext.Relations.RoomAdjacency.*
     export Zext.Idea.*
     export Zext.ControlCodes.*
+    export Zext.Infliction.*
 }
 
 
@@ -156,9 +155,9 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 
-object determiningAccessibility extends Action(1) with Context[Action] with SystemAction {
+object determiningAccessibility extends Action(1) with Returns[Action, Unit] with SystemAction {
 
- inflict(determiningAccessibility) {
+ inflict(determiningAccessibility) { _ =>
 
      // determining if noun is accessible to subject
 
@@ -193,10 +192,10 @@ object determiningAccessibility extends Action(1) with Context[Action] with Syst
 
 }
 
-object determiningVisibility extends Action(1) with Context[Action] with SystemAction {
+object determiningVisibility extends Action(1) with Returns[Action, Unit] with SystemAction {
 
     // determining if noun is visible to subject
-    inflict(determiningVisibility){
+    inflict(determiningVisibility){ forAction =>
 
         /*
         conditions for object visibility:
@@ -240,12 +239,12 @@ object determiningVisibility extends Action(1) with Context[Action] with SystemA
 
         // if noun is composite, check if the composite object is visible to subject
         if (noun.isType[Thing] && noun[Thing].isComposite) {
-            stop_unless( subject[Thing].canSee(noun[Thing].compositeObject, GetActionContext()) )
+            stop_unless( subject[Thing].canSee(noun[Thing].compositeObject, forAction) )
         }
 
         // if noun is in a container, and that container is open or transparent, check if the parent container is visible to subject
         if (targetLocation != null && (targetLocation.open || targetLocation.transparent)) {
-            stop_unless( subject[Thing].canSee(targetLocation, GetActionContext()) )
+            stop_unless( subject[Thing].canSee(targetLocation, forAction) )
         }
 
         fail
@@ -259,16 +258,40 @@ implicit object property_having extends Relation[Relatable, Property] with ManyT
         infix def is[Y <: Target](target: Y*): X = relates(subject, target)
 
         infix def is[ValueT](propertyAndValue: PropertyAndValue[ValueT]) : X = {
-            val ret = relates(subject, propertyAndValue.property.asInstanceOf[Property])
             propertyAndValue.property.values.update(subject.asInstanceOf[Relatable], propertyAndValue.value)
+            val ret = relates(subject, propertyAndValue.property.asInstanceOf[Property])
             ret
         }
+
+
+    inflict (determining) {
+        val property = arg1.resolve.asInstanceOf[Property]
+        // when this runs a returning action as a normal action, it only takes the execution result
+        // so that means determining should probably return false even with a None result.
+        val result = ExecuteAction(InheritContext(action = property.determining, subject = system, target = subject))
+        if(!result.res) fail
+        if(result.ret == None) fail
+
+        succeed
+    }
+
+
 }
 
 extension (tt: TypeTest[Any, ?]) {
     inline def test(any: Any): Boolean = tt.unapply(any).isDefined
 }
 
+
+object Debugger {
+    def attached: Boolean = {
+        val jvmArguments = ManagementFactory.getRuntimeMXBean.getInputArguments
+        jvmArguments.forEach{ arg =>
+            if(arg.contains("-Xdebug") || arg.contains("-Xrunjdwp")) return true
+        }
+        false
+    }
+}
 
 @SerialVersionUID(100L)
 abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializable with reflect.Selectable with Relatable {
@@ -287,7 +310,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var mass = false
 
     def GetName() : String = {
-        ExecuteContextAction(printing_name(name.toString), subject = system, target = this).ret
+        ExecuteReturnAction(printing_name, subject = system, target = this)(name.toString).ret
     }
 
      def indefiniteArticle: String = {
@@ -301,14 +324,14 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     }
 
     def definite: String = {
-        if (this is proper?)
+        if (this(proper))
             return GetName()
 
         definiteArticle + " " + GetName()
     }
 
     def indefinite: String = {
-        if (this is proper?)
+        if (this(proper))
             return GetName()
 
         indefiniteArticle + " " + GetName()
@@ -335,15 +358,17 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     def location : ZContainer = nowhere
 
     def canSee(other: ZextObject, forAction : Action): Boolean = {
-        ExecuteContextAction(determiningVisibility(forAction), subject = this, target = other).res
+        ExecuteReturnAction(determiningVisibility, subject = this, target = other)(forAction).res
     }
 
     def canAccess(other: ZextObject, forAction : Action): Boolean = {
-        ExecuteContextAction(determiningAccessibility(forAction), subject = this, target = other).res
+        ExecuteReturnAction(determiningAccessibility, subject = this, target = other)(forAction).res
     }
 
 
-    override def toString: String = definite
+    override def toString: String = {
+        definite
+    }
 
 
 
