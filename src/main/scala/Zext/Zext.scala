@@ -266,8 +266,6 @@ implicit object property_having extends Relation[Relatable, Property] with ManyT
 
     inflict (determining) {
         val property = arg1.resolve.asInstanceOf[Property]
-        // when this runs a returning action as a normal action, it only takes the execution result
-        // so that means determining should probably return false even with a None result.
         val result = ExecuteAction(InheritContext(action = property.determining, subject = system, target = subject))
         if(!result.res) fail
         if(result.ret == None) fail

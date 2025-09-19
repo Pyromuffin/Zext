@@ -527,6 +527,7 @@ object strong_zone  {
   inflict(strength.determining) { _ =>
     val name = noun[Thing].name.toString
     Succeed -> Some(name.length)
+    
   }
 }
 

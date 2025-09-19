@@ -114,7 +114,6 @@ object Actions {
 
       if (testingOutput){
         testOutput.addOne(MakePlain(postprocessed))
-        () // highly strange, the return type actually has to be unit
       }
       else
         println(postprocessed)

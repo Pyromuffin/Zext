@@ -19,7 +19,7 @@ object Infliction {
   case class ControlException[T](resultAndControl: ResultAndControl[T]) extends ControlThrowable
 
   trait ControlObject(ruleControl: RuleControl) {
-    infix def ->[T](arg: T): ResultAndControl[T] = throw ControlException(ResultAndControl(arg, ruleControl))
+    infix def ->[T](arg: T): T = throw ControlException(ResultAndControl(arg, ruleControl))
   }
 
   object Succeed extends ControlObject(RuleControl.Replace)
@@ -73,7 +73,7 @@ object Infliction {
   }
 
 
-  inline def before[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def before[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).beforeRules += rule
@@ -92,7 +92,7 @@ object Infliction {
   }
 
 
-  inline def check[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def check[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T =>  R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).checkRules += rule
@@ -111,7 +111,7 @@ object Infliction {
   }
 
 
-  inline def instead[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def instead[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Stop, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).insteadRules += rule
@@ -131,7 +131,7 @@ object Infliction {
 
   type ReturnActions[T,R] = Action & Returns[T, R]
 
-  inline def inflict[T, R](action: ReturnActions[T,R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def inflict[T, R](action: ReturnActions[T,R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).executeRules += rule
@@ -150,7 +150,7 @@ object Infliction {
   }
 
 
-  inline def report[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def report[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Replace, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).reportRules += rule
@@ -169,7 +169,7 @@ object Infliction {
   }
 
 
-  inline def after[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def after[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).afterRules += rule
@@ -188,7 +188,7 @@ object Infliction {
   }
 
 
-  inline def applying[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => ResultAndControl[R] | R): ActionRule[T] = {
+  inline def applying[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
     val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
     rule.definitionPosition = CodePosition()
     ruleSets(action).applyingRules += rule

@@ -486,8 +486,13 @@ trait Relatable {
 
   // potentially costly, may iterate through all relatables.
   def queryRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
-    val candidates = Relatable.GetAll[B](using relation.ttTarget)
-    candidates.filter(candidate => ExecuteAction(relation.determining, subject = this, candidate)).toSet
+    val ruleCount = ruleSets(relation.determining).GetAllRules().map(_.size).sum
+    if(ruleCount == 1) {
+      getRelatedSetFromDictionaries(relation)
+    } else {
+      val candidates = Relatable.GetAll[B](using relation.ttTarget)
+      candidates.filter(candidate => ExecuteAction(relation.determining, subject = this, candidate)).toSet
+    }
   }
 
   def queryRelated[V <: OneToOne | ManyToOne | SingleSymmetric, T <: Relatable](relation: Relation[?, T] & V): Option[T] = {
