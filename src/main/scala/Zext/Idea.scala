@@ -31,7 +31,7 @@ object Idea {
 
   // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
-  inflict(determiningVisibility.base, subject knows noun?) {
+  inflict(determiningVisibility, subject knows noun?) {
     succeed
   }
 

@@ -1,7 +1,5 @@
 package Zext
 
-import Zext.Infliction.RuleControl.{Continue, Replace, Stop}
-import Zext.Interpreter.Say
 import Zext.Rule.*
 import zobjectifier.Macros.*
 
@@ -43,212 +41,156 @@ object Infliction {
     if (res) continue else fail
   }
 
-  def GetConditions(first: Condition, _conditions: Condition*): (ActionRuleSet, Array[Condition]) = {
-    // do something to extract the action probably
-    var conditions = _conditions
-    var ruleSet = alwaysRuleSet
-    first match {
-      case ac: ConditionWithAction =>
-        if (ac.queryType == QueryPrecedence.Action) {
-          ruleSet = ruleSets(ac.action)
-        } else {
-          ruleSet = ruleSets(ac.action)
-          conditions = Array(first) concat _conditions
-        }
-      case _ =>
-        conditions = Array(first) concat _conditions
+
+
+
+  inline def CreateRule[T,R](action: Action & Returns[T, R] | Condition, inline body: T => R, control: RuleControl, ruleType: RuleType, conditions: Condition*) : ActionRule[T] = {
+
+    var conds = conditions
+
+    val ruleSet = action match {
+      case returnsWrapper: ReturnsWrapper.type  =>
+        GetRuleSet(returnsWrapper.wrapped, ruleType)
+      case action: Action =>
+        GetRuleSet(action, ruleType)
+      case ac : ActionWithContextCondition =>
+        conds = conds.appended(ac)
+        GetRuleSet(ac.action, ruleType)
+      case condition: Condition =>
+        conds = conds.appended(condition)
+        GetRuleSet(null, ruleType, true)
     }
 
-    (ruleSet, conditions.toArray)
-  }
-
-
-  inline def before(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Continue, false)
+    val rule = new ActionRule[T](body, conds.toArray, control, true)
     rule.definitionPosition = CodePosition()
-    ruleSet.beforeRules += rule
+    rule.sourceCode = SourceCode(body)
+    ruleSet += rule
 
     rule
   }
 
 
-  inline def before[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).beforeRules += rule
+  inline def CreateUnitRule(action:  Action & Returns[?, ?] | Condition, inline body : => Unit, control : RuleControl, ruleType : RuleType, conditions : Condition *) : ActionRule[Unit] = {
 
-    rule
-  }
+    var conds = conditions
 
-
-  inline def check(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Continue, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.checkRules += rule
-
-    rule
-  }
-
-
-  inline def check[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T =>  R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).checkRules += rule
-
-    rule
-  }
-
-
-  inline def instead(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Stop, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.insteadRules += rule
-
-    rule
-  }
-
-
-  inline def instead[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Stop, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).insteadRules += rule
-
-    rule
-  }
-
-
-  inline def inflict(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Continue, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.executeRules += rule
-
-    rule
-  }
-
-  type ReturnActions[T,R] = Action & Returns[T, R]
-
-  inline def inflict[T, R](action: ReturnActions[T,R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).executeRules += rule
-
-    rule
-  }
-
-
-  inline def report(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Replace, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.reportRules += rule
-
-    rule
-  }
-
-
-  inline def report[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Replace, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).reportRules += rule
-
-    rule
-  }
-
-
-  inline def after(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Continue, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.afterRules += rule
-
-    rule
-  }
-
-
-  inline def after[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).afterRules += rule
-
-    rule
-  }
-
-
-  inline def applying(first: Condition, conditions: Condition*)(inline body: => Unit): ActionRule[Unit] = {
-    val (ruleSet, c) = GetConditions(first, conditions *)
-    val rule = new ActionRule[Unit](_ => body, c, RuleControl.Continue, false)
-    rule.definitionPosition = CodePosition()
-    ruleSet.applyingRules += rule
-
-    rule
-  }
-
-
-  inline def applying[T, R](action: Action & Returns[T, R], conditions: Condition*)(inline body: T => R): ActionRule[T] = {
-    val rule = new ActionRule(body, conditions.toArray, RuleControl.Continue, true)
-    rule.definitionPosition = CodePosition()
-    ruleSets(action).applyingRules += rule
-
-    rule
-  }
-
-
-  object stuff extends Action(0)
-  object string_process extends Action(0) with Returns[String, String]
-  object string_say extends Action(0) with Returns[String, Unit]
-
-
-  inflict(stuff, unlisted) {
-    Say("nope!")
-  }
-
-  inflict(string_process, unlisted) { s =>
-    if(s.length > 1){
-      fail -> s
+    val ruleSet = action match {
+      case returnsWrapper: ReturnsWrapper.type  =>
+        GetRuleSet(returnsWrapper.wrapped, ruleType)
+      case action: Action =>
+        GetRuleSet(action, ruleType)
+      case ac : ActionWithContextCondition =>
+        conds = conds.appended(ac)
+        GetRuleSet(ac.action, ruleType)
+      case condition: Condition =>
+        conds = conds.appended(condition)
+        GetRuleSet(null, ruleType, true)
     }
-      s
+
+    val rule = new ActionRule[Unit](_ => body, conds.toArray, control, false)
+    rule.definitionPosition = CodePosition()
+    rule.sourceCode = SourceCode( _ => body)
+    ruleSet += rule
+
+    rule
   }
 
-  inflict(string_say) { s =>
-    Say(s.toLowerCase())
+
+  inline def before[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Continue, RuleType.before, conditions *)
+  }
+
+  inline def before[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Continue, RuleType.before, conditions *)
+  }
+
+
+  inline def check[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Continue, RuleType.check, conditions *)
+  }
+
+  inline def check[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Continue, RuleType.check, conditions *)
+  }
+
+
+  inline def inflict[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Continue, RuleType.inflict, conditions *)
+  }
+
+  inline def inflict[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Continue, RuleType.inflict, conditions *)
+  }
+
+
+  inline def instead[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Stop, RuleType.instead, conditions *)
+  }
+
+  inline def instead[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Stop, RuleType.instead, conditions *)
+  }
+
+
+  inline def report[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Replace, RuleType.report, conditions *)
+  }
+
+  inline def report[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Replace, RuleType.report, conditions *)
+  }
+
+
+  inline def after[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Continue, RuleType.after, conditions *)
+  }
+
+  inline def after[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Continue, RuleType.after, conditions *)
+  }
+
+
+  inline def applying[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: => R)(using DummyImplicit): ActionRule[Unit] = {
+    CreateUnitRule(action, body, RuleControl.Continue, RuleType.applying, conditions *)
+  }
+
+  inline def applying[T, R](action: Action & Returns[T, R] | Condition, conditions: Condition*)(inline body: T => R): ActionRule[T] = {
+    CreateRule(action, body, RuleControl.Continue, RuleType.applying, conditions *)
   }
 
 
 
   // ultra terse syntax
-  class InsteadConsequence(first: Condition, conditions: Condition*) {
-    infix inline def Say(s: StringExpression): ActionRule[Unit] = {
-      instead(first, conditions *)(Interpreter.Say(s))
+  class InsteadConsequence(action:  Action & Returns[?, ?] | Condition, conditions: Condition*) {
+
+    infix inline def Say(inline s: StringExpression): ActionRule[Unit] = {
+      CreateUnitRule(action, Interpreter.Say(s), RuleControl.Stop, RuleType.instead, conditions*)
     }
 
     infix inline def Stop: ActionRule[Unit] = {
-      instead(first, conditions *)(fail)
+      CreateUnitRule(action, fail, RuleControl.Stop, RuleType.instead, conditions *)
     }
   }
 
-  class ReportConsequence(first: Condition, conditions: Condition*) {
+  class ReportConsequence(action:  Action & Returns[?, ?] | Condition, conditions: Condition*) {
     infix inline def Say(s: StringExpression): ActionRule[Unit] = {
-      report(first, conditions *)(Interpreter.Say(s))
+      CreateUnitRule(action, Interpreter.Say(s), RuleControl.Replace, RuleType.report, conditions*)
     }
 
     infix inline def Add(s: StringExpression): ActionRule[Unit] = {
-      report(first, conditions *) {
-        Interpreter.Say(s)
-        continue
-      }
+      CreateUnitRule(action, Interpreter.Say(s), RuleControl.Continue, RuleType.report, conditions *)
     }
+
   }
 
-  def report(first: Condition, conditions: Condition*): ReportConsequence = {
-    new ReportConsequence(first, conditions *)
+  // this is pretty stupid, but whatever.
+  object ReturnsWrapper extends Action(0, "???") with SystemAction with Returns[Unit,Unit] {
+    var wrapped : Action = null
   }
 
-  def instead(first: Condition, conditions: Condition*): InsteadConsequence = {
-    new InsteadConsequence(first, conditions *)
-  }
+  inline def instead(action: Action & Returns[?, ?] | Condition, conditions: Condition*) : InsteadConsequence = new InsteadConsequence(action, conditions* )
+  inline def report(action: Action & Returns[?, ?] | Condition, conditions: Condition*): ReportConsequence = new ReportConsequence(action, conditions* )
+
+
 
 }

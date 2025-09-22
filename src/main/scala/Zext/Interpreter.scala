@@ -352,7 +352,7 @@ object Parser {
     understandableVerbs.clear()
     understandableEverything.clear()
 
-    for(a <- Actions.allActions){
+    for(a <- Actions.allActions.filterNot(_.isInstanceOf[SystemAction])){
       Understand(a, a.verbs *)
     }
 

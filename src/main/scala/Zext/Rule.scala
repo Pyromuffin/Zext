@@ -128,18 +128,37 @@ object Rule {
 
     var blackboard : Any = null
 
+    enum RuleType {
+        case  before, check, instead, report, inflict, after, applying,
+    }
+
+
+    def GetRuleSet(action : Action, ruleType : RuleType, always : Boolean = false): ArrayBuffer[ActionRule[?]] = {
+        val set = if always then alwaysRuleSet else ruleSets(action)
+
+        ruleType match  {
+            case RuleType.before => set.before
+            case RuleType.applying => set.applying
+            case RuleType.instead => set.instead
+            case RuleType.report => set.report
+            case RuleType.inflict => set.inflict
+            case RuleType.after => set.after
+            case RuleType.check => set.check
+        }
+    }
+
     class ActionRuleSet {
         // this is the order they're executed in
-        val applyingRules = ArrayBuffer[ActionRule[?]]()
-        val beforeRules = ArrayBuffer[ActionRule[?]]()
-        val insteadRules = ArrayBuffer[ActionRule[?]]()
-        val checkRules = ArrayBuffer[ActionRule[?]]()
-        val reportRules = ArrayBuffer[ActionRule[?]]()
-        val executeRules = ArrayBuffer[ActionRule[?]]()
-        val afterRules = ArrayBuffer[ActionRule[?]]()
+        val applying = ArrayBuffer[ActionRule[?]]()
+        val before = ArrayBuffer[ActionRule[?]]()
+        val instead = ArrayBuffer[ActionRule[?]]()
+        val check = ArrayBuffer[ActionRule[?]]()
+        val report = ArrayBuffer[ActionRule[?]]()
+        val inflict = ArrayBuffer[ActionRule[?]]()
+        val after = ArrayBuffer[ActionRule[?]]()
 
         def GetAllRules() = {
-            Array(beforeRules, insteadRules, checkRules, reportRules, executeRules, afterRules)
+            Array(before, instead, check, report, inflict, after)
         }
     }
 
@@ -260,10 +279,10 @@ object Rule {
 
     def RunApplyingRules(userCommand : Command): Unit = {
         // get all actions with applying rules
-        val applyingActions = Actions.allActions.filter(ruleSets(_).applyingRules.nonEmpty)
+        val applyingActions = Actions.allActions.filter(ruleSets(_).applying.nonEmpty)
 
         for(action <- applyingActions){
-            val applyingRules = ruleSets(action).applyingRules
+            val applyingRules = ruleSets(action).applying
             val allThings = Relatable.GetAll[Thing]
 
             for(thing <- allThings){
@@ -313,6 +332,7 @@ object Rule {
         }
 
         allRules = allRules.filter(_.nonEmpty)
+
 
          /*
             these are the rules for inform's rule execution, we are not following them, but it's useful to know anyway.
@@ -399,6 +419,7 @@ object Rule {
 abstract class Rule {
     var disabled = false
     var definitionPosition : String = null
+    var sourceCode : String = null
 }
 
 
@@ -433,15 +454,14 @@ case class Priority(amount : Int) extends ConditionHelper {
     }
 }
 
-class ConditionWithAction(val action : Action, condition: => Boolean, queryType: QueryPrecedence) extends Condition(condition, queryType)
 
 object Condition {
     // inform's precedence is something like
     // location > object > property > class > generic
 
     inline implicit def fromBoolean(inline b:  Boolean): Condition = new Condition(b, QueryPrecedence.Generic)
-    inline implicit def fromObject(inline z:  Relatable): Condition = new Condition(z == noun, QueryPrecedence.Object)
-    inline def fromSecondObject(inline z:  Relatable): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
+    inline implicit def fromObject(inline z:  ZextObject): Condition = new Condition(z == noun, QueryPrecedence.Object)
+    inline def fromSecondObject(inline z:  ZextObject): Condition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): Condition = new Condition(az.contains(noun), QueryPrecedence.Object)
     inline implicit def fromProperty(inline p: Property): Condition = new Condition(noun is p?, QueryPrecedence.Property)
     inline def fromSecondProperty(inline p: Property): Condition = new Condition(secondNoun is p?, QueryPrecedence.SecondProperty)
@@ -451,28 +471,26 @@ object Condition {
     inline implicit def fromConditionHelper(inline helper:  ConditionHelper): Condition = helper.createCondition(QueryPrecedence.Generic)
     inline implicit def fromQuery(inline query:  RelationQuery[?,?]) : Condition = new Condition(query.evaluate(), query.relation.precedence)
 
-    inline implicit def fromAction(inline action: Action): Condition = new ConditionWithAction(action, ???, QueryPrecedence.Action)
 
-
-    type ConditionTypes = Relatable | RelatableProxy[?] | ConditionHelper
+    type ConditionTypes = ZextObject | RelatableProxy[ZextObject] | ConditionHelper | Property
 
     inline implicit def fromTuple(inline t: (ConditionTypes, ConditionTypes)): Condition = {
 
         val firstPredicate : Condition = t._1 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.Class)
-            case relatableProxy: RelatableProxy[?] => fromObject(relatableProxy.resolve)
+            case relatableProxy: RelatableProxy[ZextObject] => fromObject(relatableProxy.resolve)
             case property: Property => fromProperty(property)
-            case relatable: Relatable => fromObject(relatable)
+            case relatable: ZextObject => fromObject(relatable)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
 
         val secondPredicate: Condition = t._2 match {
             case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
             case classHolder : ZextObjectClassHolder => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case relatableProxy: RelatableProxy[?] => fromSecondObject(relatableProxy.resolve)
+            case relatableProxy: RelatableProxy[ZextObject] => fromSecondObject(relatableProxy.resolve)
             case property: Property => fromSecondProperty(property)
-            case relatable: Relatable => fromSecondObject(relatable)
+            case relatable: ZextObject => fromSecondObject(relatable)
             case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
         }
 
@@ -510,14 +528,14 @@ object Condition {
     }
 }
 
-def NarrowControls(ctrl : ResultAndControl[?] | Any) : ResultAndControl[?] = {
+def NarrowControls(ctrl : Any) : ResultAndControl[?] = {
     ctrl match {
         case resultAndControl: ResultAndControl[?] => resultAndControl
         case any : Any => ResultAndControl(any, Default)
     }
 }
 
-class ActionRule[T](body : T => (ResultAndControl[?] | Any), val conditions : Array[Condition], defaultControl : RuleControl, hasReturns : Boolean) extends Rule{
+class ActionRule[T](body : T => ?, val conditions : Array[Condition], defaultControl : RuleControl, hasReturns : Boolean) extends Rule{
     var first = true
 
     def specificity = {
@@ -588,19 +606,22 @@ trait DebugAction {
 
 
 // this trait prevents running of always rules, ie things that query the 'act' object
+// verbs for system actions are also not able to be understood in commands
 trait SystemAction {
     this: Action =>
 }
 
+// passthrough actions will pass through the argument from one rule to the next.
 trait Passthrough[T] {
     this: Returns[T,T] =>
 }
 
+class ActionWithContextCondition(val action : Action, condition : => Boolean,  queryType: QueryPrecedence) extends Condition(condition, queryType)
+
 trait Returns[T, R] {
     this: Action =>
-    var arg : T = null.asInstanceOf[T]
-    def apply(context : T) = new ConditionWithAction(this,  arg == context, QueryPrecedence.Context)
-    def base : Action = this.asInstanceOf[Action]
+    private[Zext] var arg : T = null.asInstanceOf[T]
+    def apply(context : T) = new ActionWithContextCondition(this, arg == context, QueryPrecedence.Context)
 }
 
 
@@ -614,6 +635,15 @@ class MetaAction[NounType <: Relatable : TT as _tt](val targets : Int) extends R
     allMetaActions.addOne(this)
 
 }
+
+
+object Action {
+    implicit def toReturns(action : Action) : Action & Returns[Unit,Unit] = {
+        ReturnsWrapper.wrapped = action
+        ReturnsWrapper
+    }
+}
+
 
 class Action(targets : Int, val verbs : String*) extends MetaAction[ZextObject](targets) with ParsableType(PartOfSpeech.verb) {
     allActions.addOne(this)

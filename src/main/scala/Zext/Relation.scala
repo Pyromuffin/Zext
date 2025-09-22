@@ -461,12 +461,15 @@ trait Relatable {
 
     if (relatables.nonEmpty) {
 
+      
       val location = this match {
         case zextObject: ZextObject => zextObject.location
         case _ => nowhere
       }
+      
 
-      ExecuteAction(RuleContext(r.adding, this, relatables, false, location ))
+      // @todo make it so that actions with the player as the subject are also heard.
+      ExecuteAction(RuleContext(r.adding, this, relatables, false, nowhere))
     }
 
     this

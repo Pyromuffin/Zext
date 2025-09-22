@@ -38,6 +38,7 @@ object unlocking extends Action(1, "unlock")
   inflict(unlocking, of[Container]) {
     noun[Container].openable = true
   }
+  
   report(unlocking) Say s"You unlock $noun"
 }
 
@@ -46,7 +47,7 @@ object Dirt extends Room {
   override val name: StringExpression = "dirt"
   override val description: StringExpression = str {
     once("the floorboards creak underfoot.")
-   "You are buried in soil."
+    "You are buried in soil."
   }
 
 
@@ -138,6 +139,7 @@ object idea_world {
     override val description = "phantom guns are known to manifest when secrets are known"
   } is obvious
 
+
   after(thinking, violence) {
     subject can_discover guns
   }
@@ -174,7 +176,7 @@ object wet extends Property with Value[Int]
 object drying extends Action(1, "dry") {
 
   applying(drying, wet) {
-    if (noun(wet) > 0 && scala.util.Random.nextInt(4) == 0){
+    if (noun(wet)> 0 && scala.util.Random.nextInt(4) == 0){
       continue
     } else fail
   }
@@ -319,7 +321,8 @@ object clapping extends Action(0, "clap") {
   waiting is loudness(5)
 
   inflict(loud.determining) {
-
+    val volume = arg1.get(loudness).getOrElse(0)
+    Break -> (volume > 3)
   }
 
 
@@ -389,7 +392,7 @@ object CrowsNest extends Room {
     player.insured = true
   }
 
-  inflict(determiningVisibility.base, trapeze, Circus.here){
+  inflict(determiningVisibility, trapeze, Circus.here){
     succeed
   }
 
@@ -527,7 +530,7 @@ object strong_zone  {
   inflict(strength.determining) { _ =>
     val name = noun[Thing].name.toString
     Succeed -> Some(name.length)
-    
+
   }
 }
 

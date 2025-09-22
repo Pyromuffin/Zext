@@ -5,7 +5,7 @@ import opennlp.tools.postag.*
 import java.io.{ByteArrayInputStream, FileInputStream}
 
 object NLP {
-  val modelFinder = opennlp.tools.models.simple.SimpleClassPathModelFinder("opennlp-models-pos-en-1.2.0.jar")
+  val modelFinder = opennlp.tools.models.simple.SimpleClassPathModelFinder("opennlp-models-pos-en-1.3.0.jar")
   val loader = ClassPathModelLoader()
   val model = modelFinder.findModels(false).iterator().next()
   val loaded = loader.load(model)

@@ -18,6 +18,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import RelatableProxy.*
 import Zext.Infliction.*
+import zobjectifier.Macros.CodePosition
 
 extension[T] (o : Option[T]) {
   inline infix def does(inline something : T => Unit): Unit = {
@@ -66,7 +67,7 @@ object Actions {
   }
 
 
-  object preprocessingInput extends Action(0) with Returns[String, String] with Passthrough[String] with SystemAction {
+  object preprocessingInput extends Action(0, "preprocessing input") with Returns[String, String] with Passthrough[String] with SystemAction {
 
     inflict(preprocessingInput) { text =>
       text.toLowerCase
@@ -74,7 +75,7 @@ object Actions {
 
   }
 
-  object postprocessingText extends Action(0) with Returns[String, String] with Passthrough[String] with SystemAction {
+  object postprocessingText extends Action(0, "postprocessing text") with Returns[String, String] with Passthrough[String] with SystemAction {
 
     inflict(postprocessingText) { text =>
        MakeTextNice(text)
@@ -83,16 +84,15 @@ object Actions {
   }
 
   // for hooking, call SetActionContext with the final name
-  object printing_name extends Action(1) with Returns[String, String] with Passthrough[String] with SystemAction
+  object printing_name extends Action(1, "printing name") with Returns[String, String] with Passthrough[String] with SystemAction
   inflict(printing_name, Priority(-1)){ name =>
     name
   }
 
-  // i suppose we will live with this weirdness for the moment. it seems somewhat unlikely we will have things that return Unit
-  // becuase we really dont have that many things that are purely for side effects i think.
-  object saying extends Action(0) with Returns[String, Unit] with SystemAction {
 
-    check(saying) { _ =>
+  object saying extends Action(0, "saying") with Returns[String, Unit] with SystemAction {
+
+    check(saying) {
       if(subject == system)
         continue
 
@@ -102,7 +102,6 @@ object Actions {
       if (silent)
         fail
     }
-
 
     inflict(saying) { text =>
       if (text == "") fail // maybe an error
@@ -153,22 +152,6 @@ object Actions {
     instead(going, nothing) Say "You don't have to go right now."
 
     /*
-    UnderstandAlias("east", going, Direction.east)
-    UnderstandAlias("e", going, Direction.east)
-    UnderstandAlias("west", going, Direction.west)
-    UnderstandAlias("w", going, Direction.west)
-    UnderstandAlias("north", going, Direction.north)
-    UnderstandAlias("n", going, Direction.north)
-    UnderstandAlias("south", going, Direction.south)
-    UnderstandAlias("s", going, Direction.south)
-    UnderstandAlias("up", going, Direction.up)
-    UnderstandAlias("u", going, Direction.up)
-    UnderstandAlias("down", going, Direction.down)
-    UnderstandAlias("d", going, Direction.down)
-    */
-
-
-    /*
         check going
         before leaving
         instead leaving
@@ -189,9 +172,9 @@ object Actions {
 
       // this is so dumb but maybe it will work?
       val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      if !RunRule(leaveCtx, ruleSets(leaving).beforeRules).res then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).insteadRules).res then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).checkRules).res then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).before).res then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).instead).res then fail
+      if !RunRule(leaveCtx, ruleSets(leaving).check).res then fail
 
       if (!connected) {
         Say(s"You can't go $d")
@@ -200,9 +183,9 @@ object Actions {
       val destination = player.room.connections(d).get
 
       val enterCtx = RuleContext(act, subject, Array(destination), false,  player.location)
-      if !RunRule(enterCtx, ruleSets(entering).beforeRules).res then fail
-      if !RunRule(enterCtx, ruleSets(entering).insteadRules).res then fail
-      if !RunRule(enterCtx, ruleSets(entering).checkRules).res then fail
+      if !RunRule(enterCtx, ruleSets(entering).before).res then fail
+      if !RunRule(enterCtx, ruleSets(entering).instead).res then fail
+      if !RunRule(enterCtx, ruleSets(entering).check).res then fail
 
     }
 
@@ -218,21 +201,21 @@ object Actions {
       val room = player.room.connections(d).get
 
       val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      RunRule(leaveCtx, ruleSets(leaving).reportRules)
-      RunRule(leaveCtx, ruleSets(leaving).executeRules)
+      RunRule(leaveCtx, ruleSets(leaving).report)
+      RunRule(leaveCtx, ruleSets(leaving).inflict)
 
       blackboard = player.location
       player.Move(room)
 
       val enterCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      RunRule(enterCtx, ruleSets(entering).reportRules)
-      RunRule(enterCtx, ruleSets(entering).executeRules)
+      RunRule(enterCtx, ruleSets(entering).report)
+      RunRule(enterCtx, ruleSets(entering).inflict)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(act, subject, Array(previousRoom), false, player.location), ruleSets(leaving).afterRules)
-      RunRule(RuleContext(act, subject, Array(player.location), false, player.location), ruleSets(entering).afterRules)
+      RunRule(RuleContext(act, subject, Array(previousRoom), false, player.location), ruleSets(leaving).after)
+      RunRule(RuleContext(act, subject, Array(player.location), false, player.location), ruleSets(entering).after)
     }
 
   }
