@@ -17,6 +17,7 @@ lazy val meta = (project in file("meta"))
 
   )
 */
+resolvers += "Zobjectifier packages" at "https://maven.pkg.github.com/pyromuffin/zobjectifier"
 
 githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_TOKEN")
 
