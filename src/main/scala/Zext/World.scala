@@ -10,7 +10,7 @@ import Zext.Rule.*
 import scala.reflect.TypeTest
 
 // special object for actions that happen without subjects
-object nothing extends ZextObject {
+object nothing extends ZextObject with SetComprehension[Nothing] {
   val name = "nothing"
   val description = "subject for things that happen without agentic cause"
 
@@ -23,7 +23,7 @@ object system extends ZextObject {
 }
 
 
-class ZextObjectClassHolder(tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ConditionHelper {
+class ZextObjectClassHolder[T](tt : TypeTest[ZextObject | Container,?], depth: Int, className : String) extends ConditionHelper {
 
   var not = false
   def unary_! = {
@@ -89,11 +89,12 @@ class WorldState{
   var time = 0
 }
 
+/*
 object player extends RelatableProxy[PlayerClass] {
   override def resolve = World.currentWorld.player
-}
+} */
 
-
+def player : PlayerClass = World.currentWorld.player
 
 object World  {
 

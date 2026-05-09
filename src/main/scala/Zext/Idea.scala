@@ -3,25 +3,33 @@ package Zext
 import Zext.Actions.printing_name
 import Zext.Idea.allIdeas
 import Zext.Interpreter.Say
-import Zext.Relation.{ManyToMany, OneToMany}
+import Zext.Relation.{ManyToMany, OneToMany, RelationQuery}
 import Zext.ControlCodes.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import Zext.Condition.*
 import Zext.Infliction.*
-import Zext.RuleContext.first
+import Zext.RuleContext.*
 
-implicit object idea_knowing extends Relation[Thing, Idea] with ManyToMany {
+
+extension[T] (wrapper : RelatableWrapper[T]) {
+  implicit inline def toUnderlying : T = wrapper.underlying
+}
+
+// we need relatable wrappers because of ???
+case class RelatableWrapper[+T <: Relatable](underlying : T) extends SetComprehension[Nothing] with Applicable
+
+
+implicit object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def knows[Y <: Target](target: Y*): X = relates(subject, target)
 }
 
-implicit object idea_discovering extends Relation[Thing, Idea] with ManyToMany {
+implicit object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def can_discover[Y <: Target](target: Y*): X = relates(subject, target)
 }
-
 
 object Idea {
   object innate extends Property // for ideas that everyone starts with
@@ -39,10 +47,11 @@ object Idea {
     succeed
   }
 
-  object thinking extends Action(1, "think", "think of", "imagine", "think about") {
+  object thinking extends SingleAction[Idea](1, "think", "think of", "imagine", "think about") {
 
     // allow discoverable ideas to be thought of, but are otherwise not interactable.
     inflict(determiningVisibility(thinking), subject can_discover noun?) {
+
       succeed
     }
 
@@ -54,11 +63,12 @@ object Idea {
     }
 
     report(thinking, subject knows noun?) {
+
         Say(s"Thinking of $noun reveals: ${noun.description}")
     }
   }
 
-  object ideating extends Action(0, "ideas", "thoughts", "knowledge") {
+  object ideating extends SelfAction[Thing](0, "ideas", "thoughts", "knowledge") {
 
     before(ideating, first) {
       // make all innate ideas discoverable
@@ -67,7 +77,7 @@ object Idea {
     }
 
 
-    inflict(printing_name, player can_discover noun?) { name =>
+    inflict.returns(printing_name, player can_discover noun?) { name =>
       name.bold
     }
 

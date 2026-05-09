@@ -25,38 +25,43 @@ import scala.reflect.{ClassTag, TypeTest}
 
 
 
+/*
+@todo fix the printing of combinations of punctuation such as ... and ?! and "  ."
+@todo fix the confusion of arg1 vs noun. Ideally we make noun a relatable proxy instead of a zextobject and then we delete arg1
 
-case class PropertyAndValue[T](property: Value[T], value : T)
+
+*/
+
+
+
+case class PropertyWithValue[T](property: Property & Value[T], value : T)
 
 trait Value[T] {
     this : Property =>
 
     val values = mutable.HashMap[Relatable, T]()
     def apply(value : T) = {
-        PropertyAndValue(this, value)
+        PropertyWithValue(this, value)
     }
 
-    override val determining = new Action(1, s"value determining $this") with SystemAction with Returns[Option[T], Option[T]]
+    override val determining = new MetaAction[Relatable, Relatable, Nothing, Option[T], Option[T]](1, s"value determining $this") with SystemAction
     determining.arg = None
 
-    inflict(determining, Priority(-1) ) { set =>
-        set does (values(arg1) = _)
-        values.get(arg1)
+    inflict.returns(determining, Priority(-1) ) { set =>
+        set does (values(noun) = _)
+        values.get(noun)
     }
 
 }
 
 trait Property extends Relatable {
 
-    val determining = new Action(1, s"normal determining $this") with SystemAction
+    val determining = new MetaAction[Relatable, Relatable, Nothing, Unit, Unit](1, s"normal determining $this") with SystemAction
 
     //@todo hack
-    if(!this.isInstanceOf[Value[?]]) {
-        inflict(determining, Priority(-1)) {
-            Break -> arg1.getRelatedSetFromDictionaries(property_having).contains(this)
-        }
-
-    }
+      inflict(determining, Priority(-2)) {
+          Break -> noun.getRelatedSetFromDictionaries(property_having).contains(this)
+      }
 }
 
 
@@ -155,18 +160,18 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 
-object determiningAccessibility extends Action(1) with Returns[Action, Unit] with SystemAction {
+object determiningAccessibility extends ReturnsAction[Action, Unit](1, "determining accessibility")  with SystemAction {
 
- inflict(determiningAccessibility) { _ =>
+ inflict(determiningAccessibility) {
 
      // determining if noun is accessible to subject
 
-     val nounLocation = noun.resolve match {
+     val nounLocation = noun match {
          case t: Thing => t.location
          case _ => null
      }
 
-     val secondNounLocation = subject.resolve match {
+     val secondNounLocation = subject match {
          case t: Thing => t.location
          case _ => null
      }
@@ -176,9 +181,12 @@ object determiningAccessibility extends Action(1) with Returns[Action, Unit] wit
          continue
      }
 
+
+
+
      // if noun is composite, check if the composite object is accessible to secondNoun
-     if (noun.isType[Thing] && noun[Thing].isComposite) {
-         stop_unless(ExecuteAction(determiningAccessibility, target = noun[Thing].compositeObject))
+     noun.get[Thing] does { t =>
+         stop_unless(ExecuteAction(determiningAccessibility, Redirect(target = t.compositeObject)))
      }
 
      // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
@@ -192,10 +200,13 @@ object determiningAccessibility extends Action(1) with Returns[Action, Unit] wit
 
 }
 
-object determiningVisibility extends Action(1) with Returns[Action, Unit] with SystemAction {
+object determiningVisibility2 extends MetaAction[Relatable, Relatable, Nothing, AnyAction, Unit](1, "determining visibility2") with SystemAction
+
+
+object determiningVisibility extends MetaAction[ZextObject, ZextObject, Nothing, AnyAction, Unit](1, "determining visibility2") with SystemAction{
 
     // determining if noun is visible to subject
-    inflict(determiningVisibility){ forAction =>
+    inflict.returns(determiningVisibility){ forAction =>
 
         /*
         conditions for object visibility:
@@ -213,12 +224,12 @@ object determiningVisibility extends Action(1) with Returns[Action, Unit] with S
 
         // allow actions to control visibility rules for those particular actions.
 
-        val subjectLocation = subject.resolve match {
+        val subjectLocation = subject match {
             case t: Thing => t.location
             case _ => null
         }
 
-        val targetLocation = noun.resolve match {
+        val targetLocation = noun match {
             case t: Thing => t.location
             case _ => null
         }
@@ -253,20 +264,25 @@ object determiningVisibility extends Action(1) with Returns[Action, Unit] with S
 }
 
 
+
+
 implicit object property_having extends Relation[Relatable, Property] with ManyToMany {
+
+    override val precedence = QueryPrecedence.Property
+
     extension [X <: Source](subject: X)
         infix def is[Y <: Target](target: Y*): X = relates(subject, target)
 
-        infix def is[ValueT](propertyAndValue: PropertyAndValue[ValueT]) : X = {
-            propertyAndValue.property.values.update(subject.asInstanceOf[Relatable], propertyAndValue.value)
-            val ret = relates(subject, propertyAndValue.property.asInstanceOf[Property])
+        // enables object is property(whatever) syntax
+        infix def is[ValueType](propertyAndValue: PropertyWithValue[ValueType]) : X = {
+            propertyAndValue.property.values.update(subject, propertyAndValue.value)
+            val ret = relates(subject, propertyAndValue.property)
             ret
         }
 
 
     inflict (determining) {
-        val property = arg1.resolve.asInstanceOf[Property]
-        val result = ExecuteAction(InheritContext(action = property.determining, subject = system, target = subject))
+        val result = ExecuteAction(InheritContext(action = noun.determining, subject = system, target = subject))
         if(!result.res) fail
         if(result.ret == None) fail
 
@@ -355,11 +371,11 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
 
     def location : ZContainer = nowhere
 
-    def canSee(other: ZextObject, forAction : Action): Boolean = {
+    def canSee(other: ZextObject, forAction : AnyAction): Boolean = {
         ExecuteReturnAction(determiningVisibility, subject = this, target = other)(forAction).res
     }
 
-    def canAccess(other: ZextObject, forAction : Action): Boolean = {
+    def canAccess(other: ZextObject, forAction : AnyAction): Boolean = {
         ExecuteReturnAction(determiningAccessibility, subject = this, target = other)(forAction).res
     }
 

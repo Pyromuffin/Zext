@@ -30,8 +30,8 @@ extension[T] (o : Option[T]) {
 object Actions {
 
   val commandAliases = mutable.HashMap[String, Command]()
-  val allActions = ArrayBuffer[Action]()
-  val allMetaActions = ArrayBuffer[MetaAction[?]]()
+  //val allActions = ArrayBuffer[Action]()
+  val allMetaActions = ArrayBuffer[AnyAction]()
 
   def UnderstandAlias(str: String, action: Action, zextObject1: ZextObject = null, zextObject2: ZextObject = null): Unit = {
     val targets = ConsolidateTargets(zextObject1, zextObject2).map(_.asInstanceOf[ZextObject]) //@todo hack
@@ -45,7 +45,7 @@ object Actions {
 
   object being extends Action(1)
   object waiting extends Action(0, "wait", "loiter") {
-    report(waiting) Say "You wait for minute"
+    report quick(waiting) Say "You wait for minute"
   }
 
   object starting extends Action(0) {
@@ -61,36 +61,38 @@ object Actions {
     }
 
     after(starting) {
-      ExecuteAction(examining, subject = player, target = player.location)
+      val ctx = ReplaceActionContext(examining, subject = Some(player), target = Some(player.location) )
+      ExecuteAction(ctx)
     }
 
   }
 
+  type StringProcess = MetaAction[Relatable,Nothing,Nothing, String,String]
 
-  object preprocessingInput extends Action(0, "preprocessing input") with Returns[String, String] with Passthrough[String] with SystemAction {
+  object preprocessingInput extends StringProcess(0) with Passthrough[String] with SystemAction {
 
-    inflict(preprocessingInput) { text =>
+    inflict.returns(preprocessingInput) { text =>
       text.toLowerCase
     }
 
   }
 
-  object postprocessingText extends Action(0, "postprocessing text") with Returns[String, String] with Passthrough[String] with SystemAction {
+  object postprocessingText extends StringProcess(0) with Passthrough[String] with SystemAction {
 
-    inflict(postprocessingText) { text =>
+    inflict.returns(postprocessingText) { text =>
        MakeTextNice(text)
     }
 
   }
 
   // for hooking, call SetActionContext with the final name
-  object printing_name extends Action(1, "printing name") with Returns[String, String] with Passthrough[String] with SystemAction
-  inflict(printing_name, Priority(-1)){ name =>
+  object printing_name extends MetaAction[Relatable,Relatable,Nothing,String,String](1) with Passthrough[String] with SystemAction
+  inflict.returns(printing_name, Priority(-1)){ name =>
     name
   }
 
 
-  object saying extends Action(0, "saying") with Returns[String, Unit] with SystemAction {
+  object saying extends MetaAction[Relatable, Nothing, Nothing, String, Unit](0) with SystemAction {
 
     check(saying) {
       if(subject == system)
@@ -103,17 +105,16 @@ object Actions {
         fail
     }
 
-    inflict(saying) { text =>
+    inflict.returns(saying) { text =>
       if (text == "") fail // maybe an error
 
-      var postprocessed = ExecuteReturnAction(postprocessingText)(text).ret
+      var postprocessed = ExecuteReturnAction(postprocessingText, InheritContext())(text).ret
       if(subject == system){
         postprocessed = postprocessed.bold
       }
 
-      if (testingOutput){
+      if (testingOutput)
         testOutput.addOne(MakePlain(postprocessed))
-      }
       else
         println(postprocessed)
     }
@@ -139,7 +140,8 @@ object Actions {
 
     report(entering, of[Room]){
       LineBreak()
-      stop_unless(ExecuteAction(examining, target = noun))
+      val ctx = ReplaceActionContext(examining, target = Some(noun))
+      stop_unless(ExecuteAction(ctx).res)
     }
 
   }
@@ -149,7 +151,7 @@ object Actions {
 
     override def implicitTargetSelector = nothing
 
-    instead(going, nothing) Say "You don't have to go right now."
+    instead quick(going, nothing) Say "You don't have to go right now."
 
     /*
         check going
@@ -172,9 +174,9 @@ object Actions {
 
       // this is so dumb but maybe it will work?
       val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      if !RunRule(leaveCtx, ruleSets(leaving).before).res then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).instead).res then fail
-      if !RunRule(leaveCtx, ruleSets(leaving).check).res then fail
+      if !RunRule(leaveCtx, leaving.ruleSet.before.toSeq).res then fail
+      if !RunRule(leaveCtx, leaving.ruleSet.instead.toSeq).res then fail
+      if !RunRule(leaveCtx, leaving.ruleSet.check.toSeq).res then fail
 
       if (!connected) {
         Say(s"You can't go $d")
@@ -183,9 +185,9 @@ object Actions {
       val destination = player.room.connections(d).get
 
       val enterCtx = RuleContext(act, subject, Array(destination), false,  player.location)
-      if !RunRule(enterCtx, ruleSets(entering).before).res then fail
-      if !RunRule(enterCtx, ruleSets(entering).instead).res then fail
-      if !RunRule(enterCtx, ruleSets(entering).check).res then fail
+      if !RunRule(enterCtx, entering.ruleSet.before.toSeq).res then fail
+      if !RunRule(enterCtx, entering.ruleSet.instead.toSeq).res then fail
+      if !RunRule(enterCtx, entering.ruleSet.check.toSeq).res then fail
 
     }
 
@@ -201,21 +203,21 @@ object Actions {
       val room = player.room.connections(d).get
 
       val leaveCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      RunRule(leaveCtx, ruleSets(leaving).report)
-      RunRule(leaveCtx, ruleSets(leaving).inflict)
+      RunRule(leaveCtx, leaving.ruleSet.report.toSeq)
+      RunRule(leaveCtx, leaving.ruleSet.inflict.toSeq)
 
       blackboard = player.location
       player.Move(room)
 
       val enterCtx = RuleContext(act, subject, Array(player.location), false, player.location)
-      RunRule(enterCtx, ruleSets(entering).report)
-      RunRule(enterCtx, ruleSets(entering).inflict)
+      RunRule(enterCtx, entering.ruleSet.report.toSeq)
+      RunRule(enterCtx, entering.ruleSet.inflict.toSeq)
     }
 
     after(going, of[Direction]){
       val previousRoom = blackboard.asInstanceOf[Room]
-      RunRule(RuleContext(act, subject, Array(previousRoom), false, player.location), ruleSets(leaving).after)
-      RunRule(RuleContext(act, subject, Array(player.location), false, player.location), ruleSets(entering).after)
+      RunRule(RuleContext(act, subject, Array(previousRoom), false, player.location), leaving.ruleSet.after.toSeq)
+      RunRule(RuleContext(act, subject, Array(player.location), false, player.location), entering.ruleSet.after.toSeq)
     }
 
   }
@@ -247,13 +249,13 @@ object Actions {
       player.location holds noun[Thing]
     }
 
-    report(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
+    report quick(dropping) Say randomly(s"$noun gently flutters to the ground.", s"Discarded, $noun crashes into earth.", s"You abandon $noun to its fate.")
 
   }
 
 
 
-  object taking extends Action(1,"take", "get", "pick up", "g") {
+  object taking extends SingleAction[Thing](1,"take", "get", "pick up", "g") {
 
     override def implicitTargetSelector = nothing
 
@@ -269,7 +271,7 @@ object Actions {
         fail
     }
 
-    instead(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
+    instead quick(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
     instead(taking, noun[Thing].isComposite) {
       Say(s"You're going to have a difficult time removing $noun from ${noun[Thing].compositeObject}")
@@ -315,8 +317,9 @@ object Actions {
 
     after(examining, ofDebug[Room]("after room examining")) {
       val r = noun[Room]
-      var nonscenery = r.contents.filterNot(_ is scenery?).filterNot( _.isType[Person]).toSeq
-      val people = r.contents.filter(_.isType[Person]).toSeq
+      ???
+      var nonscenery = r.contents //.filterNot(_ is scenery?).filterNot( _.isType[Person])
+      val people = r.contents.filter(_.isType[Person])
 
       val roomDescribed = nonscenery.filter{ z =>
         val roomDesc = z.get(RoomDescription)
@@ -413,13 +416,13 @@ object Actions {
         noun[Container].open = false
     }
 
-    report(closing, of[Container]) Say s"You close $noun"
+    report quick(closing, of[Container]) Say s"You close $noun"
   }
 
 
   object opening extends Action(1, "open"){
 
-    instead(opening, !of[Container]) Say s"It doesn't seem like you can open $noun"
+    instead quick(opening, !of[Container]) Say s"It doesn't seem like you can open $noun"
 
     check(opening, of[Container]){
 
@@ -492,7 +495,8 @@ object Actions {
     inflict(loading) {
       Saving.LoadWorld()
       LineBreak()
-      ExecuteAction(examining, target = player.location)
+      ???
+      //ExecuteAction(examining, target = player.location)
     }
   }
 
@@ -509,7 +513,9 @@ object Actions {
     }
   }
 
-  object putting extends Action(2,"put", "insert", "place") {
+
+  // putting noun into secondNoun
+  object putting extends DoubleAction[Thing, ZContainer](2,"put", "insert", "place") {
 
     before(putting, secondNoun holds noun?) {
       Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")

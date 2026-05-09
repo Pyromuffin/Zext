@@ -6,20 +6,28 @@ import Zext.SetComprehension.narrow
 import scala.collection.mutable.ArrayBuffer
 
 
-extension [X <: Relatable](x: X | SetComprehension[X]) {
+extension [X <: Relatable](x: X ) {
+  /*
   def unary_~ : SetComprehension[X] = {
     val narrowed = narrow(x)
     val cloned = narrowed.clone()
     cloned.inverted = !cloned.inverted
     cloned
   }
+*/
+  def unary_! : X = {
+    //val narrowed = narrow(x)
+    //val cloned = narrowed.clone()
+    //cloned.not = !cloned.not
+    //cloned
 
-  def unary_! : SetComprehension[X] = {
-    val narrowed = narrow(x)
-    val cloned = narrowed.clone()
-    cloned.not = !cloned.not
-    cloned
+    assert(!negated)
+    println("negated!")
+    negated = true
+    x
+    
   }
+  
 }
 
 trait SetComprehension[+T] extends Cloneable {
@@ -33,15 +41,19 @@ trait SetComprehension[+T] extends Cloneable {
 object SetComprehension {
 
 
+  /*
   extension (queryBlock: => SetComprehension[?]) {
-    def ? : RelationQuery[?, ?] = {
+    def ? : AnyCondition = {
       NotAQuery.stack.push(ArrayBuffer())
       queryBlock
       val queries = NotAQuery.stack.pop()
       assert(queries.length == 1)
-      queries.head
+      val q = queries.head
+      fromQuery(q)
     }
   }
+  */
+
 
   def narrow[X <: Relatable](x: X | SetComprehension[X]): SetComprehension[X] = {
     x match {

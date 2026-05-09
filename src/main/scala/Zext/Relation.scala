@@ -4,6 +4,7 @@ import Zext.*
 import Zext.QueryPrecedence.Context
 import Zext.Relatable.allRelatables
 import Zext.Relation.*
+import Zext.Relation.RelationQuery.negateNext
 import Zext.SetComprehension.{AllOf, AnyOf, CombinedComprehension}
 import Zext.exports.*
 
@@ -206,21 +207,62 @@ object Relatable {
 
   }
 
-  extension (queryBlock: => Relatable) {
-    def ? : RelationQuery[?,?] = {
-      NotAQuery.stack.push(ArrayBuffer())
-      queryBlock
-      val queries = NotAQuery.stack.pop()
-      assert(queries.length == 1)
-      queries.head
-    }
 
+  // so act is loud? is always evaluated as (act is loud)?
+  // so what we need is act is loud to have a ? operator
+
+
+  inline implicit def ToQueryable[X <: Relatable, Y](inline q: => X): Queryable[X, Y] = {
+    new Queryable(q)
   }
+
+  class Queryable[X <: Relatable, Y](q: RuleContext[?, ?, ?] ?=> X) {
+    def ? : Zext.Relation.RelationQuery[X, Y] = ???
+  }
+
+
 }
 
 
+trait Applicable {
 
-trait Relatable {
+  def get[T](propertyValue: Property & Value[T]): Option[T] = {
+    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
+    result._2
+  }
+
+  def apply[T](propertyValue: Property & Value[T]): T = {
+    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
+    result._2.get
+  }
+
+  def update[T](propertyValue: Property & Value[T], value: T): Unit = {
+    ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(Some(value))
+  }
+
+  def apply(property: Property): Boolean = {
+    ExecuteAction(property.determining, subject = system, target = this)
+  }
+
+  def get[T: TT]: Option[T] = {
+    this match {
+      case t: T => Some(t)
+      case _ => None
+    }
+  }
+
+
+  /*
+  def as[T] : T = {
+    this.asInstanceOf[T]
+  }
+  */
+
+}
+
+
+trait Relatable extends Applicable {
+  this : AnyRef =>
 
   allRelatables.addOne(this)
   val objectID = allRelatables.length
@@ -229,34 +271,7 @@ trait Relatable {
 
   override def toString = this.getClass.toString
 
-  def get[T](propertyValue: Property & Value[T]) : Option[T] = {
-    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
-    result._2
-  }
 
-  def apply[T](propertyValue: Property & Value[T]) : T = {
-    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
-    result._2.get
-  }
-
-  def update[T](propertyValue: Property & Value[T], value : T) : Unit = {
-    ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(Some(value))
-  }
-
-  def apply(property: Property): Boolean = {
-    ExecuteAction(property.determining, subject = system, target = this)
-  }
-
-  def apply[T] : T = {
-    this.asInstanceOf[T]
-  }
-
-  def get[T : TT]: Option[T] = {
-    this match {
-      case t: T => Some(t)
-      case _ => None
-    }
-  }
 
 
 
@@ -561,13 +576,19 @@ object Relation {
     this: Relation[?,?] =>
   }
 
+
   object RelationQuery {
-    implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
+   // implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
+    var negateNext = false
+
   }
 
   case class RelationQuery[A <: Relatable, B <: Relatable](ays : SetComprehension[A], bees : SetComprehension[B], relation : Relation[A,B]) {
 
-     def evaluate() : Boolean = {
+    val negated = negateNext
+    negateNext = false
+
+     def evaluate(using RuleContext[?,?,?]) : Boolean = {
       val a_set = ays.getSet()
       val b_set = bees.getSet()
 
@@ -576,7 +597,7 @@ object Relation {
       val firstAny = ays.any
       val secondAny = bees.any
 
-      val not = ays.not || bees.not
+      val not = negated //ays.not || bees.not
 
       val success = if(firstAll && secondAll) {
          a_set.forall { first =>
@@ -630,9 +651,9 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   val ttSource = _ttS
   val ttTarget = _ttT
 
-  val removing = new Action(1) with SystemAction
-  val adding = new Action(1) with SystemAction
-  val determining = new Action(1) with SystemAction
+  val removing = new MetaAction[S,T,Nothing,Unit,Unit](1) with SystemAction
+  val adding = new MetaAction[S,T,Nothing,Unit,Unit](1) with SystemAction
+  val determining = new MetaAction[S,T,Nothing,Unit,Unit](1) with SystemAction
 
   // this is type checked in the relation query
   inflict(determining, Priority(-1)) {
@@ -653,19 +674,6 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   def checkTypes(s : Relatable, t : Relatable) : Boolean = {
     ttSource.unapply(s).isDefined && ttTarget.unapply(t).isDefined
   }
-
-
-  /*
-  object gettingRelatedSet extends Action(1) with Context[mutable.HashSet[T]] with SystemAction
-
-  // lower priority to make sure that default inflict statements execute before this one.
-  inflict(gettingRelatedSet, Priority(-1)) {
-    val currentSet = gettingRelatedSet.GetActionContext()
-    currentSet.addAll(subject.getRelatedSetFromDictionaries(this))
-  }
-
-  */
-
 
 
   val precedence = QueryPrecedence.Generic

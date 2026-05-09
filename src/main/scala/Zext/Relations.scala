@@ -37,12 +37,8 @@ object Relations {
 
     override val precedence = QueryPrecedence.Content
 
-    extension [X <: Source](s: X) {
-      infix def holds[Y <: Target](target: Y*) = {
-        relates(s, target)
-      }
-
-    }
+    extension [X <: Source](s: X)
+      infix def holds[Y <: Target](target: Y*): X = relates(s, target)
 
     extension [X <: Target](s: X)
       infix def inside[Y <: Source](target: Y): X = reverseRelates(s, target)

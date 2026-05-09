@@ -28,13 +28,13 @@ object drying extends Action(1, "dry") {
     noun(wet) = scala.math.max(noun(wet) -1, 0)
   }
 
-  report(drying) Say s"You dry $noun"
+  report quick(drying) Say s"You dry $noun"
 }
 
 object blessing extends Action(-1, "bless") {
 
   report(blessing) {
-    val nouns = GetTargets()
+    val nouns = context.nouns
     Say("You bless " + nouns.mkString(", "))
   }
 
@@ -82,7 +82,7 @@ object clapping extends Action(0, "clap") {
     Say("You clap.")
   }
 
-  after(act is loud?) {
+  after.always( act is loud? ) {
     Say("That was loud!")
   }
 }
@@ -91,7 +91,7 @@ object clapping extends Action(0, "clap") {
 object shouting extends Action(0, "shout") {
   this is loud
 
-  report(shouting) Say "You yell something indistinguishable."
+  report quick(shouting) Say "You yell something indistinguishable."
 
 }
 
@@ -130,8 +130,8 @@ object TestRoom extends Room  {
   val gum = "A wad of gum is stuck to the bottom of the table" initially
     "A dried out piece of chewing gum" inside table amount some
 
-  report(taking, gum) Say "You peel the gum from the table."
-  report(putting, gum -> table) Say "You try to stick it back to the underside, but the gum has lost its adhesion. You just leave it on top."
+  report quick(taking, gum) Say "You peel the gum from the table."
+  report quick(putting, gum -> table) Say "You try to stick it back to the underside, but the gum has lost its adhesion. You just leave it on top."
 
   val weginald = ~"A nice guy." is unlisted
 

@@ -56,9 +56,6 @@ object StringExpression{
 
   private val state = mutable.HashMap[String, Int]()
 
-  implicit def fromString(str : => String): StringExpression = {
-    new StringExpression(str)
-  }
 
   def str (s : => StringExpression) : StringExpression = {
     new StringExpression(s"$s")
@@ -111,6 +108,11 @@ object StringExpression{
       val which = util.Random.nextInt(strs.length)
       strs(which)
     }
+}
+
+
+inline implicit def fromString(inline str: String): StringExpression = {
+  new StringExpression(str)
 }
 
 class StringExpression(lazyStr : => String) extends Serializable{
@@ -395,7 +397,7 @@ object Parser {
   val understandableVerbs = mutable.HashMap[String, Seq[Parsable[ParsableType]]]()
   val understandableNouns = mutable.HashMap[String, Seq[Parsable[ParsableType]]]()
 
-  def Understand[T <: ParsableType](target : T, words : String*)( conditions: Condition* ): Unit = {
+  def Understand[T <: ParsableType](target : T, words : String*)( conditions: Condition[?,?,?]* ): Unit = {
 
     var understandables = if (target.part == verb)  understandableVerbs
     else if (target.part == PartOfSpeech.noun)  understandableNouns

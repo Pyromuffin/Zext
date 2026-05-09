@@ -9,6 +9,9 @@ import Zext.Idea.thinking
 import Zext.Parser.{Command, Disambiguate}
 import Zext.Relations.Direction.*
 import Zext.RoomRegioning.designates
+import Zext.Infliction.inflict.*
+import Zext.Infliction.report.*
+import Zext.QueryPrecedence.Property
 
 import scala.language.postfixOps
 
@@ -22,8 +25,8 @@ object guy extends PlayerClass(BigTop) {
 }
 
 
-extension(z : RelatableProxy[PlayerClass]) {
-  implicit def toGuy : guy.type = z.resolve.asInstanceOf[guy.type]
+extension(z : PlayerClass) {
+  implicit def toGuy : guy.type = z.asInstanceOf[guy.type]
 }
 
 
@@ -33,13 +36,15 @@ object count {
 }
 
 
+
 object unlocking extends Action(1, "unlock")
 {
   inflict(unlocking, of[Container]) {
+    val c = noun[Container]
     noun[Container].openable = true
   }
   
-  report(unlocking) Say s"You unlock $noun"
+  report quick(unlocking) Say s"You unlock $noun"
 }
 
 object Dirt extends Room {
@@ -71,7 +76,7 @@ object Dirt extends Room {
   val chemicals = ~"10 mol\\. guydrofluouric \\?type\\? \\\\acid\\\\"
 
 
-  report(opening, bucket) Say "Your pry open the bucket lid"
+  report.quick(opening, bucket) Say "Your pry open the bucket lid"
   // instead(opening, bucket) Say "It's sealed with bucket glue"
 
   val hook = Supporter("hungry tines")
@@ -82,7 +87,7 @@ object Dirt extends Room {
   val sashes = ~"Second place winner in the number of sashes competition" is scenery is not_yours
 
 
-  instead(taking, not_yours) Say "that would be uncouth"
+  instead.quick(taking, not_yours) Say "that would be uncouth"
 
   val crumble_block = ~"It disintegrated." is RoomDescription("A fragile crumble block teeters on the brink of existence") aka "block"
 
@@ -93,12 +98,12 @@ object Dirt extends Room {
     time = time + 1
   }
 
-  report(being) Add s"The time is $time"
+  report quick(being) Add s"The time is $time"
 
-  report(going, south, here) Say "You tunnel to the south."
-  report(going, north, here) Say "You mosey to the north."
+  report quick(going, south, here) Say "You tunnel to the south."
+  report quick(going, north, here) Say "You mosey to the north."
 
-  report(leaving, here) Say "The tunnel collapses behind you."
+  report quick(leaving, here) Say "The tunnel collapses behind you."
 
   inflict(leaving, here) {
     disconnect(north)
@@ -114,7 +119,7 @@ object Dirt extends Room {
 object hanging extends Action(2, "hang") {
   override val implicitSubjectSelector = player
 
-  report(hanging) Say s"$noun hangs from $secondNoun"
+  report quick (hanging) Say s"$noun hangs from $secondNoun"
 
 }
 
@@ -176,6 +181,8 @@ object wet extends Property with Value[Int]
 object drying extends Action(1, "dry") {
 
   applying(drying, wet) {
+    val n = noun
+    val iswet = n(wet)
     if (noun(wet)> 0 && scala.util.Random.nextInt(4) == 0){
       continue
     } else fail
@@ -219,8 +226,11 @@ object finding extends Action(1, "find") with DebugAction {
     None
   }
 
+
+
   inflict(finding, of[Thing]) {
-    ReplaceAction(finding, Redirect(noun[Thing].room))
+    val room = noun[Thing].room
+    Break -> ExecuteAction(Redirect(target = room))
   }
 
   inflict(finding, of[Room]) {
@@ -321,7 +331,7 @@ object clapping extends Action(0, "clap") {
   waiting is loudness(5)
 
   inflict(loud.determining) {
-    val volume = arg1.get(loudness).getOrElse(0)
+    val volume = noun.get(loudness).getOrElse(0)
     Break -> (volume > 3)
   }
 
@@ -330,7 +340,9 @@ object clapping extends Action(0, "clap") {
     Say("You clap!")
   }
 
-  after(act is loud?) {
+
+
+  after.always(act is loud?)  {
     Say("That was loud!")
   }
 
@@ -345,11 +357,11 @@ object screaming extends CustomAction(-1, "scream") {
 
   var screamCount = 0
 
-  after(postprocessingText, screamingMode) { text =>
+  after.returns(postprocessingText, screamingMode) { text =>
     text.toUpperCase
   }
 
-  before(preprocessingInput){ text =>
+  before.returns(preprocessingInput){ text =>
     if(text.toUpperCase == text) {
       screamingMode = true
       screamCount += 1
@@ -367,7 +379,8 @@ object screaming extends CustomAction(-1, "scream") {
     val verb = parseResult.nouns(0)(0).asInstanceOf[Action]
     val target = Disambiguate(parseResult.nouns(1)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
     screamingMode = true
-    ExecuteAction(verb, subject = player, target = target)
+    val ctx = RuleContext(verb, player, Array(target), false, player.location)
+    ExecuteAction(ctx)
     screamingMode = false
     Command(screaming, Array())
   }
@@ -382,9 +395,9 @@ object CrowsNest extends Room {
   val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
     "It looks like a barber pole, only it's orange and purple" is fixed
 
-  report(examining, trapeze, !player.canAccess(trapeze, examining) ) Say "A handlebar that seems to be hanging from something in the sky"
+  report quick(examining, trapeze, !player.canAccess(trapeze, examining) ) Say "A handlebar that seems to be hanging from something in the sky"
 
-  instead(hanging, player -> trapeze, !player.insured) Say "You are not insured for that"
+  instead quick(hanging, player -> trapeze, !player.insured) Say "You are not insured for that"
 
   crows_above backdrops this
 
@@ -421,7 +434,7 @@ object FairyFountain extends Room {
   val fairy_armadillo = ~"Nigiri with feet"
 
 
-  instead(leaving, here) Say "The big guy wants your attention here"
+  instead quick(leaving, here) Say "The big guy wants your attention here"
 
   this northward Dirt
 }
@@ -527,10 +540,10 @@ object strong_zone  {
     if (name.startsWith("w")) succeed
   }
 
-  inflict(strength.determining) { _ =>
+  inflict(strength.determining) {
+    val t = noun[Thing]
     val name = noun[Thing].name.toString
     Succeed -> Some(name.length)
-
   }
 }
 
