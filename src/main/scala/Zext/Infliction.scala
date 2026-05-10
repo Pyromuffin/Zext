@@ -61,7 +61,7 @@ object Infliction {
         rule.sourceCode = codeOf(body)
         action.ruleSet.addRule(rule, ruleType)
 
-      case ac: ActionWithContextCondition =>
+      case ac: ActionWithContextCondition[?,?,?,?,?] =>
         conds = conds.appended(ac)
         val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
         val rule = new ActionRule(body, typedConditions, control, false)
@@ -69,6 +69,7 @@ object Infliction {
         rule.sourceCode = codeOf(body)
         ac.action.ruleSet.addRule(rule, ruleType)
 
+        // i think this implies always rules?
       case condition: AnyCondition =>
         conds = conds.appended(condition)
         val typedConditions = conds.toArray.asInstanceOf[Array[Condition[Relatable, Relatable, Relatable]]]
@@ -93,7 +94,7 @@ object Infliction {
         rule.sourceCode = codeOf(body)
         action.ruleSet.addRule(rule, ruleType)
 
-      case ac: ActionWithContextCondition =>
+      case ac: ActionWithContextCondition[?,?,?,?,?] =>
         conds = conds.appended(ac)
         val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
         val rule = new ActionRule(body, typedConditions, control, true)
@@ -130,15 +131,15 @@ object Infliction {
     */
 
     inline def always(inline conditions: RuleQuestion[?, ?, ?]*)(inline body: UnitBodyType[?, ?, ?]): Unit = {
-      CreateUnitRule(action, _ => body, RuleControl.Continue, RuleType.before, conditions *)
+      CreateUnitRule(conditions.head, _ => body, defaultControl, ruleType, conditions.tail *)
     }
 
     inline def apply[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion[S,N1,N2]*)(inline body: UnitBodyType[S, N1, N2]): Unit = {
-      CreateUnitRule(action, _ => body, RuleControl.Continue, RuleType.before, conditions *)
+      CreateUnitRule(action, _ => body, defaultControl, ruleType, conditions *)
     }
 
     inline def returns[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion[S,N1,N2]*)(inline body: ReturnsBodyType[S, N1, N2, T, R]): Unit = {
-      CreateReturnsRule(action, body, RuleControl.Continue, RuleType.before, conditions *)
+      CreateReturnsRule(action, body, defaultControl, ruleType, conditions *)
     }
   }
 

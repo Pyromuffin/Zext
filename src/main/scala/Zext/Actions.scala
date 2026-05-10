@@ -523,20 +523,20 @@ object Actions {
     }
 
     before(putting, !player holds noun?, !secondNoun holds noun?){
-      if( ExecuteAction(taking, target = noun, silent = Some(true))) {
+      if( ExecuteAction(RuleContext(taking, subject, Seq(noun), silent = true, location)).res ) {
         Say(s"(First taking $noun)")
       }
     }
 
     before(putting, !secondNoun[Container].open) {
-      if (ExecuteAction(opening, target = secondNoun, silent = Some(true))) {
+      if (ExecuteAction(RuleContext(opening, subject, Seq(secondNoun), silent = true, location)).res   ) {
         Say(s"(First opening $secondNoun)")
       }
     }
 
-    instead(putting, !player holds noun?) Say s"You need to pick up $noun before putting it somewhere."
-    instead(putting, !player holds noun?, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
-    instead(putting, anything -> !of[Container] ) Say s"I don't think $secondNoun can hold $noun"
+    instead quick (putting, !player holds noun?) Say s"You need to pick up $noun before putting it somewhere."
+    instead quick (putting, !player holds noun?, fixed) Say s"$noun looks happy where it is." // containment takes precedence over properties.
+    instead quick (putting, anything -> !of[Container] ) Say s"I don't think $secondNoun can hold $noun"
 
     check(putting, anything -> ofDebug[Container]("anything -> container")){
 
@@ -560,7 +560,7 @@ object Actions {
         noun[Thing] inside secondNoun[ZContainer]
     }
 
-    report(putting, anything -> of[Container]) Say s"You put $noun into $secondNoun"
+    report quick (putting, anything -> of[Container]) Say s"You put $noun into $secondNoun"
 
 
 

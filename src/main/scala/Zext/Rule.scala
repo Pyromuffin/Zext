@@ -113,8 +113,8 @@ object RuleContext {
         ret
     }
 
-  
-    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N1 = {
+
+    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 = {
       val ret = ctx.nouns(0).asInstanceOf[N1]
       inline ret match {
         case nothing: Nothing => scala.compiletime.error("Action doesn't have a noun")

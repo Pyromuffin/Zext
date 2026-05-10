@@ -15,19 +15,22 @@ extension [X <: Relatable](x: X ) {
     cloned
   }
 */
+
   def unary_! : X = {
     //val narrowed = narrow(x)
     //val cloned = narrowed.clone()
     //cloned.not = !cloned.not
     //cloned
+    ???
 
-    assert(!negated)
+    // i think this being global for some reason doesnt work, but maybe.
+    assert(!RelationQuery.negateNext)
     println("negated!")
-    negated = true
+    RelationQuery.negateNext = true
     x
     
   }
-  
+
 }
 
 trait SetComprehension[+T] extends Cloneable {

@@ -271,10 +271,6 @@ trait Relatable extends Applicable {
 
   override def toString = this.getClass.toString
 
-
-
-
-
   override def equals(obj: Any) = {
     obj match {
       case relatableProxy: RelatableProxy[?] => objectID == relatableProxy.resolve.objectID
@@ -578,7 +574,8 @@ object Relation {
 
 
   object RelationQuery {
-   // implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
+    // this was commented out, im not sure if it caused problems somewhere
+    implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
     var negateNext = false
 
   }

@@ -35,8 +35,8 @@ trait Container {
 
 
 object Supporter {
-  report(putting, anything -> of[Supporter]) Say s"You put $noun on to $secondNoun"
-  report(taking, of[Thing], isZextObjectOf[Supporter](noun[Thing].location, Content)) Say s"You take $noun off of ${noun[Thing].location}"
+  report quick (putting, anything -> of[Supporter]) Say s"You put $noun on to $secondNoun"
+  report quick (taking, of[Thing], isZextObjectOf[Supporter](noun[Thing].location, Content)) Say s"You take $noun off of ${noun[Thing].location}"
 }
 
 

@@ -37,10 +37,23 @@ object Idea {
 
   val allIdeas = ArrayBuffer[Idea]()
 
+
+  // knows requires a Relatable & Zext.idea_knowing.Target (Idea, in this case) for the second param,
+  // but the context type passed for determiningVisibility is Relatable, Relatable.
+  // i think this means that if we can't find a context then we should just assume failure?
+  // essentially the type checker sees that noun is returning a relatable, and knows requires an Idea
+  // this stupid context error is really just a typechecking error for knows requiring an Idea.
+  // should we have a default context with everything set to nothing, so it can cast to any type?
+
+
+  // it think this ruins everything.
+  val DefaultContext: RuleContext[Nothing, Nothing, Nothing] = ???
+  given RuleContext[Nothing, Nothing, Nothing] = DefaultContext
+
   // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
-  inflict(determiningVisibility, subject knows noun?) {
-    succeed
+  inflict(determiningVisibility, subject knows noun? ) {
+      succeed
   }
 
   inflict(idea_knowing.determining, innate) {
@@ -51,7 +64,6 @@ object Idea {
 
     // allow discoverable ideas to be thought of, but are otherwise not interactable.
     inflict(determiningVisibility(thinking), subject can_discover noun?) {
-
       succeed
     }
 

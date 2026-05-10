@@ -376,10 +376,11 @@ object Parser {
 
   case class CustomWord(word : String) extends ParsableType(PartOfSpeech.custom)
 
-  case class Parsable[T <: ParsableType](target : T, conditions : Condition*){
+  case class Parsable[T <: ParsableType](target : T, conditions : AnyCondition*){
 
     def possible = {
-      conditions.forall(_.evaluate)
+      // this is probably not right
+      conditions.forall(_.evaluate(using null))
     }
 
     def specificity = {
