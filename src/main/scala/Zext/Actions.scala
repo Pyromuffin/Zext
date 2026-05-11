@@ -273,8 +273,9 @@ object Actions {
 
     instead quick(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
-    instead(taking, noun[Thing].isComposite) {
-      Say(s"You're going to have a difficult time removing $noun from ${noun[Thing].compositeObject}")
+    instead(taking, noun.isComposite) {
+      val n = noun
+      Say(s"You're going to have a difficult time removing $noun from ${noun.compositeObject}")
     }
 
     instead(taking, player holds noun?) {
@@ -290,7 +291,7 @@ object Actions {
     }
 
     inflict(taking){
-      player holds noun[Thing]
+      player holds noun
     }
 
     after(taking, RoomDescription) {
@@ -518,6 +519,11 @@ object Actions {
   object putting extends DoubleAction[Thing, ZContainer](2,"put", "insert", "place") {
 
     before(putting, secondNoun holds noun?) {
+      
+      val c = context
+      val n = noun
+      val n2 = secondNoun
+      
       Say(s"$noun is already ${secondNoun[Container].preposition} $secondNoun")
       fail
     }

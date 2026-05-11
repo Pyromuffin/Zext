@@ -33,26 +33,8 @@ import scala.reflect.{ClassTag, TypeTest}
 */
 
 
-
-case class PropertyWithValue[T](property: Property & Value[T], value : T)
-
-trait Value[T] {
-    this : Property =>
-
-    val values = mutable.HashMap[Relatable, T]()
-    def apply(value : T) = {
-        PropertyWithValue(this, value)
-    }
-
-    override val determining = new MetaAction[Relatable, Relatable, Nothing, Option[T], Option[T]](1, s"value determining $this") with SystemAction
-    determining.arg = None
-
-    inflict.returns(determining, Priority(-1) ) { set =>
-        set does (values(noun) = _)
-        values.get(noun)
-    }
-
-}
+//@todo this property vs property with value stuff is all a bit weird, i think we need to fix this at some point.
+case class PropertyValue[T](property: PropertyWithValue[T], value : T)
 
 trait Property extends Relatable {
 
@@ -62,6 +44,26 @@ trait Property extends Relatable {
       inflict(determining, Priority(-2)) {
           Break -> noun.getRelatedSetFromDictionaries(property_having).contains(this)
       }
+}
+
+trait PropertyWithValue[T] extends Property {
+
+    val values = mutable.HashMap[Relatable, T]()
+
+    def apply(value: T) = {
+        PropertyValue(this, value)
+    }
+
+    // we used to be able to override the type of determining with this.
+    val valueDetermining = new MetaAction[Relatable, Relatable, Nothing, Option[T], Option[T]](1, s"value determining $this") with SystemAction
+    valueDetermining.arg = None
+
+
+    inflict.returns(valueDetermining, Priority(-1)) { set =>
+        set does (values(noun) = _)
+        values.get(noun)
+    }
+
 }
 
 
@@ -95,12 +97,14 @@ object exports{
 
 
 object listing extends Action(1) {
-    instead(listing, unlisted) Stop
+    instead(listing, unlisted) {
+        stop
+    }
 }
 
 def ListNamesNicely(stuff: Seq[ZextObject]): Option[String] = {
 
-    val filtered = stuff.filter(n => ExecuteAction(listing, subject = system, target = n))
+    val filtered = stuff.filter(n => listing.run.system.noun(n).result)
     val sorted = filtered.sortBy(_.name.toString)
 
     if (sorted.isEmpty)
@@ -160,7 +164,7 @@ case class ZextObjectSerializationProxy(index : Int){
 }
 
 
-object determiningAccessibility extends ReturnsAction[Action, Unit](1, "determining accessibility")  with SystemAction {
+object determiningAccessibility extends MetaAction[ZextObject, ZextObject, Nothing, AnyAction, Unit](1, "determining accessibility") with SystemAction {
 
  inflict(determiningAccessibility) {
 
@@ -181,17 +185,18 @@ object determiningAccessibility extends ReturnsAction[Action, Unit](1, "determin
          continue
      }
 
-
-
-
-     // if noun is composite, check if the composite object is accessible to secondNoun
+     // if noun is composite, check if the composite object is accessible to subject
      noun.get[Thing] does { t =>
-         stop_unless(ExecuteAction(determiningAccessibility, Redirect(target = t.compositeObject)))
+        val ctx = RuleContext(determiningAccessibility, subject, Seq(t.compositeObject), silent, location)
+        val result = ExecuteAction(ctx).res
+        stop_unless(result)
      }
 
-     // if noun is in a container, and that container is open, check if the parent container is accessible to secondNoun
+     // if noun is in a container, and that container is open, check if the parent container is accessible to subject
      if (nounLocation != null && nounLocation.open) {
-         stop_unless(ExecuteAction(determiningAccessibility, target = nounLocation))
+         val ctx = RuleContext(determiningAccessibility, subject, Seq(nounLocation), silent, location)
+         val result = ExecuteAction(ctx).res
+         stop_unless(result)
      }
 
      // if not, fail
@@ -200,10 +205,8 @@ object determiningAccessibility extends ReturnsAction[Action, Unit](1, "determin
 
 }
 
-object determiningVisibility2 extends MetaAction[Relatable, Relatable, Nothing, AnyAction, Unit](1, "determining visibility2") with SystemAction
 
-
-object determiningVisibility extends MetaAction[ZextObject, ZextObject, Nothing, AnyAction, Unit](1, "determining visibility2") with SystemAction{
+object determiningVisibility extends MetaAction[ZextObject, ZextObject, Nothing, AnyAction, Unit](1, "determining visibility") with SystemAction{
 
     // determining if noun is visible to subject
     inflict.returns(determiningVisibility){ forAction =>
@@ -274,17 +277,19 @@ implicit object property_having extends Relation[Relatable, Property] with ManyT
         infix def is[Y <: Target](target: Y*): X = relates(subject, target)
 
         // enables object is property(whatever) syntax
-        infix def is[ValueType](propertyAndValue: PropertyWithValue[ValueType]) : X = {
-            propertyAndValue.property.values.update(subject, propertyAndValue.value)
-            val ret = relates(subject, propertyAndValue.property)
+        infix def is[ValueType](propertyValue: PropertyValue[ValueType]) : X = {
+
+            propertyValue.property.values.update(subject.asInstanceOf[Relatable], propertyValue.value)
+            val ret = relates(subject, propertyValue.property)
             ret
         }
 
 
     inflict (determining) {
-        val result = ExecuteAction(InheritContext(action = noun.determining, subject = system, target = subject))
+        val result = noun.determining.run.system.noun(subject).execute()
         if(!result.res) fail
-        if(result.ret == None) fail
+        //this might be important, i think this has to do with value determining.
+        //if(result.ret == None) fail
 
         succeed
     }
@@ -324,7 +329,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     var mass = false
 
     def GetName() : String = {
-        ExecuteReturnAction(printing_name, subject = system, target = this)(name.toString).ret
+        ExecuteReturnAction(printing_name, RuleContext(printing_name, system, Seq(this), false, nowhere))(name.toString).ret
     }
 
      def indefiniteArticle: String = {
@@ -354,7 +359,7 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     def be: String = {
         if (pluralized.isDefined && pluralized.get)
              "are"
-        else if(pluralized.isEmpty && this.isInstanceOf[Thing] && this[Thing].isAutomaticallyPlural)
+        else if(pluralized.isEmpty && this.isInstanceOf[Thing] && this.asInstanceOf[Thing].isAutomaticallyPlural)
              "are"
         else
             "is"
@@ -372,11 +377,13 @@ abstract class ZextObject extends ParsableType(PartOfSpeech.noun) with Serializa
     def location : ZContainer = nowhere
 
     def canSee(other: ZextObject, forAction : AnyAction): Boolean = {
-        ExecuteReturnAction(determiningVisibility, subject = this, target = other)(forAction).res
+        val ctx = RuleContext(determiningVisibility, this, Seq(other), false, this.location)
+        ExecuteReturnAction(determiningVisibility, ctx)(forAction).res
     }
 
     def canAccess(other: ZextObject, forAction : AnyAction): Boolean = {
-        ExecuteReturnAction(determiningAccessibility, subject = this, target = other)(forAction).res
+        val ctx = RuleContext(determiningAccessibility, this, Seq(other), false, this.location)
+        ExecuteReturnAction(determiningAccessibility, ctx)(forAction).res
     }
 
 
@@ -447,7 +454,7 @@ object Thing {
 
 }
 
-object RoomDescription extends Property with Value[StringExpression]
+object RoomDescription extends PropertyWithValue[StringExpression]
 object disturbed extends Property
 
 case class SimpleThing(description: StringExpression)(using c : Container & ZextObject) extends Thing
@@ -541,8 +548,8 @@ object Device {
 
     inflict(switching, of[Device]) {
         val d = noun[Device]
-        if (d.on) ExecuteAction(turningOff, target = d)
-        else ExecuteAction(turningOn, target = d)
+        if (d.on) turningOff.run.noun(d).result
+        else turningOn.run.noun(d).result
     }
 }
 

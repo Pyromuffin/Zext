@@ -13,7 +13,7 @@ object TestPlayer extends PlayerClass(TestRoom) {
   override val description = "Detestable"
 }
 
-object wet extends Property with Value[Int]
+object wet extends PropertyWithValue[Int]
 
 object drying extends Action(1, "dry") {
 
@@ -82,7 +82,7 @@ object clapping extends Action(0, "clap") {
     Say("You clap.")
   }
 
-  after.always( act is loud? ) {
+  after.always(act is loud?) {
     Say("That was loud!")
   }
 }
@@ -102,7 +102,7 @@ object nicknaming extends CustomAction(2, "nickname") {
 
   override def intercept(rawInput: String, parseResult: ParseResult): Command = {
     val name = parseResult.nounStrings(1)
-    val target = Disambiguate(parseResult.nouns(0)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
+    val target = Disambiguate(parseResult.nouns(0) ).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
     target.aliases.addOne(name)
     blackboard = name
     Command(nicknaming, Array(target))

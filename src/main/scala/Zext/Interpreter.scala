@@ -7,7 +7,7 @@ import Zext.ControlCodes.{TextControl, bold, orange, orangeCode}
 import Zext.Interpreter.*
 import Zext.Parser.PartOfSpeech.verb
 import Zext.Rule.*
-import Zext.RuleContext.{GetCurrentRuleContext, _noun, _nouns, location, silent}
+import Zext.RuleContext.{InheritContext, location, silent}
 import Zext.World.*
 
 import scala.collection.mutable
@@ -185,7 +185,7 @@ object Interpreter{
     print(" > ")
     var input = readLine().strip().split(" ")
     while(input.length != 1) {
-      Say("Enter a single word.")
+      SystemMessage("Enter a single word.")
       print(prompt)
       print(" > ")
       input = readLine().strip().split(" ")
@@ -194,14 +194,14 @@ object Interpreter{
   }
 
   def NumberPrompt(str: StringExpression) : Int = {
-    Say(str)
+    SystemMessage(str)
     print("> ")
     var number = readLine().toLowerCase
     var parsed = scala.util.control.Exception.allCatch.opt( Integer.parseInt(number) )
 
     while(parsed.isEmpty) {
-      Say("That's not a number.")
-      Say(str)
+      SystemMessage("That's not a number.")
+      SystemMessage(str)
       print("> ")
       number = readLine().toLowerCase
       parsed = scala.util.control.Exception.allCatch.opt( Integer.parseInt(number) )
@@ -211,11 +211,11 @@ object Interpreter{
   }
 
   def SystemMessage(str: StringExpression): Unit = {
-    ExecuteReturnAction(saying, subject = system)(str.toString)
+    ExecuteReturnAction(saying, RuleContext(saying, system, null, false, null))(str.toString)
   }
 
-  def Say(str: StringExpression): Unit = {
-    ExecuteReturnAction(saying)(str.toString)
+  def Say(str: StringExpression)(using ruleContext: RuleContext[?,?,?]) = {
+    ExecuteReturnAction(saying, ruleContext.asInstanceOf[RuleContext[Relatable,Nothing,Nothing]])(str.toString)
   }
 
 
@@ -334,7 +334,7 @@ object Parser {
     // filter out ignored words
     names = names.map( _.stripPrefix("the ").stripPrefix("a ").stripPrefix("some "))
 
-    if(z.pluralized.isEmpty && z.isInstanceOf[Thing] && z[Thing].isAutomaticallyPlural) {
+    if(z.pluralized.isEmpty && z.isInstanceOf[Thing] && z.asInstanceOf[Thing].isAutomaticallyPlural) {
       names = names.concat(names.map(Inflector.singularize))
     }
     else if(z.pluralized.isDefined && z.pluralized.get){
@@ -354,7 +354,7 @@ object Parser {
     understandableVerbs.clear()
     understandableEverything.clear()
 
-    for(a <- Actions.allActions.filterNot(_.isInstanceOf[SystemAction])){
+    for(a <- Actions.allMetaActions.filterNot(_.isInstanceOf[SystemAction])){
       Understand(a, a.verbs *)
     }
 
@@ -566,7 +566,9 @@ object Parser {
     }
     
     // for tests against noun in the target selector hint
-    _noun = first
+    //_noun = first
+    // implicit targets are likely broken now.
+
 
     val seconds = targets.lift(1)
 
@@ -700,7 +702,7 @@ object Parser {
           for (result <- results) {
             val command = BuildCommand(input, result)
             command does { c =>
-              RunApplyingBeforeRules(c)
+              // RunApplyingBeforeRules(c) adios!
               time("command execution") {
                 c.action match
                   case action: CustomAction =>
@@ -736,7 +738,8 @@ object Parser {
 
     time("startup"){
       EverythingParser.parse("start")
-      ExecuteAction(starting, subject = player, location = player.location)
+      val ctx = RuleContext(starting, player, null, false, player.location)
+      ExecuteAction(ctx)
     }
 
 
@@ -744,7 +747,8 @@ object Parser {
       print("> ")
       var input : String = readLine()
 
-      input = ExecuteReturnAction(preprocessingInput, subject = system)(input).ret
+      val ctx = RuleContext(preprocessingInput, system, null, false, player.location)
+      input = ExecuteReturnAction(preprocessingInput, ctx)(input).ret
 
       time("interpreter loop") {
         val results  = time("parsing") {
@@ -756,7 +760,7 @@ object Parser {
           for (result <- results) {
             val command = BuildCommand(input, result)
             command does { c =>
-              RunApplyingBeforeRules(c)
+              //RunApplyingBeforeRules(c) i guess we just dont have this anymore
               time("command execution") {
               c.action match
                 case action: CustomAction =>
@@ -766,7 +770,7 @@ object Parser {
                   ExecuteAction(RuleContext(c.action, player, c.nouns, false, player.location))
               }
               RunApplyingRules(c)
-              ExecuteAction(being, subject = player, target = player.location, location = player.location)
+              ExecuteAction(RuleContext(being, subject = player, Seq(player.location), false, location = player.location))
               break()
             }
           }

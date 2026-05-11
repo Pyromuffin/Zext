@@ -16,10 +16,9 @@ import Zext.RuleContext.*
 extension[T] (wrapper : RelatableWrapper[T]) {
   implicit inline def toUnderlying : T = wrapper.underlying
 }
-
-// we need relatable wrappers because of ???
+// this all has to do with auto casting to nothing bullshit so that some relationship queries can work?
+// but this is apparently broken rn.
 case class RelatableWrapper[+T <: Relatable](underlying : T) extends SetComprehension[Nothing] with Applicable
-
 
 implicit object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
@@ -29,6 +28,7 @@ implicit object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
 implicit object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def can_discover[Y <: Target](target: Y*): X = relates(subject, target)
+
 }
 
 object Idea {
@@ -45,14 +45,9 @@ object Idea {
   // this stupid context error is really just a typechecking error for knows requiring an Idea.
   // should we have a default context with everything set to nothing, so it can cast to any type?
 
-
-  // it think this ruins everything.
-  val DefaultContext: RuleContext[Nothing, Nothing, Nothing] = ???
-  given RuleContext[Nothing, Nothing, Nothing] = DefaultContext
-
   // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
-  inflict(determiningVisibility, subject knows noun? ) {
+  inflict(determiningVisibility, subject knows noun?) {
       succeed
   }
 

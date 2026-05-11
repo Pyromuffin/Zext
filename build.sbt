@@ -19,6 +19,7 @@ lazy val meta = (project in file("meta"))
 */
 resolvers += "Zobjectifier packages" at "https://maven.pkg.github.com/pyromuffin/zobjectifier"
 
+// if you are having issues pulling this, add GITHUB_TOKEN to your environment.
 githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_TOKEN")
 
 lazy val zext = (project in file("."))
@@ -28,9 +29,9 @@ lazy val zext = (project in file("."))
     version := "0.2.0",
     organization := org,
     autoCompilerPlugins := true,
-    addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.2.2"),
+    addCompilerPlugin("com.pyromuffin" %% "zobjectifier" % "1.3.0"),
 
-    libraryDependencies += "com.pyromuffin" %% "zobjectifier" % "1.2.2",
+    libraryDependencies += "com.pyromuffin" %% "zobjectifier" % "1.3.0",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
     libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.18.0",
     libraryDependencies += "org.apache.opennlp" % "opennlp-tools" % "2.5.5",

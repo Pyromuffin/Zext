@@ -1,12 +1,14 @@
 package Zext
 
 import Zext.Rule.*
-import Zext.RuleContext.subject
+import Zext.RuleContext.{secondNoun, subject}
 import zobjectifier.Macros.*
 
 import scala.annotation.targetName
 import scala.compiletime.codeOf
+import scala.language.postfixOps
 import scala.util.control.ControlThrowable
+
 
 object Infliction {
 
@@ -49,46 +51,49 @@ object Infliction {
   type ReturnsBodyType[S,N1,N2,T,R] = T => RuleContext[S, N1, N2] ?=> R
 
 
-  inline def CreateUnitRule[S, N1, N2](actionOrCondition: AnyAction | AnyCondition, inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: AnyCondition*): Unit = {
 
-    var conds = conditions
+  inline def CreateAlwaysRule[S, N1, N2](inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion[S, N1, N2]*): Unit = {
 
-    inline actionOrCondition match {
-      case action: AnyAction =>
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
-        val rule = new ActionRule(body, typedConditions, control, false)
-        rule.definitionPosition = CodePosition()
-        rule.sourceCode = codeOf(body)
-        action.ruleSet.addRule(rule, ruleType)
-
-      case ac: ActionWithContextCondition[?,?,?,?,?] =>
-        conds = conds.appended(ac)
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
-        val rule = new ActionRule(body, typedConditions, control, false)
-        rule.definitionPosition = CodePosition()
-        rule.sourceCode = codeOf(body)
-        ac.action.ruleSet.addRule(rule, ruleType)
-
-        // i think this implies always rules?
-      case condition: AnyCondition =>
-        conds = conds.appended(condition)
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[Relatable, Relatable, Relatable]]]
         val typedBody = body.asInstanceOf[ReturnsBodyType[Relatable, Relatable, Relatable, Unit, Unit]]
+        val typedConditions = conditions.toArray.asInstanceOf[Array[RuleQuestion[Relatable, Relatable, Relatable]]]
         val rule = new ActionRule(typedBody, typedConditions, control, false)
         rule.definitionPosition = CodePosition()
         rule.sourceCode = codeOf(body)
         alwaysRuleSet.addRule(rule, ruleType)
+  }
+
+
+
+  inline def CreateUnitRule[S, N1, N2](firstArg: FirstArg[S,N1,N2,?,?], inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion[S,N1,N2]*): Unit = {
+
+    var conds = conditions
+
+    inline firstArg match {
+      case action: AnyAction =>
+        val typedConditions = conditions.toArray
+        val rule = new ActionRule(body, typedConditions, control, false)
+        rule.definitionPosition = CodePosition()
+        rule.sourceCode = codeOf(body)
+        action.ruleSet.addRule(rule, ruleType)
+
+      case ac: ActionWithContextCondition[?, ?, ?, ?, ?] =>
+        conds = conds.appended(ac)
+        val typedConditions = conditions.toArray
+        val rule = new ActionRule(body, typedConditions, control, false)
+        rule.definitionPosition = CodePosition()
+        rule.sourceCode = codeOf(body)
+        ac.action.ruleSet.addRule(rule, ruleType)
     }
   }
 
 
-  inline def CreateReturnsRule[S,N1,N2,T,R](actionOrCondition:  AnyAction | AnyCondition, inline body : ReturnsBodyType[S,N1,N2, T, R], control : RuleControl, ruleType : RuleType, conditions : AnyCondition *) : Unit = {
+  inline def CreateReturnsRule[S,N1,N2,T,R](firstArg: FirstArg[S,N1,N2,T,R], inline body : ReturnsBodyType[S,N1,N2, T, R], control : RuleControl, ruleType : RuleType, conditions : RuleQuestion[S,N1,N2] *) : Unit = {
 
     var conds = conditions
 
-    inline actionOrCondition match {
+    inline firstArg match {
       case action: AnyAction =>
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
+        val typedConditions = conds.toArray
         val rule = new ActionRule(body, typedConditions, control, true)
         rule.definitionPosition = CodePosition()
         rule.sourceCode = codeOf(body)
@@ -96,29 +101,21 @@ object Infliction {
 
       case ac: ActionWithContextCondition[?,?,?,?,?] =>
         conds = conds.appended(ac)
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[S, N1, N2]]]
+        val typedConditions = conds.toArray
         val rule = new ActionRule(body, typedConditions, control, true)
         rule.definitionPosition = CodePosition()
         rule.sourceCode = codeOf(body)
         ac.action.ruleSet.addRule(rule, ruleType)
 
-      case condition: AnyCondition =>
-        conds = conds.appended(condition)
-        val typedConditions = conds.toArray.asInstanceOf[Array[Condition[Relatable, Relatable, Relatable]]]
-        val typedBody = body.asInstanceOf[ReturnsBodyType[Relatable, Relatable, Relatable, Unit, Unit]]
-        val rule = new ActionRule(typedBody, typedConditions, control, true)
-        rule.definitionPosition = CodePosition()
-        rule.sourceCode = codeOf(body)
-        alwaysRuleSet.addRule(rule, ruleType)
-        ???
     }
 
   }
 
 
   type ActionQuestion = RuleContext[?,?,?] ?=> MetaAction[Relatable, Relatable, Relatable, Unit, Unit]
-  type RuleQuestion[S,N1,N2] = RuleContext[S,N1,N2] ?=> AnyCondition
+  type RuleQuestion[S,N1,N2] =  RuleContext[S, N1, N2] ?=> AnyCondition
   type FirstArg[S,N1,N2,T,R] = MetaAction[S, N1, N2, T, R] | ActionWithContextCondition[S,N1,N2,T,R]
+  type ContextQuestion[S,N1,N2] = RuleContext[S, N1, N2] ?=> Boolean
 
   trait Infliction(defaultControl : RuleControl, ruleType: RuleType) {
 
@@ -130,8 +127,8 @@ object Infliction {
     }
     */
 
-    inline def always(inline conditions: RuleQuestion[?, ?, ?]*)(inline body: UnitBodyType[?, ?, ?]): Unit = {
-      CreateUnitRule(conditions.head, _ => body, defaultControl, ruleType, conditions.tail *)
+    inline def always(inline conditions: RuleQuestion[?,?,?] *)(inline body: UnitBodyType[?, ?, ?]): Unit = {
+      CreateAlwaysRule(_ => body, defaultControl, ruleType, conditions*)
     }
 
     inline def apply[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion[S,N1,N2]*)(inline body: UnitBodyType[S, N1, N2]): Unit = {
@@ -164,7 +161,7 @@ object Infliction {
   //inline def report[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], conditions: RuleQuestion[S,N1,N2]*): ReportConsequence = ??? // new ReportConsequence(action, conditions *)
 
   // ultra terse syntax
-  class InsteadConsequence(action: Action | AnyCondition, conditions: AnyCondition*) {
+  class InsteadConsequence(action: Action, conditions: RuleQuestion[?,?,?]*) {
     infix inline def Say(inline s: RuleContext[?,?,?] ?=> StringExpression) : Unit  = {
       CreateUnitRule(action, _ => Interpreter.Say(s), RuleControl.Stop, RuleType.instead, conditions *)
     }
@@ -174,7 +171,7 @@ object Infliction {
     }
   }
 
-  class ReportConsequence(action: Action | AnyCondition, conditions: AnyCondition*) {
+  class ReportConsequence(action: Action, conditions: RuleQuestion[?,?,?]*) {
     infix inline def Say(inline s: RuleContext[?,?,?] ?=> StringExpression) : Unit  = {
       CreateUnitRule(action, _=> Interpreter.Say(s), RuleControl.Replace, RuleType.report, conditions *)
     }

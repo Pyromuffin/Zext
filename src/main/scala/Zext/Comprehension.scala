@@ -35,12 +35,18 @@ extension [X <: Relatable](x: X ) {
 
 trait SetComprehension[+T] extends Cloneable {
   def getSet(): Seq[T]
+
   var inverted = false
   var any = false
   var not = false
-  override def clone : this.type = super.clone().asInstanceOf[this.type]
-}
 
+  override def clone: this.type = super.clone().asInstanceOf[this.type]
+
+  def unary_! : this.type = {
+    not = !not
+    this
+  }
+}
 object SetComprehension {
 
 

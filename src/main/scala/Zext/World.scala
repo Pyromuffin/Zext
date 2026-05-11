@@ -35,12 +35,15 @@ class ZextObjectClassHolder[T](tt : TypeTest[ZextObject | Container,?], depth: I
 
     val condition = new Condition(
       {
-        val target = if (queryPrecedence == QueryPrecedence.Class) noun else secondNoun
+        /*
+        val target = if (queryPrecedence == QueryPrecedence.Class) RuleContext.noun else RuleContext.secondNoun
         var success = test(target)
         if(not) success = !success
 
         //println(s"testing if $target is $className with depth $depth : $success")
         success
+        */
+        true
       }
       , queryPrecedence)
 

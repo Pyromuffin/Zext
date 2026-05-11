@@ -1,7 +1,7 @@
 package Zext
 
 import Zext.*
-import Zext.QueryPrecedence.Context
+import Zext.QueryPrecedence.ActionContext
 import Zext.Relatable.allRelatables
 import Zext.Relation.*
 import Zext.Relation.RelationQuery.negateNext
@@ -166,12 +166,15 @@ Gratuitous various-to-various relations are therefore not a good idea.
 */
 
 class RelationQueryContext {
+
   val queries = ArrayBuffer[RelationQuery[?,?]]()
   def evaluate : Boolean = {
-    if(queries.nonEmpty)
-      queries.forall(_.evaluate())
-    else false
+    if(queries.nonEmpty) {
+      ???
+      queries.forall(_.evaluate(using null))
+    } else false
   }
+
 }
 
 class RelationHolder[RequiredValence <: AllValence] {
@@ -207,41 +210,51 @@ object Relatable {
 
   }
 
+  def QueryRelation[X <: Relatable,Y <: Relatable, S : TT, T : TT](relation: Relation[S,T], first : X, second : Y) : RelationQuery[X, Y] = {
+    ???
+  }
 
-  // so act is loud? is always evaluated as (act is loud)?
+  // so act is loud? is always evaluated as (act is loud)?, even when ? is a member of relatable.
   // so what we need is act is loud to have a ? operator
-
-
-  inline implicit def ToQueryable[X <: Relatable, Y](inline q: => X): Queryable[X, Y] = {
+  inline implicit def ToQueryable[X <: Relatable | Zebra[?], Y](inline q: => X): Queryable[X, Y] = {
     new Queryable(q)
   }
 
-  class Queryable[X <: Relatable, Y](q: RuleContext[?, ?, ?] ?=> X) {
+  class Queryable[X <: Relatable | Zebra[?], Y](q: RuleContext[?, ?, ?] ?=> X) {
     def ? : Zext.Relation.RelationQuery[X, Y] = ???
   }
+
 
 
 }
 
 
 trait Applicable {
+  this : Relatable =>
 
-  def get[T](propertyValue: Property & Value[T]): Option[T] = {
-    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
-    result._2
+  def get[T](propertyValue: PropertyWithValue[T]): Option[T] = {
+
+    val ctx = RuleContext(propertyValue.valueDetermining, system,  Seq(this), false, nowhere)
+    val arg : Option[T] = None
+    val result = ExecuteReturnAction(propertyValue.valueDetermining, ctx)(arg) // why do we need to cast this??
+    result.ret
   }
 
-  def apply[T](propertyValue: Property & Value[T]): T = {
-    val result = ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(None)
-    result._2.get
+  def apply[T](propertyValue: PropertyWithValue[T]): T = {
+    val ctx = RuleContext(propertyValue.valueDetermining,   system,   Seq(this), false, nowhere)
+    val arg: Option[T] = None
+    val result = ExecuteReturnAction(propertyValue.valueDetermining, ctx)(arg)
+    result.ret.get
   }
 
-  def update[T](propertyValue: Property & Value[T], value: T): Unit = {
-    ExecuteReturnAction(propertyValue.determining, subject = system, target = this)(Some(value))
+  def update[T](propertyValue: PropertyWithValue[T], value: T): Unit = {
+    val ctx = RuleContext(propertyValue.valueDetermining,   system,   Seq(this), false, nowhere)
+    ExecuteReturnAction(propertyValue.valueDetermining, ctx)(Some(value))
   }
 
   def apply(property: Property): Boolean = {
-    ExecuteAction(property.determining, subject = system, target = this)
+    val ctx = RuleContext(property.determining, system, Seq(this), false, nowhere)
+    ExecuteAction(ctx).res
   }
 
   def get[T: TT]: Option[T] = {
@@ -263,6 +276,9 @@ trait Applicable {
 
 trait Relatable extends Applicable {
   this : AnyRef =>
+
+
+  //def ? : RelationQuestion = RelationQuestion(this)
 
   allRelatables.addOne(this)
   val objectID = allRelatables.length
@@ -500,12 +516,12 @@ trait Relatable extends Applicable {
 
   // potentially costly, may iterate through all relatables.
   def queryRelatedSet[B <: Relatable](relation: Relation[?,B]) : Set[B] = {
-    val ruleCount = ruleSets(relation.determining).GetAllRules().map(_.size).sum
+    val ruleCount = relation.determining.ruleSet.GetAllRules().map(_.size).sum
     if(ruleCount == 1) {
       getRelatedSetFromDictionaries(relation)
     } else {
       val candidates = Relatable.GetAll[B](using relation.ttTarget)
-      candidates.filter(candidate => ExecuteAction(relation.determining, subject = this, candidate)).toSet
+      candidates.filter(candidate => ExecuteAction( RuleContext(relation.determining, this, Seq(candidate), false, nowhere)).res ).toSet
     }
   }
 
@@ -575,7 +591,7 @@ object Relation {
 
   object RelationQuery {
     // this was commented out, im not sure if it caused problems somewhere
-    implicit def toBoolean(rq : RelationQuery[?,?]) : Boolean = rq.evaluate()
+    implicit def toBoolean(rq : RelationQuery[?,?])(using RuleContext[?,?,?]) : Boolean = rq.evaluate
     var negateNext = false
 
   }
@@ -599,26 +615,30 @@ object Relation {
       val success = if(firstAll && secondAll) {
          a_set.forall { first =>
           b_set.forall { second =>
-              relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
+            val ctx = RuleContext(relation.determining, subject = first.asInstanceOf[Relatable], nouns = Seq(second.asInstanceOf[Relatable]), false, nowhere)
+            relation.checkTypes(first, second) && ExecuteAction(ctx).res
           }
         }
       } else if (firstAny && secondAll) {
         a_set.exists { first =>
           b_set.forall { second =>
-            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
+            val ctx = RuleContext(relation.determining, subject = first.asInstanceOf[Relatable], nouns = Seq(second.asInstanceOf[Relatable]), false, nowhere)
+            relation.checkTypes(first, second) && ExecuteAction(ctx).res
           }
         }
 
       } else if (firstAny && secondAny) {
         a_set.exists { first =>
           b_set.exists { second =>
-            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
+            val ctx = RuleContext(relation.determining, subject = first.asInstanceOf[Relatable], nouns = Seq(second.asInstanceOf[Relatable]), false, nowhere)
+            relation.checkTypes(first, second) && ExecuteAction(ctx).res
           }
         }
       } else if (firstAll && secondAny) {
         a_set.forall { first =>
           b_set.exists { second =>
-            relation.checkTypes(first, second) && ExecuteAction(relation.determining, subject = first.asInstanceOf[Relatable], target = second.asInstanceOf[Relatable])
+            val ctx = RuleContext(relation.determining, subject = first.asInstanceOf[Relatable], nouns = Seq(second.asInstanceOf[Relatable]), false, nowhere)
+            relation.checkTypes(first, second) && ExecuteAction(ctx).res
           }
         }
       } else false
@@ -638,9 +658,14 @@ abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] ext
   def condition(s : S, t : T) : Boolean
 
   inflict(this.determining) {
-    Break -> condition(subject.resolve.asInstanceOf[S], arg1.resolve.asInstanceOf[T])
+    Break -> condition(subject, noun)
   }
 
+}
+
+transparent trait Zebra[T <: Relatable] {
+  this : T =>
+  implicit def toUnderlying : T = this.asInstanceOf[T]
 }
 
 class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
@@ -655,16 +680,16 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   // this is type checked in the relation query
   inflict(determining, Priority(-1)) {
     val related = subject.getRelatedSetFromDictionaries(this)
-    if !related.contains(arg1.resolve.asInstanceOf[T]) then fail
+    if !related.contains(noun) then fail
   }
 
   inflict(adding, Priority(-1)) {
-    val relatables = GetTargets()
+    val relatables = nouns
     subject.addRelatedInner(this, relatables)
   }
 
   inflict(removing, Priority(-1)) {
-    val relatables = GetTargets()
+    val relatables = nouns
     subject.innerRemove(this, relatables)
   }
 
@@ -672,11 +697,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
     ttSource.unapply(s).isDefined && ttTarget.unapply(t).isDefined
   }
 
-
   val precedence = QueryPrecedence.Generic
 
-  type Source = S | SetComprehension[S]
-  type Target = T | SetComprehension[T]
+  type Source = S | SetComprehension[S] | Zebra[?]
+  type Target = T | SetComprehension[T] | Zebra[?]
 
   relations.addOne(this)
 
@@ -764,7 +788,7 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
 }
 
-abstract class ReciprocalRelation[S <: Relatable : TT, T <: Relatable : TT] extends Relation[S, T] {
+abstract class ReciprocalRelation[S,T] extends Relation[S,T] {
   def getReciprocal : Relation[T,S]
   def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A = {
     getReciprocal.relates(_b, _a)
@@ -787,30 +811,12 @@ object RelationsTest extends App {
     val arms = ~"pool noodles" makes statue
     val feet = Box("better left unmentioned")
 
-    if(arms makes statue?){
-      println("he got arms")
-    }
-
-    /*
-    if( (statue made_from legs?) && !(feet makes statue?) ){
-      println("and legs, but no feet")
-    }
-
-    feet makes statue
-
-    if ((statue made_from legs?) && !(feet makes statue?)) {
-      println("and legs, but no feet")
-    }
-  */
-
     val box = Box("may conceal something hidden")
-
     val hat = Box("not you again") holds horse holds statue
-
     val key = ~"what might this unlock?" made_from (horse, feet)
 
 
-
+  /*
     val sc : SetComprehension[Nothing] = ???
 
     val notSc = !sc
@@ -823,6 +829,7 @@ object RelationsTest extends App {
 
     val what5 = !feet makes statue?
 
+    */
 
 
     println(statue.queryRelated(Composition))

@@ -176,7 +176,7 @@ object Circus extends RoomRegion("Circus Region") {
 
 }
 
-object wet extends Property with Value[Int]
+object wet extends PropertyWithValue[Int]
 
 object drying extends Action(1, "dry") {
 
@@ -323,7 +323,7 @@ object BigTop extends Room {
 
 }
 
-object loudness extends Property with Value[Int]
+object loudness extends PropertyWithValue[Int]
 object loud extends Property
 
 object clapping extends Action(0, "clap") {
@@ -340,12 +340,9 @@ object clapping extends Action(0, "clap") {
     Say("You clap!")
   }
 
-
-
   after.always(act is loud?)  {
     Say("That was loud!")
   }
-
 
 }
 
@@ -377,7 +374,7 @@ object screaming extends CustomAction(-1, "scream") {
 
   override def intercept(rawInput: String, parseResult: ParseResult): Command = {
     val verb = parseResult.nouns(0)(0).asInstanceOf[Action]
-    val target = Disambiguate(parseResult.nouns(1)).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
+    val target = Disambiguate(parseResult.nouns(1).asInstanceOf[Array[ZextObject]]).asInstanceOf[ZextObject] // this does not respect visibility or the other normal command rules.
     screamingMode = true
     val ctx = RuleContext(verb, player, Array(target), false, player.location)
     ExecuteAction(ctx)
@@ -508,7 +505,7 @@ object MazeEntrance extends Room {
   rooms(0) inward this
 }
 
-object strength extends Property with Value[Int]
+object strength extends PropertyWithValue[Int]
 object nice extends Property
 
 object purporting extends Action(1, "purport") {

@@ -6,7 +6,7 @@ import Zext.Infliction.*
 import Zext.Infliction.RuleControl.Default
 import Zext.Interpreter.Say
 import Zext.Parser.*
-import Zext.QueryPrecedence.{Action, Context}
+import Zext.QueryPrecedence.{Action, ActionContext}
 import Zext.Relation.RelationQuery
 import Zext.Rule.*
 import Zext.RuleContext.*
@@ -20,11 +20,14 @@ import scala.util.control.{Breaks, ControlThrowable}
 import zobjectifier.Macros
 import zobjectifier.Macros.CodePosition
 
+import scala.compiletime.summonFrom
+
 
 object RelatableProxy {
     implicit def toRelatable[T <: Relatable](r : RelatableProxy[T]): T = r.resolve
 }
 
+@deprecated
 abstract class RelatableProxy[+T <: Relatable] extends SetComprehension[Nothing]{
 
     override def getSet() = Seq(resolve).asInstanceOf[Seq[Nothing]]
@@ -52,7 +55,7 @@ object RuleContext {
 
     // covariance is list of cat can be passed into list of animal
 
-    inline def Redirect[S <: Relatable, N1 <: Relatable, N2 <: Relatable, A,B,C](subject : A = null, target : B = null, secondTarget : C = null)
+    inline def Redirect[S <: Relatable, N1 <: Relatable, N2 <: Relatable, A <: S, B <: N1, C <: N2](subject : A = null, target : B = null, secondTarget : C = null)
                                                                                 (using RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = {
         InheritContext(subject = Option(subject), target = Option(target), target2 = Option(secondTarget))
     }
@@ -97,54 +100,57 @@ object RuleContext {
     }
 
 
+    // it think this ruins everything.
+    //val DefaultContext: RuleContext[Nothing, Nothing, Nothing] = ???
+    //given RuleContext[Nothing, Nothing, Nothing] = DefaultContext
 
     inline def context[S,N1,N2](using ctx : RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = ctx
 
     inline def act(using ctx: RuleContext[?,?,?]) : MetaAction[Relatable,Relatable,Relatable,Unit,Unit] = {
-        ctx.action
+        ctx.action.asInstanceOf[MetaAction[Relatable,Relatable,Relatable,Unit,Unit]]
     }
 
     // @todo improve this, we basically dont want to ever cast, and this should be a query in the conditions list that automatically constrains the rule context
-    inline def noun[N](using ctx: RuleContext[?, ?, ?]): N = {
+    inline def noun[N](using ctx: RuleContext[?, ?, ?]): N & Zebra[N] = {
         val ret = ctx.nouns(0).asInstanceOf[N]
         inline ret match {
             case nothing: Nothing => scala.compiletime.error("Action doesn't have a noun")
         }
-        ret
+        ret.asInstanceOf[N & Zebra[N]]
     }
 
 
-    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 = {
+    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 & Zebra[N1] = {
       val ret = ctx.nouns(0).asInstanceOf[N1]
       inline ret match {
         case nothing: Nothing => scala.compiletime.error("Action doesn't have a noun")
       }
-      ret
+      ret.asInstanceOf[N1 & Zebra[N1]]
     }
 
-    inline def secondNoun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N2 = {
+    inline def secondNoun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N2 & Zebra[N2] = {
       val ret = ctx.nouns(1).asInstanceOf[N2]
       inline ret match {
         case nothing: Nothing => scala.compiletime.error("Action doesn't have a second noun")
       }
-      ret
+      ret.asInstanceOf[N2 & Zebra[N2]]
     }
 
 
-    inline def secondNoun[N](using ctx: RuleContext[?, ?, ?]): N = {
+    inline def secondNoun[N](using ctx: RuleContext[?, ?, ?]): N & Zebra[N] = {
         val ret = ctx.nouns(1).asInstanceOf[N]
         inline ret match {
             case nothing : Nothing => scala.compiletime.error("Action doesn't have second noun")
         }
-        ret
+        ret.asInstanceOf[N & Zebra[N]]
     }
 
-    inline def subject[S](using ctx: RuleContext[?, ?, ?]): S = {
-        ctx.subject.asInstanceOf[S]
+    inline def subject[S](using ctx: RuleContext[?, ?, ?]): S & Zebra[S] = {
+        ctx.subject.asInstanceOf[S & Zebra[S]]
     }
 
-    inline def subject[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): S = {
-      ctx.subject
+    inline def subject[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): S & Zebra[S] = {
+      ctx.subject.asInstanceOf[S & Zebra[S]]
     }
 
     inline def arg(using ctx: RuleContext[?, ?, ?]): Any = {
@@ -289,6 +295,8 @@ object Rule {
     case class ExecutionResult[T](res : Boolean, ret : T)
 
 
+    // the reason this requires the action again is so we can do type inference on the argument and return type.
+    // it is not required to specify the action twice for normal execution.
     def ExecuteReturnAction[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T,R](action : MetaAction[S,N1,N2,T,R], context: RuleContext[S,N1,N2])(arg : T) :ExecutionResult[R] = {
         val previousArg = action.arg
         action.arg = arg
@@ -403,12 +411,13 @@ abstract class Rule {
 
 
 enum QueryPrecedence:
-    case Generic, Class, SecondClass, Property, SecondProperty, Content, Object, SecondObject, Location, Action, Context
+    case Generic, Class, SecondClass, Property, SecondProperty, Content, Object, SecondObject, Location, Action, ActionContext
 
 
 class Condition[S <: Relatable, N1 <: Relatable, N2 <: Relatable](private val conditionBody: RuleContext[S,N1,N2] ?=> Boolean, var queryType: QueryPrecedence) {
 
-    def evaluate(using context: RuleContext[S,N1,N2]) = conditionBody(using context)
+    // evil casting probably wont work.
+    def evaluate(using context: RuleContext[?,?,?]) = conditionBody(using context.asInstanceOf[RuleContext[S,N1,N2]])
     var specificity = 1
     def precedence = queryType.ordinal
 
@@ -437,17 +446,18 @@ case class Priority(amount : Int) extends ConditionHelper {
 
 object Condition {
 
+    // condition needs a context so it can ask about noun context variables.
     inline implicit def fromBoolean(inline b:  Boolean): AnyCondition = new Condition(b, QueryPrecedence.Generic)
     inline implicit def fromObject(inline z:  ZextObject): AnyCondition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  ZextObject): AnyCondition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): AnyCondition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition(noun is p?, QueryPrecedence.Property)
-    inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition(secondNoun is p?, QueryPrecedence.SecondProperty)
+    @deprecated("just ask noun is p?") inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition(Relatable.QueryRelation(property_having, noun, p), QueryPrecedence.Property)
+    @deprecated("just ask secondNoun is p?") inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition(Relatable.QueryRelation(property_having, secondNoun, p), QueryPrecedence.SecondProperty)
     inline implicit def fromLocation(inline r:  Room): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder[?]): AnyCondition = ch.createCondition(QueryPrecedence.Class)
     inline implicit def fromConditionHelper(inline helper:  ConditionHelper): AnyCondition = helper.createCondition(QueryPrecedence.Generic)
-    inline implicit def fromQuery(inline query:  RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate(), query.relation.precedence)
+    inline implicit def fromQuery(inline query:  RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate, query.relation.precedence) // act is loud should become a relation query
 
 
     type ConditionTypes = ZextObject | RelatableProxy[ZextObject] | ConditionHelper | Property
@@ -507,20 +517,30 @@ def WrapDefault(any : Any) : ResultAndControl[?] = {
 
 type AnyRule = ActionRule[?,?,?,?,?]
 
-class ActionRule[S, N1, N2, T, R](body : ReturnsBodyType[S,N1,N2,T,R], val conditions : Array[Condition[S,N1,N2]], defaultControl : RuleControl, hasReturns : Boolean) extends Rule {
+
+class ActionRule[S, N1, N2, T, R](body : ReturnsBodyType[S,N1,N2,T,R], val conditions : Array[RuleQuestion[S,N1,N2]], defaultControl : RuleControl, hasReturns : Boolean) extends Rule {
     var first = true
 
+    // should be ok to pass null here becuase we're not using the context?
+    // i mean the context is required to generate the condition, which is annoying
     def specificity = {
-        conditions.map( _.specificity ).sum
+        conditions.map( _(using null).specificity ).sum
     }
 
-    def precedence ={
-        conditions.map(_.precedence).foldLeft(0)( _ max _ )
+    def precedence = {
+        conditions.map( _(using null).precedence).foldLeft(0)( _ max _ )
     }
 
     def possible(context : RuleContext[?,?,?]) : Boolean = {
         try {
-            conditions.forall( _.evaluate(context.asInstanceOf[RuleContext[S,N1,N2]]) )
+            // this probably not going to work.
+            // the context for the rule question provides the nouns, but it can be any context i think?
+            val typedCtx = context.asInstanceOf[RuleContext[S,N1,N2]]
+            for(ruleQ <- conditions){
+                val condition = ruleQ(using typedCtx)
+                if(!condition.evaluate(using context)) return false
+            }
+            true
         } catch {
             case e: Throwable =>
                 System.err.println(s"Error $e from condition at: .(" + definitionPosition + s")\n with code: $sourceCode\n")
@@ -636,9 +656,78 @@ class ActionRuleSet[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R] {
     }
 }
 
-// a metaaction of relatables is also a metacation of thing
 
-class MetaAction[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Returns](val targets : Int, val verbs : String*) extends Rule with Relatable {
+class PendingContext[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Returns](val action : MetaAction[S, N1, N2, Takes, Returns]) {
+    private var _subject : Option[S] = None
+    private var _noun : Option[N1] = None
+    private var _secondNoun: Option[N2] = None
+    private var _silent: Option[Boolean] = Some(false)
+    private var _location : Option[ZContainer] = None
+
+    def subject(s : S) : this.type = { _subject = Option(s);  this }
+    def noun(n : N1)  : this.type = { _noun = Option(n); this }
+    def secondNoun(n : N2) : this.type = { _secondNoun = Option(n); this }
+    def silent(b : Boolean) : this.type = { _silent = Option(b); this }
+    def location(c : ZContainer) : this.type = { _location = Option(c); this }
+
+    def system: this.type = {
+        _subject = Some(system.asInstanceOf[S])
+        _silent = Some(false)
+        _location = Some(nowhere)
+        this
+    }
+
+    inline def result : Boolean = {
+        val ctx = summonFrom {
+            case given RuleContext[S,N1,N2] => context
+            case _                          => RuleContext[S,N1,N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+        }
+
+        val pendingSubject = _subject.getOrElse(ctx.subject)
+        val pendingNouns = ConsolidateTargets(_noun.orNull, _secondNoun.orNull)
+        val pendingSilence = _silent.getOrElse(ctx.silent)
+        val pendingLocation = _location.getOrElse(ctx.location)
+        val pendingCtx = RuleContext(action, pendingSubject, pendingNouns, pendingSilence, pendingLocation)
+        ExecuteAction(pendingCtx).res
+    }
+
+    inline def returned(arg : Takes): Returns = {
+        val ctx = summonFrom {
+            case given RuleContext[S, N1, N2] => context
+            case _ => RuleContext[S, N1, N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+        }
+
+        val pendingSubject = _subject.getOrElse(ctx.subject)
+        val pendingNouns = ConsolidateTargets(_noun.orNull, _secondNoun.orNull)
+        val pendingSilence = _silent.getOrElse(ctx.silent)
+        val pendingLocation = _location.getOrElse(ctx.location)
+        val pendingCtx = RuleContext(action, pendingSubject, pendingNouns, pendingSilence, pendingLocation)
+        ExecuteReturnAction(action, pendingCtx)(arg).ret
+    }
+
+    inline def execute(arg: Takes = null.asInstanceOf[Takes]): ExecutionResult[Returns] = {
+        val ctx = summonFrom {
+            case given RuleContext[S, N1, N2] => context
+            case _ => RuleContext[S, N1, N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+        }
+
+        val pendingSubject = _subject.getOrElse(ctx.subject)
+        val pendingNouns = ConsolidateTargets(_noun.orNull, _secondNoun.orNull)
+        val pendingSilence = _silent.getOrElse(ctx.silent)
+        val pendingLocation = _location.getOrElse(ctx.location)
+        val pendingCtx = RuleContext(action, pendingSubject, pendingNouns, pendingSilence, pendingLocation)
+
+        if(arg != null) {
+            ExecuteReturnAction(action, pendingCtx)(arg)
+        } else {
+            ExecuteAction(pendingCtx).asInstanceOf[ExecutionResult[Returns]]
+        }
+    }
+
+}
+
+// a metaaction of relatables is also a metacation of thing
+class MetaAction[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Returns](val targets : Int, val verbs : String*) extends Rule with Relatable with ParsableType(PartOfSpeech.verb){
 
     def checkContext(ruleContext : RuleContext[?,?,?]): Unit = {
        // require(_stt.test(ruleContext.subject), "Incompatible subject type")
@@ -647,25 +736,29 @@ class MetaAction[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Return
     }
 
     private[Zext] var arg: Takes = null.asInstanceOf[Takes]
-    def apply(context: Takes) = new ActionWithContextCondition(this, arg == context, QueryPrecedence.Context)
+    def apply(context: Takes) = new ActionWithContextCondition(this, arg == context, QueryPrecedence.ActionContext)
 
     def implicitTargetSelector: SetComprehension[N1] = null
     def implicitSubjectSelector: SetComprehension[N2] = null
-    var disambiguationHint: Relatable => Boolean = null
+    var disambiguationHint: ParsableType => Boolean = null
 
     val ruleSet = new ActionRuleSet[S, N1, N2, Takes, Returns]
 
+    // @todo add execute fuction with modifiable context chaining eg: execute.redirect.result or execute.inherit.returned, execute.targets().subject().noun().location()
+    def run : PendingContext[S,N1,N2,Takes,Returns] = {
+        PendingContext(this)
+    }
 
     allMetaActions.addOne(this)
 
 }
 
 
-class Action(targets : Int, val verbs : String*) extends MetaAction[ZextObject,ZextObject,ZextObject, Unit, Unit](targets, verbs*) with ParsableType(PartOfSpeech.verb) {
+class Action(targets : Int, val verbs : String*) extends MetaAction[ZextObject,ZextObject,ZextObject, Unit, Unit](targets, verbs*)  {
     override def toString = if(verbs.nonEmpty) verbs(0) else this.getClass.toString
 }
 
-class ReturnsAction[T,R](targets: Int, val verbs: String*) extends MetaAction[ZextObject, ZextObject, ZextObject, T, R](targets, verbs*) with ParsableType(PartOfSpeech.verb) {
+class ReturnsAction[T,R](targets: Int, val verbs: String*) extends MetaAction[ZextObject, ZextObject, ZextObject, T, R](targets, verbs*)  {
     override def toString = if (verbs.nonEmpty) verbs(0) else this.getClass.toString
 }
 
