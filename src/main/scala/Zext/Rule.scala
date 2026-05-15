@@ -20,7 +20,7 @@ import scala.util.control.{Breaks, ControlThrowable}
 import zobjectifier.Macros
 import zobjectifier.Macros.CodePosition
 
-import scala.compiletime.summonFrom
+import scala.compiletime.{erasedValue, summonFrom}
 
 
 object RelatableProxy {
@@ -49,7 +49,6 @@ abstract class RelatableProxy[+T <: Relatable] extends SetComprehension[Nothing]
 object RuleContext {
 
     import scala.compiletime.summonInline
-
 
     private[Zext] var _first: Boolean = false
 
@@ -100,57 +99,64 @@ object RuleContext {
     }
 
 
-    // it think this ruins everything.
-    //val DefaultContext: RuleContext[Nothing, Nothing, Nothing] = ???
-    //given RuleContext[Nothing, Nothing, Nothing] = DefaultContext
+    // it think this ruins everything, but maybe not.
+    val DefaultContext: RuleContext[SProxy, N1Proxy, N2Proxy] = null
 
-    inline def context[S,N1,N2](using ctx : RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = ctx
+    given RuleContext[SProxy, N1Proxy, N2Proxy] = DefaultContext
+
+
+    inline def TrySummonContext() : RuleContext[?,?,?] = {
+        val ctx = summonFrom {
+            case r: RuleContext[?,?,?] => r
+            case _ => compiletime.error("couldn't find a context")
+        }
+
+        ctx
+    }
+
+    inline def context[S <: Relatable,N1 <: Relatable,N2<: Relatable](using ctx : RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = ctx
 
     inline def act(using ctx: RuleContext[?,?,?]) : MetaAction[Relatable,Relatable,Relatable,Unit,Unit] = {
         ctx.action.asInstanceOf[MetaAction[Relatable,Relatable,Relatable,Unit,Unit]]
     }
 
     // @todo improve this, we basically dont want to ever cast, and this should be a query in the conditions list that automatically constrains the rule context
-    inline def noun[N](using ctx: RuleContext[?, ?, ?]): N & Zebra[N] = {
-        val ret = ctx.nouns(0).asInstanceOf[N]
-        inline ret match {
-            case nothing: Nothing => scala.compiletime.error("Action doesn't have a noun")
+    @deprecated
+    inline def noun[N](using ctx: RuleContext[?, ?, ?]): N  = {
+        inline erasedValue[N] match {
+            case _: Nothing => scala.compiletime.error("Action doesn't have a noun")
+            case _ => ctx.nouns(0).asInstanceOf[N]
         }
-        ret.asInstanceOf[N & Zebra[N]]
     }
 
 
-    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 & Zebra[N1] = {
-      val ret = ctx.nouns(0).asInstanceOf[N1]
-      inline ret match {
-        case nothing: Nothing => scala.compiletime.error("Action doesn't have a noun")
+    inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 = {
+      inline erasedValue[N1] match {
+        case _: Nothing => scala.compiletime.error("Action doesn't have a noun")
+        case _ => ctx.nouns(0).asInstanceOf[N1]
       }
-      ret.asInstanceOf[N1 & Zebra[N1]]
     }
 
-    inline def secondNoun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N2 & Zebra[N2] = {
-      val ret = ctx.nouns(1).asInstanceOf[N2]
-      inline ret match {
-        case nothing: Nothing => scala.compiletime.error("Action doesn't have a second noun")
+    inline def secondNoun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N2 = {
+      inline erasedValue[N2] match {
+        case _: Nothing => scala.compiletime.error("Action doesn't have a second noun")
+        case _ => ctx.nouns(1).asInstanceOf[N2]
       }
-      ret.asInstanceOf[N2 & Zebra[N2]]
     }
 
-
-    inline def secondNoun[N](using ctx: RuleContext[?, ?, ?]): N & Zebra[N] = {
-        val ret = ctx.nouns(1).asInstanceOf[N]
-        inline ret match {
-            case nothing : Nothing => scala.compiletime.error("Action doesn't have second noun")
+    inline def secondNoun[N](using ctx: RuleContext[?, ?, ?]): N = {
+        inline erasedValue[N] match {
+            case _ : Nothing => scala.compiletime.error("Action doesn't have second noun")
+            case _ =>  ctx.nouns(1).asInstanceOf[N]
         }
-        ret.asInstanceOf[N & Zebra[N]]
     }
 
-    inline def subject[S](using ctx: RuleContext[?, ?, ?]): S & Zebra[S] = {
-        ctx.subject.asInstanceOf[S & Zebra[S]]
+    inline def subject[S](using ctx: RuleContext[?, ?, ?]): S = {
+        ctx.subject.asInstanceOf[S]
     }
 
-    inline def subject[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): S & Zebra[S] = {
-      ctx.subject.asInstanceOf[S & Zebra[S]]
+    inline def subject[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): S  = {
+      ctx.subject.asInstanceOf[S]
     }
 
     inline def arg(using ctx: RuleContext[?, ?, ?]): Any = {
@@ -451,8 +457,8 @@ object Condition {
     inline implicit def fromObject(inline z:  ZextObject): AnyCondition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  ZextObject): AnyCondition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): AnyCondition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    @deprecated("just ask noun is p?") inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition(Relatable.QueryRelation(property_having, noun, p), QueryPrecedence.Property)
-    @deprecated("just ask secondNoun is p?") inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition(Relatable.QueryRelation(property_having, secondNoun, p), QueryPrecedence.SecondProperty)
+    @deprecated("just ask noun is p?") inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition(noun is p?, QueryPrecedence.Property)
+    @deprecated("just ask secondNoun is p?") inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition(secondNoun is p?, QueryPrecedence.SecondProperty)
     inline implicit def fromLocation(inline r:  Room): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder[?]): AnyCondition = ch.createCondition(QueryPrecedence.Class)
@@ -494,6 +500,13 @@ object Condition {
          new ZextObjectClassHolder[T](tt, depth, typeName)
     }
 
+    inline def ofConstraint[T <: Relatable] : N1Constraint[T] = {
+        ???
+    }
+
+    inline def ofSecondConstraint[T <: Relatable]: N2Constraint[T] = {
+        ???
+    }
 
     inline def ofDebug[T <: ZextObject | Container](name : String)(using tt: TypeTest[ZextObject | Container, T]) : ZextObjectClassHolder[T] = {
         val depth = Macros.depth[T, ZextObject, Container] // depth of container is -1, which is maybe not expected
@@ -518,26 +531,24 @@ def WrapDefault(any : Any) : ResultAndControl[?] = {
 type AnyRule = ActionRule[?,?,?,?,?]
 
 
-class ActionRule[S, N1, N2, T, R](body : ReturnsBodyType[S,N1,N2,T,R], val conditions : Array[RuleQuestion[S,N1,N2]], defaultControl : RuleControl, hasReturns : Boolean) extends Rule {
+class ActionRule[S<: Relatable, N1<: Relatable, N2<: Relatable, T, R](body : ReturnsBodyType[S,N1,N2,T,R], val conditions : Array[RuleQuestion], defaultControl : RuleControl, hasReturns : Boolean) extends Rule {
     var first = true
 
     // should be ok to pass null here becuase we're not using the context?
     // i mean the context is required to generate the condition, which is annoying
     def specificity = {
-        conditions.map( _(using null).specificity ).sum
+        conditions.map( _.specificity ).sum
     }
 
     def precedence = {
-        conditions.map( _(using null).precedence).foldLeft(0)( _ max _ )
+        conditions.map( _.precedence).foldLeft(0)( _ max _ )
     }
 
     def possible(context : RuleContext[?,?,?]) : Boolean = {
         try {
             // this probably not going to work.
             // the context for the rule question provides the nouns, but it can be any context i think?
-            val typedCtx = context.asInstanceOf[RuleContext[S,N1,N2]]
-            for(ruleQ <- conditions){
-                val condition = ruleQ(using typedCtx)
+            for(condition <- conditions){
                 if(!condition.evaluate(using context)) return false
             }
             true
@@ -599,11 +610,6 @@ class ActionRule[S, N1, N2, T, R](body : ReturnsBodyType[S,N1,N2,T,R], val condi
     }
 }
 
-type SelfAction[S] = MetaAction[S, Nothing, Nothing, Unit, Unit]
-type SingleAction[T] = MetaAction[ZextObject, T, Nothing, Unit, Unit]
-type DoubleAction[T1,T2] = MetaAction[ZextObject, T1, T2, Unit, Unit]
-type AnyAction = MetaAction[?,?,?,?,?]
-type AnyCondition = Condition[?,?,?]
 
 // debug actions will have the entire set of objects in their scope
 trait DebugAction {
@@ -622,7 +628,7 @@ trait Passthrough[T] {
     this: MetaAction[?,?,?,T,T] =>
 }
 
-class ActionWithContextCondition[S,N1,N2,T,R](val action : MetaAction[S,N1,N2,T,R], condition : => Boolean,  queryType: QueryPrecedence) extends Condition(condition, queryType)
+class ActionWithContextCondition[S <: Relatable,N1  <: Relatable,N2  <: Relatable,T,R](val action : MetaAction[S,N1,N2,T,R], condition : => Boolean,  queryType: QueryPrecedence) extends Condition(condition, queryType)
 
 class ActionRuleSet[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R] {
     val applying = ArrayBuffer[ActionRule[S, N1, N2, T, R]]()
@@ -754,11 +760,11 @@ class MetaAction[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Return
 }
 
 
-class Action(targets : Int, val verbs : String*) extends MetaAction[ZextObject,ZextObject,ZextObject, Unit, Unit](targets, verbs*)  {
+class Action(targets : Int, verbs : String*) extends MetaAction[ZextObject,ZextObject,ZextObject, Unit, Unit](targets, verbs*)  {
     override def toString = if(verbs.nonEmpty) verbs(0) else this.getClass.toString
 }
 
-class ReturnsAction[T,R](targets: Int, val verbs: String*) extends MetaAction[ZextObject, ZextObject, ZextObject, T, R](targets, verbs*)  {
+class ReturnsAction[T,R](targets: Int, verbs: String*) extends MetaAction[ZextObject, ZextObject, ZextObject, T, R](targets, verbs*)  {
     override def toString = if (verbs.nonEmpty) verbs(0) else this.getClass.toString
 }
 

@@ -47,15 +47,14 @@ object Infliction {
   }
 
 
-  type UnitBodyType[S,N1,N2] = RuleContext[S, N1, N2] ?=> Unit
-  type ReturnsBodyType[S,N1,N2,T,R] = T => RuleContext[S, N1, N2] ?=> R
+  type UnitBodyType[S <: Relatable, N1 <: Relatable, N2 <: Relatable] = RuleContext[S, N1, N2] ?=> Unit
+  type ReturnsBodyType[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R] = T => RuleContext[S, N1, N2] ?=> R
 
 
-
-  inline def CreateAlwaysRule[S, N1, N2](inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion[S, N1, N2]*): Unit = {
+  inline def CreateAlwaysRule[S<: Relatable, N1<: Relatable, N2<: Relatable](inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion*): Unit = {
 
         val typedBody = body.asInstanceOf[ReturnsBodyType[Relatable, Relatable, Relatable, Unit, Unit]]
-        val typedConditions = conditions.toArray.asInstanceOf[Array[RuleQuestion[Relatable, Relatable, Relatable]]]
+        val typedConditions = conditions.toArray
         val rule = new ActionRule(typedBody, typedConditions, control, false)
         rule.definitionPosition = CodePosition()
         rule.sourceCode = codeOf(body)
@@ -64,7 +63,7 @@ object Infliction {
 
 
 
-  inline def CreateUnitRule[S, N1, N2](firstArg: FirstArg[S,N1,N2,?,?], inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion[S,N1,N2]*): Unit = {
+  inline def CreateUnitRule[S<: Relatable, N1<: Relatable, N2<: Relatable, T , R](inline firstArg: FirstArg[S,N1,N2,T,R], inline body: ReturnsBodyType[S, N1, N2, Unit, Unit], control: RuleControl, ruleType: RuleType, conditions: RuleQuestion*): Unit = {
 
     var conds = conditions
 
@@ -83,11 +82,16 @@ object Infliction {
         rule.definitionPosition = CodePosition()
         rule.sourceCode = codeOf(body)
         ac.action.ruleSet.addRule(rule, ruleType)
+
+      case _ =>
+        println(firstArg.getClass.getName + "huh?")
+        //scala.compiletime.error("huh?")
     }
+
   }
 
 
-  inline def CreateReturnsRule[S,N1,N2,T,R](firstArg: FirstArg[S,N1,N2,T,R], inline body : ReturnsBodyType[S,N1,N2, T, R], control : RuleControl, ruleType : RuleType, conditions : RuleQuestion[S,N1,N2] *) : Unit = {
+  inline def CreateReturnsRule[S  <: Relatable,N1  <: Relatable,N2  <: Relatable,T,R](firstArg: FirstArg[S,N1,N2,T,R], inline body : ReturnsBodyType[S,N1,N2, T, R], control : RuleControl, ruleType : RuleType, conditions : RuleQuestion*) : Unit = {
 
     var conds = conditions
 
@@ -111,11 +115,21 @@ object Infliction {
 
   }
 
+  type SelfAction[S <: Relatable] = MetaAction[S, Nothing, Nothing, Unit, Unit]
+  type SingleAction[T <: Relatable] = MetaAction[ZextObject, T, Nothing, Unit, Unit]
+  type DoubleAction[T1 <: Relatable, T2 <: Relatable] = MetaAction[ZextObject, T1, T2, Unit, Unit]
+  type AnyAction = MetaAction[?, ?, ?, ?, ?]
+  type AnyCondition = Condition[?, ?, ?]
 
   type ActionQuestion = RuleContext[?,?,?] ?=> MetaAction[Relatable, Relatable, Relatable, Unit, Unit]
-  type RuleQuestion[S,N1,N2] =  RuleContext[S, N1, N2] ?=> AnyCondition
-  type FirstArg[S,N1,N2,T,R] = MetaAction[S, N1, N2, T, R] | ActionWithContextCondition[S,N1,N2,T,R]
-  type ContextQuestion[S,N1,N2] = RuleContext[S, N1, N2] ?=> Boolean
+  type RuleQuestion =  AnyCondition
+  type FirstArg[S <: Relatable,N1 <: Relatable,N2 <: Relatable,T,R] = MetaAction[S, N1, N2, T, R] | ActionWithContextCondition[S,N1,N2,T,R]
+  trait N1Constraint[T <: Relatable]
+  trait N2Constraint[T <: Relatable]
+  trait SConstraint[T <: Relatable]
+  trait ConstraintCondition[SC <: Relatable, N1C <: Relatable, N2C <: Relatable]
+
+  object ThingsInContainers extends ConstraintCondition[ZextObject, Thing, ZContainer]
 
   trait Infliction(defaultControl : RuleControl, ruleType: RuleType) {
 
@@ -127,15 +141,29 @@ object Infliction {
     }
     */
 
-    inline def always(inline conditions: RuleQuestion[?,?,?] *)(inline body: UnitBodyType[?, ?, ?]): Unit = {
+    inline def always(inline conditions: RuleQuestion *)(inline body: UnitBodyType[Relatable, Relatable, Relatable]): Unit = {
       CreateAlwaysRule(_ => body, defaultControl, ruleType, conditions*)
     }
 
-    inline def apply[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion[S,N1,N2]*)(inline body: UnitBodyType[S, N1, N2]): Unit = {
+    inline def apply[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](
+        inline action: FirstArg[S,N1,N2,T,R],
+        inline conditions: RuleQuestion*)(inline body: UnitBodyType[S, N1, N2]): Unit = {
+
       CreateUnitRule(action, _ => body, defaultControl, ruleType, conditions *)
     }
 
-    inline def returns[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion[S,N1,N2]*)(inline body: ReturnsBodyType[S, N1, N2, T, R]): Unit = {
+    inline def constrained[S <: Relatable, N1 <: Relatable, N2 <: Relatable, SC <: S, N1C <: N1, N2C <: N2, T, R](
+                                                                                       action: FirstArg[S, N1, N2, T, R],
+                                                                                       inline constraintCondition: ConstraintCondition[SC, N1C, N2C],
+                                                                                       inline conditions: RuleQuestion*)(inline body: UnitBodyType[SC, N1C, N2C]): Unit = {
+      ???
+      //CreateUnitRule(action, _ => body, defaultControl, ruleType, conditions *)
+    }
+
+
+
+
+    inline def returns[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], inline conditions: RuleQuestion*)(inline body: ReturnsBodyType[S, N1, N2, T, R]): Unit = {
       CreateReturnsRule(action, body, defaultControl, ruleType, conditions *)
     }
   }
@@ -143,13 +171,13 @@ object Infliction {
   object before extends Infliction(RuleControl.Continue, RuleType.before)
   object check extends Infliction(RuleControl.Continue, RuleType.check)
   object instead extends Infliction(RuleControl.Stop, RuleType.instead) {
-    infix inline def quick[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], inline conditions: RuleQuestion[S, N1, N2]*)(using DummyImplicit): InsteadConsequence = {
-      ???
+    infix inline def quick[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], inline conditions: RuleQuestion*): InsteadConsequence[S,N1,N2,T,R] = {
+      new InsteadConsequence(action, conditions*)
     }
   }
   object report extends Infliction(RuleControl.Replace, RuleType.report){
-    infix inline def quick[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], inline conditions: RuleQuestion[S, N1, N2]*)(using DummyImplicit): ReportConsequence = {
-      ???
+    infix inline def quick[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], inline conditions: RuleQuestion*): ReportConsequence[S,N1,N2,T,R] = {
+      new ReportConsequence(action, conditions*)
     }
   }
   object inflict extends Infliction(RuleControl.Continue, RuleType.inflict)
@@ -161,7 +189,7 @@ object Infliction {
   //inline def report[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S,N1,N2,T,R], conditions: RuleQuestion[S,N1,N2]*): ReportConsequence = ??? // new ReportConsequence(action, conditions *)
 
   // ultra terse syntax
-  class InsteadConsequence(action: Action, conditions: RuleQuestion[?,?,?]*) {
+  class InsteadConsequence[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], conditions: RuleQuestion*) {
     infix inline def Say(inline s: RuleContext[?,?,?] ?=> StringExpression) : Unit  = {
       CreateUnitRule(action, _ => Interpreter.Say(s), RuleControl.Stop, RuleType.instead, conditions *)
     }
@@ -171,7 +199,7 @@ object Infliction {
     }
   }
 
-  class ReportConsequence(action: Action, conditions: RuleQuestion[?,?,?]*) {
+  class ReportConsequence[S <: Relatable, N1 <: Relatable, N2 <: Relatable, T, R](action: FirstArg[S, N1, N2, T, R], conditions: RuleQuestion*) {
     infix inline def Say(inline s: RuleContext[?,?,?] ?=> StringExpression) : Unit  = {
       CreateUnitRule(action, _=> Interpreter.Say(s), RuleControl.Replace, RuleType.report, conditions *)
     }

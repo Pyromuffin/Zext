@@ -4,3 +4,8 @@ target
 .bsp
 null
 Generated.scala
+/.bloop
+/.metals
+/project/.bloop
+project/metals.sbt
+/.vscode

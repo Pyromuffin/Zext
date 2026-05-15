@@ -4,6 +4,7 @@ import EverythingParser.{ParseResult, time}
 import Zext.*
 import Zext.Actions.*
 import Zext.ControlCodes.{TextControl, bold, orange, orangeCode}
+import Zext.Infliction.AnyCondition
 import Zext.Interpreter.*
 import Zext.Parser.PartOfSpeech.verb
 import Zext.Rule.*

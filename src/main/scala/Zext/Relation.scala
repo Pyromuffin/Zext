@@ -5,6 +5,7 @@ import Zext.QueryPrecedence.ActionContext
 import Zext.Relatable.allRelatables
 import Zext.Relation.*
 import Zext.Relation.RelationQuery.negateNext
+import Zext.Relations.Containment.holds
 import Zext.SetComprehension.{AllOf, AnyOf, CombinedComprehension}
 import Zext.exports.*
 
@@ -210,17 +211,23 @@ object Relatable {
 
   }
 
-  def QueryRelation[X <: Relatable,Y <: Relatable, S : TT, T : TT](relation: Relation[S,T], first : X, second : Y) : RelationQuery[X, Y] = {
-    ???
-  }
+
 
   // so act is loud? is always evaluated as (act is loud)?, even when ? is a member of relatable.
   // so what we need is act is loud to have a ? operator
-  inline implicit def ToQueryable[X <: Relatable | Zebra[?], Y](inline q: => X): Queryable[X, Y] = {
+  inline implicit def ToQueryable[X <: Relatable, Y <: Relatable](inline q: => X): Queryable[X, Y] = {
     new Queryable(q)
   }
 
-  class Queryable[X <: Relatable | Zebra[?], Y](q: RuleContext[?, ?, ?] ?=> X) {
+
+  // here are some kinds of questions we will like to ask:
+  // noun is wet?
+  // subject knows noun?
+  // hat inside box?
+  // noun inside box?
+  // hat inside secondNoun?
+
+  class Queryable[X <: Relatable, Y <: Relatable](q: RuleContext[?, ?, ?] ?=> X) {
     def ? : Zext.Relation.RelationQuery[X, Y] = ???
   }
 
@@ -663,10 +670,21 @@ abstract class ConditionalRelation[S <: Relatable : TT, T <: Relatable : TT] ext
 
 }
 
-transparent trait Zebra[T <: Relatable] {
-  this : T =>
-  implicit def toUnderlying : T = this.asInstanceOf[T]
-}
+trait Proxy extends Relatable
+
+/*
+implicit def toT[T <: Relatable](n2p : N2Proxy[T]) : T = ???
+implicit def toT[T <: Relatable](n2p : SProxy[T]) : T = ???
+implicit def toT[T <: Relatable](n2p : N1Proxy[T]) : T = ???
+*/
+
+trait N1Proxy extends Proxy
+trait N2Proxy extends Proxy
+trait SProxy extends Proxy
+
+
+
+transparent trait PendingRelation[S <: Relatable, T <: Relatable, X, Y](x : X, y : Y)
 
 class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
@@ -699,8 +717,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
   val precedence = QueryPrecedence.Generic
 
-  type Source = S | SetComprehension[S] | Zebra[?]
-  type Target = T | SetComprehension[T] | Zebra[?]
+  type SourceT = S
+  type TargetT = T
+  type Source = S | SetComprehension[S] | Proxy
+  type Target = T | SetComprehension[T] | Proxy
 
   relations.addOne(this)
 
@@ -788,7 +808,8 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
 }
 
-abstract class ReciprocalRelation[S,T] extends Relation[S,T] {
+// this is not symmetric, it is like, father <-> son or east-going <-> west-going
+abstract class ReciprocalRelation[S <: Relatable,T <: Relatable] extends Relation[S,T] {
   def getReciprocal : Relation[T,S]
   def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A = {
     getReciprocal.relates(_b, _a)

@@ -3,7 +3,9 @@ package Tests
 import Zext.*
 import Zext.EverythingParser.ParseResult
 import Zext.Parser.{Command, Disambiguate}
+import Zext.Relations.Containment.inside
 import Zext.exports.*
+import Zext.idea_discovering.can_discover
 
 import scala.language.postfixOps
 

@@ -11,7 +11,7 @@ import scala.reflect.TypeTest
 
 object Relations {
 
-  implicit object Composition extends Relation[Thing, Thing] with ManyToOne {
+   implicit object Composition extends Relation[Thing, Thing] with ManyToOne {
 
     override val precedence = QueryPrecedence.Content
 
@@ -33,7 +33,7 @@ object Relations {
   }
 
 
-  implicit object Containment extends Relation[ZContainer, Thing] with OneToMany{
+ implicit object Containment extends Relation[ZContainer, Thing] with OneToMany{
 
     override val precedence = QueryPrecedence.Content
 

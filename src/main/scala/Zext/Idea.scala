@@ -11,21 +11,27 @@ import scala.language.postfixOps
 import Zext.Condition.*
 import Zext.Infliction.*
 import Zext.RuleContext.*
+import Zext.idea_discovering.can_discover
+import Zext.idea_knowing.knows
 
-
+/*
 extension[T] (wrapper : RelatableWrapper[T]) {
   implicit inline def toUnderlying : T = wrapper.underlying
 }
 // this all has to do with auto casting to nothing bullshit so that some relationship queries can work?
 // but this is apparently broken rn.
 case class RelatableWrapper[+T <: Relatable](underlying : T) extends SetComprehension[Nothing] with Applicable
+*/
 
-implicit object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
+
+
+object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def knows[Y <: Target](target: Y*): X = relates(subject, target)
+    infix def superKnows[Y <: Target](target: Y*): X & PendingRelation[SourceT,TargetT, X, Y] = ??? //relates(subject, target)
 }
 
-implicit object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
+object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
     infix def can_discover[Y <: Target](target: Y*): X = relates(subject, target)
 
@@ -45,7 +51,7 @@ object Idea {
   // this stupid context error is really just a typechecking error for knows requiring an Idea.
   // should we have a default context with everything set to nothing, so it can cast to any type?
 
-  // known ideas are always visible.
+  // known ideas are always visible. 
   // this is so we can say stuff like go north (north, being an idea)
   inflict(determiningVisibility, subject knows noun?) {
       succeed
@@ -71,6 +77,7 @@ object Idea {
 
     report(thinking, subject knows noun?) {
 
+      val n = noun
         Say(s"Thinking of $noun reveals: ${noun.description}")
     }
   }
@@ -84,7 +91,7 @@ object Idea {
     }
 
 
-    inflict.returns(printing_name, player can_discover noun?) { name =>
+    inflict.returns(printing_name, player can_discover noun[Idea]?) { name =>
       name.bold
     }
 

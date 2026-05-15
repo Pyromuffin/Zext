@@ -12,6 +12,10 @@ import Zext.RoomRegioning.designates
 import Zext.Infliction.inflict.*
 import Zext.Infliction.report.*
 import Zext.QueryPrecedence.Property
+import Zext.Relations.Containment.{holds, inside}
+import Zext.idea_discovering.can_discover
+import Zext.idea_knowing.superKnows
+import zobjectifier.Macros
 
 import scala.language.postfixOps
 
@@ -37,13 +41,14 @@ object count {
 
 
 
+
 object unlocking extends Action(1, "unlock")
 {
   inflict(unlocking, of[Container]) {
-    val c = noun[Container]
+    val c = noun
     noun[Container].openable = true
   }
-  
+
   report quick(unlocking) Say s"You unlock $noun"
 }
 
@@ -85,7 +90,6 @@ object Dirt extends Room {
   val scarves = ~"An array of zebra patterned tactical scarves" is scenery is not_yours
   val mantles = ~"How did they get all these fireplaces in here???" is scenery is not_yours
   val sashes = ~"Second place winner in the number of sashes competition" is scenery is not_yours
-
 
   instead.quick(taking, not_yours) Say "that would be uncouth"
 

@@ -14,6 +14,10 @@ object nothing extends ZextObject with SetComprehension[Nothing] {
   val name = "nothing"
   val description = "subject for things that happen without agentic cause"
 
+  override def getSet() : Seq[Nothing] = {
+    ???
+  }
+
   ZextObject.globals.addOne(this)
 }
 

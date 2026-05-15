@@ -273,7 +273,7 @@ object Actions {
 
     instead quick(taking, nothing) Say s"You wrap your arms around yourself, doesn't that feel nice?"
 
-    instead(taking, noun.isComposite) {
+    instead(taking, noun[Thing].isComposite) {
       val n = noun
       Say(s"You're going to have a difficult time removing $noun from ${noun.compositeObject}")
     }
