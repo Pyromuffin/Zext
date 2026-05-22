@@ -211,28 +211,6 @@ object Relatable {
 
   }
 
-
-
-  // so act is loud? is always evaluated as (act is loud)?, even when ? is a member of relatable.
-  // so what we need is act is loud to have a ? operator
-  inline implicit def ToQueryable[X <: Relatable, Y <: Relatable](inline q: => X): Queryable[X, Y] = {
-    new Queryable(q)
-  }
-
-
-  // here are some kinds of questions we will like to ask:
-  // noun is wet?
-  // subject knows noun?
-  // hat inside box?
-  // noun inside box?
-  // hat inside secondNoun?
-
-  class Queryable[X <: Relatable, Y <: Relatable](q: RuleContext[?, ?, ?] ?=> X) {
-    def ? : Zext.Relation.RelationQuery[X, Y] = ???
-  }
-
-
-
 }
 
 
@@ -280,12 +258,13 @@ trait Applicable {
 
 }
 
+trait Question[+T]
 
 trait Relatable extends Applicable {
   this : AnyRef =>
 
 
-  //def ? : RelationQuestion = RelationQuestion(this)
+  def ? : Question[this.type] = ???
 
   allRelatables.addOne(this)
   val objectID = allRelatables.length
@@ -305,6 +284,14 @@ trait Relatable extends Applicable {
   extension(h : mutable.HashMap[Relation[?,?], mutable.HashSet[Relatable]]) {
     def defaulted(r : Relation[?,?]) = h.getOrElseUpdate(r, mutable.HashSet())
   }
+
+  def withPendingRelation[S <: Relatable,T <: Relatable,A,B] : this.type & PendingRelation[S,T,A,B] = {
+    // we have to construct a new object to add a trait.
+    // the pending relation type is pretty much compile time only, which kind of annoying.
+    // i think that means relatable needs to be cloneable
+    ???
+  }
+
 
   // removes relation and all related from relatable
   def removeRelation(r: Relation[?, ?]): Unit = {
@@ -681,10 +668,42 @@ implicit def toT[T <: Relatable](n2p : N1Proxy[T]) : T = ???
 trait N1Proxy extends Proxy
 trait N2Proxy extends Proxy
 trait SProxy extends Proxy
+private[Zext] object _nounProxy extends N1Proxy
+private[Zext] object _subjectProxy extends SProxy
+private[Zext] object _secondNounProxy extends N2Proxy
 
 
 
-transparent trait PendingRelation[S <: Relatable, T <: Relatable, X, Y](x : X, y : Y)
+/*
+extension[S <: Relatable,T <: Relatable, A,B] (queryBlock: => PendingRelation[S,T,A,B]) {
+   def ? : Condition[?, ?,?] = {
+     new Condition(
+       {
+       NotAQuery.stack.push(ArrayBuffer())
+       queryBlock
+       val queries = NotAQuery.stack.pop()
+       assert(queries.length == 1)
+       val q = queries.head
+       q.evaluate
+      },
+       QueryPrecedence.Generic
+     )
+
+  }
+}
+*/
+
+case class PendingRelation[S <: Relatable, T <: Relatable, A, B](a : A, b : Seq[B]) {
+
+  // here are some kinds of questions we will like to ask:
+  // noun is wet?
+  // subject knows noun?
+  // hat inside box?
+  // noun inside box?
+  // hat inside secondNoun?
+
+}
+
 
 class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
@@ -752,6 +771,7 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   def relates[A <: Source, B <: Target](_a: A, _b: B): A = {
     makeRelation(narrowSource(_a), narrowTarget(_b))
     _a
+
   }
 
   def reverseRelates[A <: Source, B <: Target](_b: B, _a: A): B = {

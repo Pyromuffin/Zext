@@ -19,6 +19,8 @@ import scala.util.boundary
 import boundary.break
 import zobjectifier.Macros
 
+import scala.collection.immutable.Set.Set1
+
 
 
 
@@ -212,7 +214,7 @@ object Interpreter{
   }
 
   def SystemMessage(str: StringExpression): Unit = {
-    ExecuteReturnAction(saying, RuleContext(saying, system, null, false, null))(str.toString)
+    ExecuteReturnAction(saying, RuleContext(saying, system, Seq(), false, nowhere))(str.toString)
   }
 
   def Say(str: StringExpression)(using ruleContext: RuleContext[?,?,?]) = {

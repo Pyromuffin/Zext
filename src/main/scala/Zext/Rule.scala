@@ -99,8 +99,8 @@ object RuleContext {
     }
 
 
-    // it think this ruins everything, but maybe not.
-    val DefaultContext: RuleContext[SProxy, N1Proxy, N2Proxy] = null
+    // this is to only be used in the query context, or else~!
+    val DefaultContext: RuleContext[SProxy, N1Proxy, N2Proxy] = RuleContext(null,_subjectProxy,Seq(_nounProxy,_secondNounProxy), false, nowhere)
 
     given RuleContext[SProxy, N1Proxy, N2Proxy] = DefaultContext
 
@@ -457,13 +457,13 @@ object Condition {
     inline implicit def fromObject(inline z:  ZextObject): AnyCondition = new Condition(z == noun, QueryPrecedence.Object)
     inline def fromSecondObject(inline z:  ZextObject): AnyCondition = new Condition(z == secondNoun, QueryPrecedence.SecondObject)
     inline implicit def fromObjectArray(inline az:  Seq[ZextObject]): AnyCondition = new Condition(az.contains(noun), QueryPrecedence.Object)
-    @deprecated("just ask noun is p?") inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition(noun is p?, QueryPrecedence.Property)
-    @deprecated("just ask secondNoun is p?") inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition(secondNoun is p?, QueryPrecedence.SecondProperty)
+    @deprecated("just ask noun is p?") inline implicit def fromProperty(inline p: Property): AnyCondition = new Condition( (noun is p?).evaluate, QueryPrecedence.Property)
+    @deprecated("just ask secondNoun is p?") inline def fromSecondProperty(inline p: Property): AnyCondition = new Condition( (secondNoun is p?).evaluate, QueryPrecedence.SecondProperty)
     inline implicit def fromLocation(inline r:  Room): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromRegion(inline r:  RoomRegion): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder[?]): AnyCondition = ch.createCondition(QueryPrecedence.Class)
     inline implicit def fromConditionHelper(inline helper:  ConditionHelper): AnyCondition = helper.createCondition(QueryPrecedence.Generic)
-    inline implicit def fromQuery(inline query:  RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate, query.relation.precedence) // act is loud should become a relation query
+    inline def fromQuery(inline query: RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate, query.relation.precedence) // act is loud should become a relation query
 
 
     type ConditionTypes = ZextObject | RelatableProxy[ZextObject] | ConditionHelper | Property

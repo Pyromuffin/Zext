@@ -13,22 +13,34 @@ import Zext.Infliction.*
 import Zext.RuleContext.*
 import Zext.idea_discovering.can_discover
 import Zext.idea_knowing.knows
+import scala.util.NotGiven
 
-/*
-extension[T] (wrapper : RelatableWrapper[T]) {
-  implicit inline def toUnderlying : T = wrapper.underlying
+
+
+// this can be super psycho
+// we have essentially 3 places where we will be using these relation statements
+// definition context = val hat : Thing =~"hattable" is wet
+// query context =  hat is wet? : RelationQuery[Thing, Property]
+// rule context = hat is wet : PendingRelation, or just Thing, i suppose
+// the question is that can we use givens to distinguish between query context and definition context
+// we can distinguish between query and rule context by using a default context object
+// maybe we can use something like the prescence of the implicit Zcontainer?
+
+type RelationQuestion[S <: Relatable, T <: Relatable, A, B] = PendingRelation[S,T,A,B] ?=> Question[A]
+
+
+def make[S <: Relatable, T <: Relatable, A, B](question : PendingRelation[S,T,A,B] ?=> Question[A]) : PendingRelation[S,T,A,B] = {
+  val q = question(using null)
 }
-// this all has to do with auto casting to nothing bullshit so that some relationship queries can work?
-// but this is apparently broken rn.
-case class RelatableWrapper[+T <: Relatable](underlying : T) extends SetComprehension[Nothing] with Applicable
-*/
 
-
+val x = make(noun knows subject?)
+val y = noun knows subject
 
 object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
-  extension [X <: Source](subject: X)
-    infix def knows[Y <: Target](target: Y*): X = relates(subject, target)
-    infix def superKnows[Y <: Target](target: Y*): X & PendingRelation[SourceT,TargetT, X, Y] = ??? //relates(subject, target)
+  extension [X <: Source](subject: X) {
+    infix def knows[Y <: Target](target: Y*)(using pr: PendingRelation[Relatable, Idea, X, Y] = null): X = relates(subject, target)
+
+  }
 }
 
 object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
@@ -43,7 +55,6 @@ object Idea {
 
   val allIdeas = ArrayBuffer[Idea]()
 
-
   // knows requires a Relatable & Zext.idea_knowing.Target (Idea, in this case) for the second param,
   // but the context type passed for determiningVisibility is Relatable, Relatable.
   // i think this means that if we can't find a context then we should just assume failure?
@@ -51,7 +62,8 @@ object Idea {
   // this stupid context error is really just a typechecking error for knows requiring an Idea.
   // should we have a default context with everything set to nothing, so it can cast to any type?
 
-  // known ideas are always visible. 
+  
+  // known ideas are always visible.
   // this is so we can say stuff like go north (north, being an idea)
   inflict(determiningVisibility, subject knows noun?) {
       succeed
@@ -76,9 +88,7 @@ object Idea {
     }
 
     report(thinking, subject knows noun?) {
-
-      val n = noun
-        Say(s"Thinking of $noun reveals: ${noun.description}")
+      Say(s"Thinking of $noun reveals: ${noun.description}")
     }
   }
 
@@ -86,7 +96,7 @@ object Idea {
 
     before(ideating, first) {
       // make all innate ideas discoverable
-      val known = subject.queryRelated(idea_knowing).filter(_ is innate?)
+      val known = subject.queryRelated(idea_knowing).filter( x => (x is innate?).evaluate )
       subject can_discover known
     }
 
@@ -98,7 +108,7 @@ object Idea {
 
     report(ideating) {
       val knownIdeas = subject.queryRelated(idea_knowing)
-      val obviousIdeas = subject.queryRelated(idea_discovering).filter(_ is obvious?)
+      val obviousIdeas = subject.queryRelated(idea_discovering).filter(x => (x is obvious?).evaluate )
       val ideas = knownIdeas.concat(obviousIdeas)
       val ideasList = ListNamesNicely(ideas.toSeq)
       if(ideasList.isEmpty){

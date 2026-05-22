@@ -274,7 +274,7 @@ implicit object property_having extends Relation[Relatable, Property] with ManyT
     override val precedence = QueryPrecedence.Property
 
     extension [X <: Source](subject: X)
-        infix def is[Y <: Target](target: Y*): X = relates(subject, target)
+        infix def is[Y <: Target](target: Y*): X & PendingRelation[SourceT,TargetT,X,Y] = relates(subject, target)
 
         // enables object is property(whatever) syntax
         infix def is[ValueType](propertyValue: PropertyValue[ValueType]) : X = {

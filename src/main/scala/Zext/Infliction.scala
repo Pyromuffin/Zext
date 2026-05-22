@@ -1,5 +1,6 @@
 package Zext
 
+import Zext.Relation.RelationQuery
 import Zext.Rule.*
 import Zext.RuleContext.{secondNoun, subject}
 import zobjectifier.Macros.*
@@ -84,7 +85,7 @@ object Infliction {
         ac.action.ruleSet.addRule(rule, ruleType)
 
       case _ =>
-        println(firstArg.getClass.getName + "huh?")
+        println(firstArg.getClass.getName + " huh?")
         //scala.compiletime.error("huh?")
     }
 

@@ -14,7 +14,6 @@ import Zext.Infliction.report.*
 import Zext.QueryPrecedence.Property
 import Zext.Relations.Containment.{holds, inside}
 import Zext.idea_discovering.can_discover
-import Zext.idea_knowing.superKnows
 import zobjectifier.Macros
 
 import scala.language.postfixOps
@@ -395,6 +394,7 @@ object CrowsNest extends Room {
 
   val trapeze =  "The trapeze hangs limply from a bit of scaffolding" initially
     "It looks like a barber pole, only it's orange and purple" is fixed
+
 
   report quick(examining, trapeze, !player.canAccess(trapeze, examining) ) Say "A handlebar that seems to be hanging from something in the sky"
 
