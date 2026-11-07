@@ -272,7 +272,6 @@ trait Relatable extends Applicable {
 
   override def equals(obj: Any) = {
     obj match {
-      case relatableProxy: RelatableProxy[?] => objectID == relatableProxy.resolve.objectID
       case relatable: Relatable => objectID == relatable.objectID
       case null => false
     }
