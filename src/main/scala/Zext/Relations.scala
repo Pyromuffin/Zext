@@ -21,9 +21,7 @@ object Relations {
     }
 
     extension [X <: Source](s: X)
-      infix def makes[Y <: Target](target: Y): X = {
-        relates(s, target)
-      }
+      infix def makes[Y <: Target](target: Y): X & PendingRelation[Thing, Thing, X, Y] = relates(s, target)
 
 
     extension [X <: Target](s: X)
@@ -38,7 +36,7 @@ object Relations {
     override val precedence = QueryPrecedence.Content
 
     extension [X <: Source](s: X)
-      infix def holds[Y <: Target](target: Y*): X & PendingRelation[SourceT,TargetT,X,Y] = relates(s, target)
+      infix def holds[Y <: Target](target: Y*): X & PendingRelation[ZContainer, Thing, X, Y] = relates(s, target)
 
     extension [X <: Target](s: X)
       infix def inside[Y <: Source](target: Y): X = reverseRelates(s, target)
@@ -100,42 +98,42 @@ object Relations {
 
     implicit object east_going extends DirectionalRelation(east) {
       extension [X <: Source](s: X)
-        infix def eastward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def eastward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object west_going extends DirectionalRelation(west)  {
       extension [X <: Source](s: X)
-        infix def westward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def westward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object north_going extends DirectionalRelation(north) {
       extension [X <: Source](s: X)
-        infix def northward[Y <: Target](target: Y): X = reciprocates(s,target)
+        infix def northward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s,target)
     }
 
     implicit object south_going extends DirectionalRelation(south)  {
       extension [X <: Source](s: X)
-        infix def southward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def southward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object in_going extends DirectionalRelation(in)  {
       extension [X <: Source](s: X)
-        infix def inward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def inward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object out_going extends DirectionalRelation(out)  {
       extension [X <: Source](s: X)
-        infix def outward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def outward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object up_going extends DirectionalRelation(up)  {
       extension [X <: Source](s: X)
-        infix def upward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def upward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
 
     implicit object down_going extends DirectionalRelation(down)  {
       extension [X <: Source](s: X)
-        infix def downward[Y <: Target](target: Y): X = reciprocates(s, target)
+        infix def downward[Y <: Target](target: Y): X & PendingRelation[Room, Room, X, Y] = reciprocates(s, target)
     }
   }
 }

@@ -26,26 +26,27 @@ import scala.util.NotGiven
 // we can distinguish between query and rule context by using a default context object
 // maybe we can use something like the prescence of the implicit Zcontainer?
 
-type RelationQuestion[S <: Relatable, T <: Relatable, A, B] = PendingRelation[S,T,A,B] ?=> Question[A]
-
-
-def make[S <: Relatable, T <: Relatable, A, B](question : PendingRelation[S,T,A,B] ?=> Question[A]) : PendingRelation[S,T,A,B] = {
-  val q = question(using null)
-}
-
-val x = make(noun knows subject?)
+// Experimental: RelationQuestion and make are placeholders for future query syntax
+// type RelationQuestion[S <: Relatable, T <: Relatable, R <: Relation[S,T], A, B] = PendingRelation[S,T,R,A,B] ?=> Question[A]
+//
+// def make[S <: Relatable, T <: Relatable, R <: Relation[S,T], A, B](question : PendingRelation[S,T,R,A,B] ?=> Question[A]) : PendingRelation[S,T,R,A,B] = {
+//   val q = question(using null)
+//   q.asInstanceOf[PendingRelation[S,T,R,A,B]]
+// }
+//
+// val x = make(noun knows subject?)
 val y = noun knows subject
 
 object idea_knowing extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X) {
-    infix def knows[Y <: Target](target: Y*)(using pr: PendingRelation[Relatable, Idea, X, Y] = null): X = relates(subject, target)
+    infix def knows[Y <: Target](target: Y*): X & PendingRelation[Relatable, Idea, X, Y] = relates(subject, target)
 
   }
 }
 
 object idea_discovering extends Relation[Relatable, Idea] with ManyToMany {
   extension [X <: Source](subject: X)
-    infix def can_discover[Y <: Target](target: Y*): X = relates(subject, target)
+    infix def can_discover[Y <: Target](target: Y*): X & PendingRelation[Relatable, Idea, X, Y] = relates(subject, target)
 
 }
 

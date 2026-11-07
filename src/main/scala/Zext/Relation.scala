@@ -263,9 +263,6 @@ trait Question[+T]
 trait Relatable extends Applicable {
   this : AnyRef =>
 
-
-  def ? : Question[this.type] = ???
-
   allRelatables.addOne(this)
   val objectID = allRelatables.length
 
@@ -482,12 +479,12 @@ trait Relatable extends Applicable {
 
     if (relatables.nonEmpty) {
 
-      
+
       val location = this match {
         case zextObject: ZextObject => zextObject.location
         case _ => nowhere
       }
-      
+
 
       // @todo make it so that actions with the player as the subject are also heard.
       ExecuteAction(RuleContext(r.adding, this, relatables, false, nowhere))
@@ -674,26 +671,23 @@ private[Zext] object _secondNounProxy extends N2Proxy
 
 
 
-/*
-extension[S <: Relatable,T <: Relatable, A,B] (queryBlock: => PendingRelation[S,T,A,B]) {
-   def ? : Condition[?, ?,?] = {
-     new Condition(
-       {
-       NotAQuery.stack.push(ArrayBuffer())
-       queryBlock
-       val queries = NotAQuery.stack.pop()
-       assert(queries.length == 1)
-       val q = queries.head
-       q.evaluate
-      },
-       QueryPrecedence.Generic
-     )
-
+extension[S <: Relatable, T <: Relatable, A, B](queryBlock: => PendingRelation[S, T, A, B]) {
+  def ? : Condition[?, ?,?] = {
+    new Condition(
+      {
+      NotAQuery.stack.push(ArrayBuffer())
+      queryBlock
+      val queries = NotAQuery.stack.pop()
+      assert(queries.length == 1)
+      val q = queries.head
+      q.evaluate
+     },
+      QueryPrecedence.Generic
+    )
   }
 }
-*/
 
-case class PendingRelation[S <: Relatable, T <: Relatable, A, B](a : A, b : Seq[B]) {
+transparent trait PendingRelation[S <: Relatable, T <: Relatable, A, B](a : A, b : Seq[B]) {
 
   // here are some kinds of questions we will like to ask:
   // noun is wet?
@@ -701,9 +695,7 @@ case class PendingRelation[S <: Relatable, T <: Relatable, A, B](a : A, b : Seq[
   // hat inside box?
   // noun inside box?
   // hat inside secondNoun?
-
 }
-
 
 class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
@@ -758,9 +750,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   }
 
 
-  def relates[A <: Source, B <: Target](_a: A, _b: Seq[B]) : A = {
+  def relates[A <: Source, B <: Target](_a: A, _b: Seq[B]) : A & PendingRelation[S, T, A, B] = {
     val scs = _b.map(narrowTarget)
-    relates(_a, CombinedComprehension(scs*))
+    makeRelation(narrowSource(_a), narrowTarget(CombinedComprehension(scs*)))
+    _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
   }
 
   def reverseRelates[A <: Source, B <: Target](_b : B, _a: Seq[A]) : B = {
@@ -768,10 +761,9 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
     reverseRelates(_b, CombinedComprehension(scs*))
   }
 
-  def relates[A <: Source, B <: Target](_a: A, _b: B): A = {
+  def relates[A <: Source, B <: Target](_a: A, _b: B): A & PendingRelation[S, T, A, B] = {
     makeRelation(narrowSource(_a), narrowTarget(_b))
-    _a
-
+    _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
   }
 
   def reverseRelates[A <: Source, B <: Target](_b: B, _a: A): B = {
@@ -831,7 +823,7 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 // this is not symmetric, it is like, father <-> son or east-going <-> west-going
 abstract class ReciprocalRelation[S <: Relatable,T <: Relatable] extends Relation[S,T] {
   def getReciprocal : Relation[T,S]
-  def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A = {
+  def reciprocates[A <: Source, B <: Target](_a: A, _b: B): A & PendingRelation[S, T, A, B] = {
     getReciprocal.relates(_b, _a)
     relates(_a, _b)
   }
@@ -855,6 +847,7 @@ object RelationsTest extends App {
     val box = Box("may conceal something hidden")
     val hat = Box("not you again") holds horse holds statue
     val key = ~"what might this unlock?" made_from (horse, feet)
+    val what = hat holds statue?
 
 
   /*
