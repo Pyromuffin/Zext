@@ -664,10 +664,10 @@ implicit def toT[T <: Relatable](n2p : N1Proxy[T]) : T = ???
 trait N1Proxy extends Proxy
 trait N2Proxy extends Proxy
 trait SProxy extends Proxy
+
 private[Zext] object _nounProxy extends N1Proxy
 private[Zext] object _subjectProxy extends SProxy
 private[Zext] object _secondNounProxy extends N2Proxy
-
 
 
 extension[S <: Relatable, T <: Relatable, A, B](queryBlock: => PendingRelation[S, T, A, B]) {
@@ -675,7 +675,10 @@ extension[S <: Relatable, T <: Relatable, A, B](queryBlock: => PendingRelation[S
     new Condition(
       {
       NotAQuery.stack.push(ArrayBuffer())
+      val prev = queryContext
+      queryContext = context
       queryBlock
+      queryContext = prev
       val queries = NotAQuery.stack.pop()
       assert(queries.length == 1)
       val q = queries.head
@@ -751,8 +754,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
 
   def relates[A <: Source, B <: Target](_a: A, _b: Seq[B]) : A & PendingRelation[S, T, A, B] = {
     val scs = _b.map(narrowTarget)
-    makeRelation(narrowSource(_a), narrowTarget(CombinedComprehension(scs*)))
-    _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
+    if(makeRelation(narrowSource(_a), narrowTarget(CombinedComprehension(scs*))))
+      _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
+    else
+      null.asInstanceOf[A & PendingRelation[S, T, A, B]]
   }
 
   def reverseRelates[A <: Source, B <: Target](_b : B, _a: Seq[A]) : B = {
@@ -761,8 +766,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   }
 
   def relates[A <: Source, B <: Target](_a: A, _b: B): A & PendingRelation[S, T, A, B] = {
-    makeRelation(narrowSource(_a), narrowTarget(_b))
-    _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
+    if(makeRelation(narrowSource(_a), narrowTarget(_b)))
+      _a.asInstanceOf[A & PendingRelation[S, T, A, B]]
+    else
+      null.asInstanceOf[A & PendingRelation[S, T, A, B]]
   }
 
   def reverseRelates[A <: Source, B <: Target](_b: B, _a: A): B = {
@@ -771,13 +778,14 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
   }
 
 
-  private def makeRelation(a: SetComprehension[S], b : SetComprehension[T])(using ctx : RelationQueryContext) : Unit = {
+  private def makeRelation(a: SetComprehension[S], b : SetComprehension[T])(using ctx : RelationQueryContext) : Boolean = {
 
     val not = a.not || b.not
 
     val secretMode = ctx == NotAQuery && NotAQuery.stack.nonEmpty
     if(secretMode){
       NotAQuery.stack.top.addOne(RelationQuery(a,b, this))
+      return false
     }
     else if(ctx != NotAQuery) {
       ctx.queries.addOne(RelationQuery(a,b, this))
@@ -790,9 +798,10 @@ class Relation[S <: Relatable : TT as _ttS, T <: Relatable : TT as _ttT]  {
           a_node.addRelated(this, b_filtered *)
         else
           a_node.removeRelated(this, b_filtered *)
-
       }
     }
+
+    true
   }
 
   private def makeReverseRelation(b : SetComprehension[T], a: SetComprehension[S])(using ctx : RelationQueryContext) : Unit = {

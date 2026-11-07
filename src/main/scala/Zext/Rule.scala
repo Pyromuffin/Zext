@@ -25,7 +25,7 @@ import scala.compiletime.{erasedValue, summonFrom}
 
 object RuleContext {
 
-    import scala.compiletime.summonInline
+    private[Zext] var queryContext : RuleContext[?,?,?] = null
 
     private[Zext] var _first: Boolean = false
 
@@ -76,10 +76,9 @@ object RuleContext {
     }
 
 
-    // this is to only be used in the query context, or else~!
-    val DefaultContext: RuleContext[SProxy, N1Proxy, N2Proxy] = RuleContext(null,_subjectProxy,Seq(_nounProxy,_secondNounProxy), false, nowhere)
-
-    given RuleContext[SProxy, N1Proxy, N2Proxy] = DefaultContext
+     //this is to only be used in the query context, or else~!
+     val DefaultContext: RuleContext[SProxy, N1Proxy, N2Proxy] = RuleContext(null,_subjectProxy,Seq(_nounProxy,_secondNounProxy), false, nowhere)
+     given RuleContext[SProxy, N1Proxy, N2Proxy] = DefaultContext
 
 
     inline def TrySummonContext() : RuleContext[?,?,?] = {
@@ -93,25 +92,34 @@ object RuleContext {
 
     inline def context[S <: Relatable,N1 <: Relatable,N2<: Relatable](using ctx : RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = ctx
 
-    inline def act(using ctx: RuleContext[?,?,?]) : MetaAction[Relatable,Relatable,Relatable,Unit,Unit] = {
-        ctx.action.asInstanceOf[MetaAction[Relatable,Relatable,Relatable,Unit,Unit]]
+     def act(using ctx: RuleContext[?,?,?]) : MetaAction[Relatable,Relatable,Relatable,Unit,Unit] = {
+
+        println("evaluating act!")
+        if(ctx == DefaultContext) {
+            // we end up here with the default context while in a query, so we need to get the actual context from somewhere.
+            queryContext.action.asInstanceOf[MetaAction[Relatable, Relatable, Relatable, Unit, Unit]]
+        } else {
+            ctx.action.asInstanceOf[MetaAction[Relatable, Relatable, Relatable, Unit, Unit]]
+        }
     }
 
     // @todo improve this, we basically dont want to ever cast, and this should be a query in the conditions list that automatically constrains the rule context
     @deprecated
     inline def noun[N](using ctx: RuleContext[?, ?, ?]): N  = {
-        inline erasedValue[N] match {
-            case _: Nothing => scala.compiletime.error("Action doesn't have a noun")
-            case _ => ctx.nouns(0).asInstanceOf[N]
-        }
+        if (ctx == DefaultContext)
+            queryContext.nouns(0).asInstanceOf[N]
+        else
+            ctx.nouns(0).asInstanceOf[N]
     }
 
 
     inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 = {
-      inline erasedValue[N1] match {
-        case _: Nothing => scala.compiletime.error("Action doesn't have a noun")
-        case _ => ctx.nouns(0).asInstanceOf[N1]
-      }
+        println("evaluating noun!")
+
+        if(ctx == DefaultContext)
+           queryContext.nouns(0).asInstanceOf[N1]
+        else
+            ctx.nouns(0).asInstanceOf[N1]
     }
 
     inline def secondNoun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2]): N2 = {
@@ -663,7 +671,7 @@ class PendingContext[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Re
     def location(c : ZContainer) : this.type = { _location = Option(c); this }
 
     def system: this.type = {
-        _subject = Some(system.asInstanceOf[S])
+        _subject = Some(Zext.system.asInstanceOf[S])
         _silent = Some(false)
         _location = Some(nowhere)
         this
