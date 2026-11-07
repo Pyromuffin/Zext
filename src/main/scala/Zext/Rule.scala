@@ -23,29 +23,6 @@ import zobjectifier.Macros.CodePosition
 import scala.compiletime.{erasedValue, summonFrom}
 
 
-object RelatableProxy {
-    implicit def toRelatable[T <: Relatable](r : RelatableProxy[T]): T = r.resolve
-}
-
-@deprecated
-abstract class RelatableProxy[+T <: Relatable] extends SetComprehension[Nothing]{
-
-    override def getSet() = Seq(resolve).asInstanceOf[Seq[Nothing]]
-
-    override def toString = resolve.toString
-    def resolve : T
-
-    //@todo: superstition
-    override def equals(obj: Any) = {
-         obj match {
-             case relatableProxy: RelatableProxy[?] => this.objectID == relatableProxy.objectID
-             case relatable: Relatable => this.objectID == relatable.objectID
-             case null => false
-        }
-    }
-}
-
-
 object RuleContext {
 
     import scala.compiletime.summonInline
@@ -463,32 +440,41 @@ object Condition {
     inline implicit def fromRegion(inline r:  RoomRegion): AnyCondition = new Condition(r == noun, QueryPrecedence.Location)
     inline implicit def fromClassHolder(inline ch:  ZextObjectClassHolder[?]): AnyCondition = ch.createCondition(QueryPrecedence.Class)
     inline implicit def fromConditionHelper(inline helper:  ConditionHelper): AnyCondition = helper.createCondition(QueryPrecedence.Generic)
-    inline def fromQuery(inline query: RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate, query.relation.precedence) // act is loud should become a relation query
+    inline implicit def fromAnything(inline nething: anything.type) : AnyCondition = { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
+    //inline def fromQuery(inline query: RelationQuery[?,?]) : AnyCondition = new Condition(query.evaluate, query.relation.precedence) // act is loud should become a relation query
 
-
-    type ConditionTypes = ZextObject | RelatableProxy[ZextObject] | ConditionHelper | Property
-
-    inline implicit def fromTuple[X,Y,Z](inline t: (ConditionTypes, ConditionTypes)): AnyCondition = {
-
-        val firstPredicate : AnyCondition = t._1 match {
-            case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
-            case classHolder : ZextObjectClassHolder[?] => classHolder.createCondition(QueryPrecedence.Class)
-            case relatableProxy: RelatableProxy[ZextObject] => fromObject(relatableProxy.resolve)
-            case property: Property => fromProperty(property)
-            case relatable: ZextObject => fromObject(relatable)
-            case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
+     def CombineConditionTuple(a : AnyCondition, b : AnyCondition): AnyCondition = {
+        // massage second conditions
+        val secondPrec = b.queryType match {
+            case QueryPrecedence.Class => QueryPrecedence.SecondClass
+            case QueryPrecedence.Object => QueryPrecedence.SecondObject
+            case QueryPrecedence.Property => QueryPrecedence.SecondProperty
+            case _ => b.queryType
         }
+        b.queryType = secondPrec
 
-        val secondPredicate: AnyCondition = t._2 match {
-            case anythingFirst : ZextObject if anythingFirst == anything => { val c = Condition(true, QueryPrecedence.Generic); c.specificity = 0; c}
-            case classHolder : ZextObjectClassHolder[?] => classHolder.createCondition(QueryPrecedence.SecondClass)
-            case relatableProxy: RelatableProxy[ZextObject] => fromSecondObject(relatableProxy.resolve)
-            case property: Property => fromSecondProperty(property)
-            case relatable: ZextObject => fromSecondObject(relatable)
-            case helper : ConditionHelper => helper.createCondition(QueryPrecedence.Generic)
-        }
+        a && b.asInstanceOf[a.type]
+    }
 
-        firstPredicate && secondPredicate.asInstanceOf[firstPredicate.type]
+
+    inline implicit def fromTupleZC[X,Y,Z](inline t: (ZextObject, ConditionHelper)): AnyCondition = {
+        CombineConditionTuple(t._1, t._2)
+    }
+
+    inline implicit def fromTupleZZ[X,Y,Z](inline t: (ZextObject, ZextObject)): AnyCondition = {
+        CombineConditionTuple(t._1, t._2)
+    }
+
+    inline implicit def fromTuplePP[X, Y, Z](inline t: (Property, Property)): AnyCondition = {
+        CombineConditionTuple(t._1, t._2)
+    }
+
+    inline implicit def fromTupleZP[X, Y, Z](inline t: (ZextObject, Property)): AnyCondition = {
+        CombineConditionTuple(t._1, t._2)
+    }
+
+    inline implicit def fromTuplePZ[X, Y, Z](inline t: (Property, ZextObject)): AnyCondition = {
+        CombineConditionTuple(t._1, t._2)
     }
 
 

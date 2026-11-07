@@ -130,8 +130,6 @@ object Infliction {
   trait SConstraint[T <: Relatable]
   trait ConstraintCondition[SC <: Relatable, N1C <: Relatable, N2C <: Relatable]
 
-  object ThingsInContainers extends ConstraintCondition[ZextObject, Thing, ZContainer]
-
   trait Infliction(defaultControl : RuleControl, ruleType: RuleType) {
 
 

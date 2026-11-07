@@ -16,7 +16,6 @@ import Zext.ControlCodes.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
-import RelatableProxy.*
 import Zext.Infliction.*
 import zobjectifier.Macros.CodePosition
 
