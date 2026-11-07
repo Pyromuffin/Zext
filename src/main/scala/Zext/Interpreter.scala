@@ -741,7 +741,7 @@ object Parser {
 
     time("startup"){
       EverythingParser.parse("start")
-      val ctx = RuleContext(starting, player, null, false, player.location)
+      val ctx = RuleContext(starting, player, Seq.empty, false, player.location)
       ExecuteAction(ctx)
     }
 
@@ -750,7 +750,7 @@ object Parser {
       print("> ")
       var input : String = readLine()
 
-      val ctx = RuleContext(preprocessingInput, system, null, false, player.location)
+      val ctx = RuleContext(preprocessingInput, system, Seq.empty, false, player.location)
       input = ExecuteReturnAction(preprocessingInput, ctx)(input).ret
 
       time("interpreter loop") {

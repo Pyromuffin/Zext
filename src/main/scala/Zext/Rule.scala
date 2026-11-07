@@ -93,8 +93,6 @@ object RuleContext {
     inline def context[S <: Relatable,N1 <: Relatable,N2<: Relatable](using ctx : RuleContext[S,N1,N2]) : RuleContext[S,N1,N2] = ctx
 
      def act(using ctx: RuleContext[?,?,?]) : MetaAction[Relatable,Relatable,Relatable,Unit,Unit] = {
-
-        println("evaluating act!")
         if(ctx == DefaultContext) {
             // we end up here with the default context while in a query, so we need to get the actual context from somewhere.
             queryContext.action.asInstanceOf[MetaAction[Relatable, Relatable, Relatable, Unit, Unit]]
@@ -114,8 +112,6 @@ object RuleContext {
 
 
     inline def noun[S <: Relatable, N1 <: Relatable, N2 <: Relatable](using ctx: RuleContext[S, N1, N2] ): N1 = {
-        println("evaluating noun!")
-
         if(ctx == DefaultContext)
            queryContext.nouns(0).asInstanceOf[N1]
         else
@@ -680,7 +676,14 @@ class PendingContext[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Re
     inline def result : Boolean = {
         val ctx = summonFrom {
             case given RuleContext[S,N1,N2] => context
-            case _                          => RuleContext[S,N1,N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+            case _ =>
+                RuleContext[S,N1,N2](
+                    action,
+                    _subject.getOrElse(null.asInstanceOf[S]),
+                    ConsolidateTargets(_noun.orNull, _secondNoun.orNull),
+                    _silent.getOrElse(false),
+                    _location.getOrElse(nowhere)
+                )
         }
 
         val pendingSubject = _subject.getOrElse(ctx.subject)
@@ -694,7 +697,14 @@ class PendingContext[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Re
     inline def returned(arg : Takes): Returns = {
         val ctx = summonFrom {
             case given RuleContext[S, N1, N2] => context
-            case _ => RuleContext[S, N1, N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+            case _ =>
+                RuleContext[S, N1, N2](
+                    action,
+                    _subject.getOrElse(null.asInstanceOf[S]),
+                    ConsolidateTargets(_noun.orNull, _secondNoun.orNull),
+                    _silent.getOrElse(false),
+                    _location.getOrElse(nowhere)
+                )
         }
 
         val pendingSubject = _subject.getOrElse(ctx.subject)
@@ -708,7 +718,14 @@ class PendingContext[S <: Relatable, N1 <: Relatable, N2 <: Relatable, Takes, Re
     inline def execute(arg: Takes = null.asInstanceOf[Takes]): ExecutionResult[Returns] = {
         val ctx = summonFrom {
             case given RuleContext[S, N1, N2] => context
-            case _ => RuleContext[S, N1, N2](action, _subject.get, Seq(_noun.get, _secondNoun.get), _silent.get, _location.get)
+            case _ =>
+                RuleContext[S, N1, N2](
+                    action,
+                    _subject.getOrElse(null.asInstanceOf[S]),
+                    ConsolidateTargets(_noun.orNull, _secondNoun.orNull),
+                    _silent.getOrElse(false),
+                    _location.getOrElse(nowhere)
+                )
         }
 
         val pendingSubject = _subject.getOrElse(ctx.subject)

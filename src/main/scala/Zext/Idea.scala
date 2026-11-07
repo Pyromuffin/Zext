@@ -102,9 +102,9 @@ object Idea {
     }
 
 
-    inflict.returns(printing_name, player can_discover noun?) { name =>
-      name.bold
-    }
+    //inflict.returns(printing_name, player can_discover noun?) { name =>
+     // name.bold
+   // }
 
 
     report(ideating) {
